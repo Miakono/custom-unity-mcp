@@ -1,0 +1,394 @@
+{
+  "default_enabled_groups": [
+    "core"
+  ],
+  "generated_from": "live_tool_registry",
+  "group_count": 6,
+  "subagent_count": 7,
+  "subagents": [
+    {
+      "description": "Routes work to the right Unity specialist, keeps tool groups lean, and coordinates verification after mutations.",
+      "handoff_map": {
+        "animation": {
+          "activate": {
+            "params": {
+              "action": "activate",
+              "group": "animation"
+            },
+            "tool": "manage_tools"
+          },
+          "specialist_id": "unity-animation-specialist",
+          "tool_count": 1
+        },
+        "core": {
+          "activate": {
+            "params": {
+              "action": "activate",
+              "group": "core"
+            },
+            "tool": "manage_tools"
+          },
+          "specialist_id": "unity-core-specialist",
+          "tool_count": 21
+        },
+        "scripting_ext": {
+          "activate": {
+            "params": {
+              "action": "activate",
+              "group": "scripting_ext"
+            },
+            "tool": "manage_tools"
+          },
+          "specialist_id": "unity-scripting-ext-specialist",
+          "tool_count": 1
+        },
+        "testing": {
+          "activate": {
+            "params": {
+              "action": "activate",
+              "group": "testing"
+            },
+            "tool": "manage_tools"
+          },
+          "specialist_id": "unity-testing-specialist",
+          "tool_count": 5
+        },
+        "ui": {
+          "activate": {
+            "params": {
+              "action": "activate",
+              "group": "ui"
+            },
+            "tool": "manage_tools"
+          },
+          "specialist_id": "unity-ui-specialist",
+          "tool_count": 1
+        },
+        "vfx": {
+          "activate": {
+            "params": {
+              "action": "activate",
+              "group": "vfx"
+            },
+            "tool": "manage_tools"
+          },
+          "specialist_id": "unity-vfx-specialist",
+          "tool_count": 3
+        }
+      },
+      "id": "unity-orchestrator",
+      "instructions": [
+        "Start with core unless the task is clearly UI, VFX, animation, data, or testing focused.",
+        "Use manage_tools to activate only the group needed for the current phase of work.",
+        "Set the active Unity instance before specialist handoff when multiple editors are connected.",
+        "After meaningful mutations, hand off to the testing specialist for verification."
+      ],
+      "kind": "orchestrator",
+      "manages_groups": [
+        "animation",
+        "core",
+        "scripting_ext",
+        "testing",
+        "ui",
+        "vfx"
+      ],
+      "name": "Unity Orchestrator",
+      "shared_meta_tools": [
+        "debug_request_context",
+        "execute_custom_tool",
+        "manage_catalog",
+        "manage_error_catalog",
+        "manage_script_capabilities",
+        "manage_subagents",
+        "manage_tools",
+        "set_active_instance"
+      ]
+    },
+    {
+      "activation": {
+        "params": {
+          "action": "activate",
+          "group": "animation"
+        },
+        "tool": "manage_tools"
+      },
+      "default_enabled": false,
+      "description": "Focuses on animator, clips, and animation editing tasks.",
+      "group": "animation",
+      "handoff_targets": [
+        "unity-testing-specialist",
+        "unity-core-builder"
+      ],
+      "id": "unity-animation-specialist",
+      "kind": "specialist",
+      "name": "Unity Animation Specialist",
+      "shared_meta_tools": [
+        "debug_request_context",
+        "execute_custom_tool",
+        "manage_catalog",
+        "manage_error_catalog",
+        "manage_script_capabilities",
+        "manage_subagents",
+        "manage_tools",
+        "set_active_instance"
+      ],
+      "tool_group_description": "Animator control & AnimationClip creation",
+      "tools": [
+        "manage_animation"
+      ],
+      "when_to_use": [
+        "Animator or clip authoring.",
+        "Animation controller inspection or repair.",
+        "Playback-oriented content adjustments."
+      ],
+      "workflow": [
+        "Activate the animation group for the current session.",
+        "Prefer small, verifiable changes to animation assets.",
+        "Route follow-up validation to testing when clips or controllers were mutated."
+      ]
+    },
+    {
+      "activation": {
+        "params": {
+          "action": "activate",
+          "group": "core"
+        },
+        "tool": "manage_tools"
+      },
+      "default_enabled": true,
+      "description": "Owns everyday Unity editing work: scenes, gameobjects, prefabs, assets, scripts, and editor state.",
+      "group": "core",
+      "handoff_targets": [
+        "unity-testing-specialist",
+        "unity-ui-specialist"
+      ],
+      "id": "unity-core-specialist",
+      "kind": "specialist",
+      "name": "Unity Core Builder",
+      "shared_meta_tools": [
+        "debug_request_context",
+        "execute_custom_tool",
+        "manage_catalog",
+        "manage_error_catalog",
+        "manage_script_capabilities",
+        "manage_subagents",
+        "manage_tools",
+        "set_active_instance"
+      ],
+      "tool_group_description": "Essential scene, script, asset & editor tools (always on by default)",
+      "tools": [
+        "batch_execute",
+        "execute_menu_item",
+        "find_gameobjects",
+        "find_in_file",
+        "manage_asset",
+        "manage_components",
+        "manage_editor",
+        "manage_gameobject",
+        "manage_material",
+        "manage_prefabs",
+        "manage_scene",
+        "refresh_unity",
+        "apply_text_edits",
+        "create_script",
+        "delete_script",
+        "validate_script",
+        "manage_script",
+        "get_sha",
+        "read_console",
+        "validate_compile_health",
+        "script_apply_edits"
+      ],
+      "when_to_use": [
+        "Scene composition, hierarchy edits, and asset inspection.",
+        "Script reads or targeted script mutations.",
+        "Prefab creation, updates, and validation."
+      ],
+      "workflow": [
+        "Confirm the active Unity instance before mutating.",
+        "Inspect current state first, then batch related changes when possible.",
+        "Hand off to testing after meaningful mutations or compile-sensitive edits."
+      ]
+    },
+    {
+      "activation": {
+        "params": {
+          "action": "activate",
+          "group": "scripting_ext"
+        },
+        "tool": "manage_tools"
+      },
+      "default_enabled": false,
+      "description": "Handles ScriptableObject and data-oriented authoring flows.",
+      "group": "scripting_ext",
+      "handoff_targets": [
+        "unity-testing-specialist",
+        "unity-core-builder"
+      ],
+      "id": "unity-scripting-ext-specialist",
+      "kind": "specialist",
+      "name": "Unity Data Specialist",
+      "shared_meta_tools": [
+        "debug_request_context",
+        "execute_custom_tool",
+        "manage_catalog",
+        "manage_error_catalog",
+        "manage_script_capabilities",
+        "manage_subagents",
+        "manage_tools",
+        "set_active_instance"
+      ],
+      "tool_group_description": "ScriptableObject management",
+      "tools": [
+        "manage_scriptable_object"
+      ],
+      "when_to_use": [
+        "ScriptableObject reads and mutations.",
+        "Data definition setup and maintenance.",
+        "Project data validation tasks."
+      ],
+      "workflow": [
+        "Activate scripting_ext before using ScriptableObject tools.",
+        "Inspect target data before write operations.",
+        "Escalate to testing if the data impacts runtime or build behavior."
+      ]
+    },
+    {
+      "activation": {
+        "params": {
+          "action": "activate",
+          "group": "testing"
+        },
+        "tool": "manage_tools"
+      },
+      "default_enabled": false,
+      "description": "Runs validation loops, test jobs, and post-change verification.",
+      "group": "testing",
+      "handoff_targets": [
+        "unity-core-builder",
+        "unity-ui-specialist",
+        "unity-vfx-specialist"
+      ],
+      "id": "unity-testing-specialist",
+      "kind": "specialist",
+      "name": "Unity Testing Specialist",
+      "shared_meta_tools": [
+        "debug_request_context",
+        "execute_custom_tool",
+        "manage_catalog",
+        "manage_error_catalog",
+        "manage_script_capabilities",
+        "manage_subagents",
+        "manage_tools",
+        "set_active_instance"
+      ],
+      "tool_group_description": "Test runner & async test jobs",
+      "tools": [
+        "audit_prefab_integrity",
+        "audit_scene_integrity",
+        "preflight_audit",
+        "run_tests",
+        "get_test_job"
+      ],
+      "when_to_use": [
+        "Run tests after code or asset mutations.",
+        "Collect diagnostics after failures.",
+        "Verify compile, editor, or batch outcomes."
+      ],
+      "workflow": [
+        "Activate the testing group only when validation is needed.",
+        "Use focused checks first, then broader suites if failures persist.",
+        "Return findings to the originating specialist with exact failing commands or artifacts."
+      ]
+    },
+    {
+      "activation": {
+        "params": {
+          "action": "activate",
+          "group": "ui"
+        },
+        "tool": "manage_tools"
+      },
+      "default_enabled": false,
+      "description": "Owns UI Toolkit and interface authoring tasks.",
+      "group": "ui",
+      "handoff_targets": [
+        "unity-testing-specialist",
+        "unity-core-builder"
+      ],
+      "id": "unity-ui-specialist",
+      "kind": "specialist",
+      "name": "Unity UI Specialist",
+      "shared_meta_tools": [
+        "debug_request_context",
+        "execute_custom_tool",
+        "manage_catalog",
+        "manage_error_catalog",
+        "manage_script_capabilities",
+        "manage_subagents",
+        "manage_tools",
+        "set_active_instance"
+      ],
+      "tool_group_description": "UI Toolkit (UXML, USS, UIDocument)",
+      "tools": [
+        "manage_ui"
+      ],
+      "when_to_use": [
+        "UXML, USS, and UIDocument changes.",
+        "UI hierarchy or styling work.",
+        "Interface assembly and review loops."
+      ],
+      "workflow": [
+        "Activate the ui group before interacting with UI tools.",
+        "Keep UI changes scoped and inspect generated output after edits.",
+        "Hand off to testing for visual verification or regression checks."
+      ]
+    },
+    {
+      "activation": {
+        "params": {
+          "action": "activate",
+          "group": "vfx"
+        },
+        "tool": "manage_tools"
+      },
+      "default_enabled": false,
+      "description": "Handles shaders, materials, textures, and VFX authoring flows.",
+      "group": "vfx",
+      "handoff_targets": [
+        "unity-core-builder",
+        "unity-testing-specialist"
+      ],
+      "id": "unity-vfx-specialist",
+      "kind": "specialist",
+      "name": "Unity VFX Specialist",
+      "shared_meta_tools": [
+        "debug_request_context",
+        "execute_custom_tool",
+        "manage_catalog",
+        "manage_error_catalog",
+        "manage_script_capabilities",
+        "manage_subagents",
+        "manage_tools",
+        "set_active_instance"
+      ],
+      "tool_group_description": "Visual effects \u2013 VFX Graph, shaders, procedural textures",
+      "tools": [
+        "manage_shader",
+        "manage_texture",
+        "manage_vfx"
+      ],
+      "when_to_use": [
+        "Shader and material iteration.",
+        "Texture inspection or mutation workflows.",
+        "VFX Graph or look-dev tasks."
+      ],
+      "workflow": [
+        "Activate the vfx group before work starts.",
+        "Capture or inspect current asset state before broad mutations.",
+        "Escalate back to core or testing when changes affect shared assets or scene behavior."
+      ]
+    }
+  ],
+  "version": 1
+}

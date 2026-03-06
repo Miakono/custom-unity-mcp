@@ -1,0 +1,200 @@
+{
+  "domain_count": 2,
+  "domains": [
+    {
+      "description": "Stable machine-readable codes emitted by script edit and validation flows.",
+      "entries": [
+        {
+          "code": "missing_field",
+          "meaning": "A required edit field was omitted or could not be normalized.",
+          "surface": [
+            "apply_text_edits",
+            "script_apply_edits"
+          ],
+          "typical_fix": "Send the required path, range, or replacement fields."
+        },
+        {
+          "code": "zero_based_explicit_fields",
+          "meaning": "Explicit line or column coordinates were sent as 0-based values.",
+          "surface": [
+            "apply_text_edits"
+          ],
+          "typical_fix": "Resend explicit line and column coordinates as 1-based indices."
+        },
+        {
+          "code": "overlap",
+          "meaning": "Two requested edit spans overlap.",
+          "surface": [
+            "apply_text_edits"
+          ],
+          "typical_fix": "Split or reorder edits so no two spans intersect."
+        },
+        {
+          "code": "preview_failed",
+          "meaning": "The server could not build the requested local preview payload.",
+          "surface": [
+            "apply_text_edits"
+          ],
+          "typical_fix": "Retry with a smaller edit batch or remove preview mode."
+        },
+        {
+          "code": "path_outside_assets",
+          "meaning": "A path or URI resolved outside the Unity Assets folder.",
+          "surface": [
+            "create_script",
+            "delete_script",
+            "validate_script",
+            "apply_text_edits"
+          ],
+          "typical_fix": "Use an asset path rooted under Assets/."
+        },
+        {
+          "code": "bad_path",
+          "meaning": "The provided path was malformed, absolute, or traversal-like.",
+          "surface": [
+            "create_script"
+          ],
+          "typical_fix": "Send a normalized Unity asset path without traversal segments."
+        },
+        {
+          "code": "bad_extension",
+          "meaning": "The provided file extension is not valid for that script operation.",
+          "surface": [
+            "create_script"
+          ],
+          "typical_fix": "Use a .cs target path for script creation."
+        },
+        {
+          "code": "bad_level",
+          "meaning": "The requested script validation level is not recognized.",
+          "surface": [
+            "validate_script"
+          ],
+          "typical_fix": "Use one of the documented level values."
+        },
+        {
+          "code": "anchor_not_found",
+          "meaning": "An anchor-based edit target could not be resolved.",
+          "surface": [
+            "script_apply_edits"
+          ],
+          "typical_fix": "Re-read the file and provide a more specific anchor."
+        },
+        {
+          "code": "unsupported_op",
+          "meaning": "The requested structured edit operation is not supported.",
+          "surface": [
+            "script_apply_edits"
+          ],
+          "typical_fix": "Rewrite the request using a supported edit op."
+        },
+        {
+          "code": "no_spans",
+          "meaning": "No applicable text spans were computed for the requested edit.",
+          "surface": [
+            "script_apply_edits"
+          ],
+          "typical_fix": "Verify that the target method, class, or anchor still exists."
+        },
+        {
+          "code": "conversion_failed",
+          "meaning": "The server failed converting a higher-level edit into raw spans.",
+          "surface": [
+            "script_apply_edits"
+          ],
+          "typical_fix": "Simplify the edit request and retry after re-reading the file."
+        }
+      ],
+      "entry_count": 12,
+      "id": "script_editing",
+      "title": "Script Editing"
+    },
+    {
+      "description": "Stable Unity-side error codes emitted by ScriptableObject management.",
+      "entries": [
+        {
+          "code": "compiling_or_reloading",
+          "meaning": "Unity was compiling or reloading and rejected the write operation.",
+          "surface": [
+            "manage_scriptable_object"
+          ],
+          "typical_fix": "Wait until the editor is idle, then retry."
+        },
+        {
+          "code": "invalid_params",
+          "meaning": "A required ScriptableObject parameter was missing or malformed.",
+          "surface": [
+            "manage_scriptable_object"
+          ],
+          "typical_fix": "Validate the action payload and resend the required fields."
+        },
+        {
+          "code": "type_not_found",
+          "meaning": "The requested ScriptableObject CLR type could not be resolved.",
+          "surface": [
+            "manage_scriptable_object"
+          ],
+          "typical_fix": "Use a valid namespace-qualified ScriptableObject type name."
+        },
+        {
+          "code": "invalid_folder_path",
+          "meaning": "The target folder path is invalid or outside the supported project area.",
+          "surface": [
+            "manage_scriptable_object"
+          ],
+          "typical_fix": "Use a valid folder rooted under Assets/."
+        },
+        {
+          "code": "target_not_found",
+          "meaning": "The ScriptableObject target could not be resolved from guid or path.",
+          "surface": [
+            "manage_scriptable_object"
+          ],
+          "typical_fix": "Re-resolve the asset guid or path and retry."
+        },
+        {
+          "code": "asset_create_failed",
+          "meaning": "Unity failed while creating or saving the requested asset.",
+          "surface": [
+            "manage_scriptable_object"
+          ],
+          "typical_fix": "Inspect the payload and target path, then retry after Unity is idle."
+        }
+      ],
+      "entry_count": 6,
+      "id": "scriptable_objects",
+      "title": "Scriptable Objects"
+    }
+  ],
+  "generated_from": "fork_error_contract_registry",
+  "operational_patterns": [
+    {
+      "meaning": "No active Unity instance is selected for the current session.",
+      "pattern": "success=false with guidance to call set_active_instance",
+      "surface": "multi-instance server flows",
+      "typical_fix": "Call set_active_instance with a Name@hash value from mcpforunity://instances."
+    },
+    {
+      "meaning": "Unity is compiling, importing, running tests, or otherwise not ready for mutation.",
+      "pattern": "preflight-gated tool returns success=false before mutation",
+      "surface": "mutating tools",
+      "typical_fix": "Wait for the editor to become ready, then retry the mutation tool."
+    },
+    {
+      "meaning": "The connected Unity plugin is too old to report tool-state visibility.",
+      "pattern": "manage_tools(action='sync') returns unsupported wording",
+      "surface": "tool visibility sync",
+      "typical_fix": "Update the Unity package or toggle groups manually with activate/deactivate."
+    }
+  ],
+  "stable_code_count": 18,
+  "surfaces": [
+    "apply_text_edits",
+    "create_script",
+    "delete_script",
+    "manage_scriptable_object",
+    "script_apply_edits",
+    "validate_script"
+  ],
+  "version": 1
+}

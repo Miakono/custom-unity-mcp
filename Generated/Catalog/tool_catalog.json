@@ -1,0 +1,3763 @@
+{
+  "default_enabled_groups": [
+    "core"
+  ],
+  "generated_from": "live_tool_registry",
+  "group_count": 6,
+  "grouped_counts": {
+    "animation": 1,
+    "core": 21,
+    "scripting_ext": 1,
+    "testing": 5,
+    "ui": 1,
+    "vfx": 3
+  },
+  "tool_count": 40,
+  "tools": [
+    {
+      "action_capabilities": {},
+      "capabilities": {
+        "action_model": "always_mutating",
+        "high_risk": true,
+        "known_read_only_actions": [],
+        "local_only": false,
+        "mutating": true,
+        "read_only": false,
+        "refresh_if_dirty": true,
+        "requires_explicit_opt_in": false,
+        "requires_no_tests": false,
+        "requires_unity": true,
+        "runtime_only": false,
+        "server_only": false,
+        "supports_dry_run": false,
+        "supports_verification": false,
+        "wait_for_no_compile": true
+      },
+      "default_enabled": true,
+      "description": "Apply small text edits to a C# script identified by URI.\n    IMPORTANT: This tool replaces EXACT character positions. Always verify content at target lines/columns BEFORE editing!\n    RECOMMENDED WORKFLOW:\n        1. First call resources/read with start_line/line_count to verify exact content\n        2. Count columns carefully (or use find_in_file to locate patterns)\n        3. Apply your edit with precise coordinates\n        4. Consider script_apply_edits with anchors for safer pattern-based replacements\n    Notes:\n        - For method/class operations, use script_apply_edits (safer, structured edits)\n        - For pattern-based replacements, consider anchor operations in script_apply_edits\n        - Lines, columns are 1-indexed\n        - Tabs count as 1 column",
+      "group": "core",
+      "group_description": "Essential scene, script, asset & editor tools (always on by default)",
+      "name": "apply_text_edits",
+      "parameters": [
+        {
+          "name": "uri",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "edits",
+          "required": true,
+          "type": "array"
+        },
+        {
+          "name": "precondition_sha256",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "strict",
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "name": "options",
+          "required": false,
+          "type": "object"
+        }
+      ],
+      "supported_actions": [],
+      "tags": [
+        "group:core"
+      ],
+      "unity_target": "manage_script"
+    },
+    {
+      "action_capabilities": {},
+      "capabilities": {
+        "action_model": "always_read_only",
+        "high_risk": false,
+        "known_read_only_actions": [],
+        "local_only": false,
+        "mutating": false,
+        "read_only": true,
+        "refresh_if_dirty": true,
+        "requires_explicit_opt_in": false,
+        "requires_no_tests": false,
+        "requires_unity": true,
+        "runtime_only": false,
+        "server_only": false,
+        "supports_dry_run": false,
+        "supports_verification": false,
+        "wait_for_no_compile": true
+      },
+      "default_enabled": false,
+      "description": "Audit prefab assets under a folder for missing scripts, variants, and load failures.",
+      "group": "testing",
+      "group_description": "Test runner & async test jobs",
+      "name": "audit_prefab_integrity",
+      "parameters": [
+        {
+          "name": "root_folder",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "max_prefabs",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "max_issues",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "include_variants",
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "supported_actions": [],
+      "tags": [
+        "group:testing"
+      ],
+      "unity_target": "audit_prefab_integrity"
+    },
+    {
+      "action_capabilities": {},
+      "capabilities": {
+        "action_model": "always_read_only",
+        "high_risk": false,
+        "known_read_only_actions": [],
+        "local_only": false,
+        "mutating": false,
+        "read_only": true,
+        "refresh_if_dirty": true,
+        "requires_explicit_opt_in": false,
+        "requires_no_tests": false,
+        "requires_unity": true,
+        "runtime_only": false,
+        "server_only": false,
+        "supports_dry_run": false,
+        "supports_verification": false,
+        "wait_for_no_compile": true
+      },
+      "default_enabled": false,
+      "description": "Audit loaded scenes for missing scripts, dirty state, inactive object counts, and issue samples.",
+      "group": "testing",
+      "group_description": "Test runner & async test jobs",
+      "name": "audit_scene_integrity",
+      "parameters": [
+        {
+          "enum": [
+            "active",
+            "loaded"
+          ],
+          "name": "scope",
+          "required": false,
+          "type": "enum"
+        },
+        {
+          "name": "include_inactive",
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "name": "max_issues",
+          "required": false,
+          "type": "integer"
+        }
+      ],
+      "supported_actions": [],
+      "tags": [
+        "group:testing"
+      ],
+      "unity_target": "audit_scene_integrity"
+    },
+    {
+      "action_capabilities": {},
+      "capabilities": {
+        "action_model": "mixed",
+        "high_risk": false,
+        "known_read_only_actions": [],
+        "local_only": false,
+        "mutating": false,
+        "read_only": true,
+        "refresh_if_dirty": true,
+        "requires_explicit_opt_in": false,
+        "requires_no_tests": false,
+        "requires_unity": true,
+        "runtime_only": false,
+        "server_only": false,
+        "supports_dry_run": false,
+        "supports_verification": false,
+        "wait_for_no_compile": true
+      },
+      "default_enabled": true,
+      "description": "Executes multiple MCP commands in a single batch for dramatically better performance. STRONGLY RECOMMENDED when creating/modifying multiple objects, adding components to multiple targets, or performing any repetitive operations. Reduces latency and token costs by 10-100x compared to sequential tool calls. The max commands per batch is configurable in the Unity MCP Tools window (default 25, hard max 100). Example: creating 5 cubes \u2192 use 1 batch_execute with 5 create commands instead of 5 separate calls.",
+      "group": "core",
+      "group_description": "Essential scene, script, asset & editor tools (always on by default)",
+      "name": "batch_execute",
+      "parameters": [
+        {
+          "name": "commands",
+          "required": true,
+          "type": "array"
+        },
+        {
+          "name": "parallel",
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "name": "fail_fast",
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "name": "max_parallelism",
+          "required": false,
+          "type": "integer"
+        }
+      ],
+      "supported_actions": [],
+      "tags": [
+        "group:core"
+      ],
+      "unity_target": "batch_execute"
+    },
+    {
+      "action_capabilities": {},
+      "capabilities": {
+        "action_model": "always_mutating",
+        "high_risk": true,
+        "known_read_only_actions": [],
+        "local_only": false,
+        "mutating": true,
+        "read_only": false,
+        "refresh_if_dirty": true,
+        "requires_explicit_opt_in": false,
+        "requires_no_tests": false,
+        "requires_unity": true,
+        "runtime_only": false,
+        "server_only": false,
+        "supports_dry_run": false,
+        "supports_verification": true,
+        "wait_for_no_compile": true
+      },
+      "default_enabled": true,
+      "description": "Create a new C# script at the given project path.",
+      "group": "core",
+      "group_description": "Essential scene, script, asset & editor tools (always on by default)",
+      "name": "create_script",
+      "parameters": [
+        {
+          "name": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "contents",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "script_type",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "namespace",
+          "required": false,
+          "type": "string"
+        }
+      ],
+      "supported_actions": [],
+      "tags": [
+        "group:core"
+      ],
+      "unity_target": "manage_script"
+    },
+    {
+      "action_capabilities": {},
+      "capabilities": {
+        "action_model": "always_read_only",
+        "high_risk": false,
+        "known_read_only_actions": [],
+        "local_only": false,
+        "mutating": false,
+        "read_only": true,
+        "refresh_if_dirty": true,
+        "requires_explicit_opt_in": false,
+        "requires_no_tests": false,
+        "requires_unity": false,
+        "runtime_only": false,
+        "server_only": true,
+        "supports_dry_run": false,
+        "supports_verification": false,
+        "wait_for_no_compile": true
+      },
+      "default_enabled": true,
+      "description": "Return the current FastMCP request context details (client_id, session_id, and meta dump).",
+      "group": null,
+      "group_description": null,
+      "name": "debug_request_context",
+      "parameters": [],
+      "supported_actions": [],
+      "tags": [],
+      "unity_target": null
+    },
+    {
+      "action_capabilities": {},
+      "capabilities": {
+        "action_model": "always_mutating",
+        "high_risk": true,
+        "known_read_only_actions": [],
+        "local_only": false,
+        "mutating": true,
+        "read_only": false,
+        "refresh_if_dirty": true,
+        "requires_explicit_opt_in": false,
+        "requires_no_tests": false,
+        "requires_unity": true,
+        "runtime_only": false,
+        "server_only": false,
+        "supports_dry_run": false,
+        "supports_verification": true,
+        "wait_for_no_compile": true
+      },
+      "default_enabled": true,
+      "description": "Delete a C# script by URI or Assets-relative path.",
+      "group": "core",
+      "group_description": "Essential scene, script, asset & editor tools (always on by default)",
+      "name": "delete_script",
+      "parameters": [
+        {
+          "name": "uri",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "supported_actions": [],
+      "tags": [
+        "group:core"
+      ],
+      "unity_target": "manage_script"
+    },
+    {
+      "action_capabilities": {},
+      "capabilities": {
+        "action_model": "always_mutating",
+        "high_risk": true,
+        "known_read_only_actions": [],
+        "local_only": false,
+        "mutating": true,
+        "read_only": false,
+        "refresh_if_dirty": true,
+        "requires_explicit_opt_in": false,
+        "requires_no_tests": false,
+        "requires_unity": false,
+        "runtime_only": false,
+        "server_only": true,
+        "supports_dry_run": false,
+        "supports_verification": false,
+        "wait_for_no_compile": true
+      },
+      "default_enabled": true,
+      "description": "Execute a project-scoped custom tool registered by Unity.",
+      "group": null,
+      "group_description": null,
+      "name": "execute_custom_tool",
+      "parameters": [
+        {
+          "name": "tool_name",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "parameters",
+          "required": false,
+          "type": "dict"
+        }
+      ],
+      "supported_actions": [],
+      "tags": [],
+      "unity_target": null
+    },
+    {
+      "action_capabilities": {},
+      "capabilities": {
+        "action_model": "always_mutating",
+        "high_risk": true,
+        "known_read_only_actions": [],
+        "local_only": false,
+        "mutating": true,
+        "read_only": false,
+        "refresh_if_dirty": true,
+        "requires_explicit_opt_in": false,
+        "requires_no_tests": false,
+        "requires_unity": true,
+        "runtime_only": false,
+        "server_only": false,
+        "supports_dry_run": false,
+        "supports_verification": false,
+        "wait_for_no_compile": true
+      },
+      "default_enabled": true,
+      "description": "Execute a Unity menu item by path.",
+      "group": "core",
+      "group_description": "Essential scene, script, asset & editor tools (always on by default)",
+      "name": "execute_menu_item",
+      "parameters": [
+        {
+          "name": "menu_path",
+          "required": false,
+          "type": "string"
+        }
+      ],
+      "supported_actions": [],
+      "tags": [
+        "group:core"
+      ],
+      "unity_target": "execute_menu_item"
+    },
+    {
+      "action_capabilities": {},
+      "capabilities": {
+        "action_model": "always_read_only",
+        "high_risk": false,
+        "known_read_only_actions": [],
+        "local_only": false,
+        "mutating": false,
+        "read_only": true,
+        "refresh_if_dirty": true,
+        "requires_explicit_opt_in": false,
+        "requires_no_tests": false,
+        "requires_unity": true,
+        "runtime_only": false,
+        "server_only": false,
+        "supports_dry_run": false,
+        "supports_verification": false,
+        "wait_for_no_compile": true
+      },
+      "default_enabled": true,
+      "description": "Search for GameObjects in the scene by name, tag, layer, component type, or path. Returns instance IDs only (paginated). Then use mcpforunity://scene/gameobject/{id} resource for full data, or mcpforunity://scene/gameobject/{id}/components for component details. For CRUD operations (create/modify/delete), use manage_gameobject instead.",
+      "group": "core",
+      "group_description": "Essential scene, script, asset & editor tools (always on by default)",
+      "name": "find_gameobjects",
+      "parameters": [
+        {
+          "name": "search_term",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "enum": [
+            "by_component",
+            "by_id",
+            "by_layer",
+            "by_name",
+            "by_path",
+            "by_tag"
+          ],
+          "name": "search_method",
+          "required": false,
+          "type": "enum"
+        },
+        {
+          "name": "include_inactive",
+          "required": false,
+          "type": "boolean | string"
+        },
+        {
+          "name": "page_size",
+          "required": false,
+          "type": "integer | string"
+        },
+        {
+          "name": "cursor",
+          "required": false,
+          "type": "integer | string"
+        }
+      ],
+      "supported_actions": [],
+      "tags": [
+        "group:core"
+      ],
+      "unity_target": "find_gameobjects"
+    },
+    {
+      "action_capabilities": {},
+      "capabilities": {
+        "action_model": "always_read_only",
+        "high_risk": false,
+        "known_read_only_actions": [],
+        "local_only": false,
+        "mutating": false,
+        "read_only": true,
+        "refresh_if_dirty": true,
+        "requires_explicit_opt_in": false,
+        "requires_no_tests": false,
+        "requires_unity": true,
+        "runtime_only": false,
+        "server_only": false,
+        "supports_dry_run": false,
+        "supports_verification": false,
+        "wait_for_no_compile": true
+      },
+      "default_enabled": true,
+      "description": "Searches a file with a regex pattern and returns line numbers and excerpts.",
+      "group": "core",
+      "group_description": "Essential scene, script, asset & editor tools (always on by default)",
+      "name": "find_in_file",
+      "parameters": [
+        {
+          "name": "uri",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "pattern",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "project_root",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "max_results",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "ignore_case",
+          "required": false,
+          "type": "boolean | string"
+        }
+      ],
+      "supported_actions": [],
+      "tags": [
+        "group:core"
+      ],
+      "unity_target": "manage_script"
+    },
+    {
+      "action_capabilities": {},
+      "capabilities": {
+        "action_model": "always_read_only",
+        "high_risk": false,
+        "known_read_only_actions": [],
+        "local_only": false,
+        "mutating": false,
+        "read_only": true,
+        "refresh_if_dirty": true,
+        "requires_explicit_opt_in": false,
+        "requires_no_tests": false,
+        "requires_unity": true,
+        "runtime_only": false,
+        "server_only": false,
+        "supports_dry_run": false,
+        "supports_verification": false,
+        "wait_for_no_compile": true
+      },
+      "default_enabled": true,
+      "description": "Get SHA256 and basic metadata for a Unity C# script without returning file contents. Requires uri (script path under Assets/ or mcpforunity://path/Assets/... or file://...).",
+      "group": "core",
+      "group_description": "Essential scene, script, asset & editor tools (always on by default)",
+      "name": "get_sha",
+      "parameters": [
+        {
+          "name": "uri",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "supported_actions": [],
+      "tags": [
+        "group:core"
+      ],
+      "unity_target": "manage_script"
+    },
+    {
+      "action_capabilities": {},
+      "capabilities": {
+        "action_model": "always_read_only",
+        "high_risk": false,
+        "known_read_only_actions": [],
+        "local_only": false,
+        "mutating": false,
+        "read_only": true,
+        "refresh_if_dirty": true,
+        "requires_explicit_opt_in": false,
+        "requires_no_tests": false,
+        "requires_unity": true,
+        "runtime_only": false,
+        "server_only": false,
+        "supports_dry_run": false,
+        "supports_verification": false,
+        "wait_for_no_compile": true
+      },
+      "default_enabled": false,
+      "description": "Polls an async Unity test job by job_id.",
+      "group": "testing",
+      "group_description": "Test runner & async test jobs",
+      "name": "get_test_job",
+      "parameters": [
+        {
+          "name": "job_id",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "include_failed_tests",
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "name": "include_details",
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "name": "wait_timeout",
+          "required": false,
+          "type": "integer"
+        }
+      ],
+      "supported_actions": [],
+      "tags": [
+        "group:testing"
+      ],
+      "unity_target": "get_test_job"
+    },
+    {
+      "action_capabilities": {},
+      "capabilities": {
+        "action_model": "mixed",
+        "high_risk": true,
+        "known_read_only_actions": [
+          "animator_get_info",
+          "animator_get_parameter",
+          "clip_get_info",
+          "controller_get_info"
+        ],
+        "local_only": false,
+        "mutating": true,
+        "read_only": false,
+        "refresh_if_dirty": true,
+        "requires_explicit_opt_in": false,
+        "requires_no_tests": false,
+        "requires_unity": true,
+        "runtime_only": false,
+        "server_only": false,
+        "supports_dry_run": false,
+        "supports_verification": false,
+        "wait_for_no_compile": true
+      },
+      "default_enabled": false,
+      "description": "Manage Unity animation: Animator control and AnimationClip creation. Action prefixes: animator_* (play, crossfade, set parameters, get info), controller_* (create AnimatorControllers, add states/transitions/parameters), clip_* (create clips, add keyframe curves, assign to GameObjects). Action-specific parameters go in `properties` (keys match ManageAnimation.cs).",
+      "group": "animation",
+      "group_description": "Animator control & AnimationClip creation",
+      "name": "manage_animation",
+      "parameters": [
+        {
+          "name": "action",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "target",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "enum": [
+            "by_id",
+            "by_layer",
+            "by_name",
+            "by_path",
+            "by_tag"
+          ],
+          "name": "search_method",
+          "required": false,
+          "type": "enum"
+        },
+        {
+          "name": "clip_path",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "controller_path",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "properties",
+          "required": false,
+          "type": "object | string"
+        }
+      ],
+      "supported_actions": [],
+      "tags": [
+        "group:animation"
+      ],
+      "unity_target": "manage_animation"
+    },
+    {
+      "action_capabilities": {
+        "create": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "create_folder": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "delete": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "duplicate": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "get_components": {
+          "high_risk": false,
+          "mutating": false,
+          "read_only": true,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "get_info": {
+          "high_risk": false,
+          "mutating": false,
+          "read_only": true,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "import": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "modify": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "move": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "rename": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "search": {
+          "high_risk": false,
+          "mutating": false,
+          "read_only": true,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        }
+      },
+      "capabilities": {
+        "action_model": "mixed",
+        "high_risk": true,
+        "known_read_only_actions": [
+          "get_components",
+          "get_info",
+          "search"
+        ],
+        "local_only": false,
+        "mutating": true,
+        "read_only": false,
+        "refresh_if_dirty": true,
+        "requires_explicit_opt_in": false,
+        "requires_no_tests": false,
+        "requires_unity": true,
+        "runtime_only": false,
+        "server_only": false,
+        "supports_dry_run": false,
+        "supports_verification": false,
+        "wait_for_no_compile": true
+      },
+      "default_enabled": true,
+      "description": "Performs asset operations (import, create, modify, delete, etc.) in Unity.\n\nTip (payload safety): for `action=\"search\"`, prefer paging (`page_size`, `page_number`) and keep `generate_preview=false` (previews can add large base64 blobs).",
+      "group": "core",
+      "group_description": "Essential scene, script, asset & editor tools (always on by default)",
+      "name": "manage_asset",
+      "parameters": [
+        {
+          "enum": [
+            "create",
+            "create_folder",
+            "delete",
+            "duplicate",
+            "get_components",
+            "get_info",
+            "import",
+            "modify",
+            "move",
+            "rename",
+            "search"
+          ],
+          "name": "action",
+          "required": true,
+          "type": "enum"
+        },
+        {
+          "name": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "asset_type",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "properties",
+          "required": false,
+          "type": "object"
+        },
+        {
+          "name": "destination",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "generate_preview",
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "name": "search_pattern",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "filter_type",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "filter_date_after",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "page_size",
+          "required": false,
+          "type": "integer | number | string"
+        },
+        {
+          "name": "page_number",
+          "required": false,
+          "type": "integer | number | string"
+        }
+      ],
+      "supported_actions": [
+        "create",
+        "create_folder",
+        "delete",
+        "duplicate",
+        "get_components",
+        "get_info",
+        "import",
+        "modify",
+        "move",
+        "rename",
+        "search"
+      ],
+      "tags": [
+        "group:core"
+      ],
+      "unity_target": "manage_asset"
+    },
+    {
+      "action_capabilities": {
+        "export": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "list": {
+          "high_risk": false,
+          "mutating": false,
+          "read_only": true,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        }
+      },
+      "capabilities": {
+        "action_model": "mixed",
+        "high_risk": true,
+        "known_read_only_actions": [
+          "list"
+        ],
+        "local_only": false,
+        "mutating": true,
+        "read_only": false,
+        "refresh_if_dirty": true,
+        "requires_explicit_opt_in": false,
+        "requires_no_tests": false,
+        "requires_unity": false,
+        "runtime_only": false,
+        "server_only": true,
+        "supports_dry_run": false,
+        "supports_verification": false,
+        "wait_for_no_compile": true
+      },
+      "default_enabled": true,
+      "description": "List or export the generated Unity MCP tool catalog built from the live tool registry and action policy metadata.",
+      "group": null,
+      "group_description": null,
+      "name": "manage_catalog",
+      "parameters": [
+        {
+          "enum": [
+            "export",
+            "list"
+          ],
+          "name": "action",
+          "required": true,
+          "type": "enum"
+        },
+        {
+          "name": "output_dir",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "enum": [
+            "both",
+            "json",
+            "markdown"
+          ],
+          "name": "format",
+          "required": false,
+          "type": "enum"
+        }
+      ],
+      "supported_actions": [
+        "export",
+        "list"
+      ],
+      "tags": [],
+      "unity_target": null
+    },
+    {
+      "action_capabilities": {
+        "add": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "remove": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "set_property": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        }
+      },
+      "capabilities": {
+        "action_model": "always_mutating",
+        "high_risk": true,
+        "known_read_only_actions": [],
+        "local_only": false,
+        "mutating": true,
+        "read_only": false,
+        "refresh_if_dirty": true,
+        "requires_explicit_opt_in": false,
+        "requires_no_tests": false,
+        "requires_unity": true,
+        "runtime_only": false,
+        "server_only": false,
+        "supports_dry_run": false,
+        "supports_verification": false,
+        "wait_for_no_compile": true
+      },
+      "default_enabled": true,
+      "description": "Add, remove, or set properties on components attached to GameObjects. Actions: add, remove, set_property. Requires target (instance ID or name) and component_type. For READING component data, use the mcpforunity://scene/gameobject/{id}/components resource or mcpforunity://scene/gameobject/{id}/component/{name} for a single component. For creating/deleting GameObjects themselves, use manage_gameobject instead.",
+      "group": "core",
+      "group_description": "Essential scene, script, asset & editor tools (always on by default)",
+      "name": "manage_components",
+      "parameters": [
+        {
+          "enum": [
+            "add",
+            "remove",
+            "set_property"
+          ],
+          "name": "action",
+          "required": true,
+          "type": "enum"
+        },
+        {
+          "name": "target",
+          "required": true,
+          "type": "integer | string"
+        },
+        {
+          "name": "component_type",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "enum": [
+            "by_id",
+            "by_name",
+            "by_path"
+          ],
+          "name": "search_method",
+          "required": false,
+          "type": "enum"
+        },
+        {
+          "name": "property",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "value",
+          "required": false,
+          "type": "boolean | dict | integer | list | number | string"
+        },
+        {
+          "name": "properties",
+          "required": false,
+          "type": "object"
+        }
+      ],
+      "supported_actions": [
+        "add",
+        "remove",
+        "set_property"
+      ],
+      "tags": [
+        "group:core"
+      ],
+      "unity_target": "manage_components"
+    },
+    {
+      "action_capabilities": {
+        "add_layer": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "add_tag": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "pause": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "play": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "remove_layer": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "remove_tag": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "set_active_tool": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "stop": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "telemetry_ping": {
+          "high_risk": false,
+          "mutating": false,
+          "read_only": true,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "telemetry_status": {
+          "high_risk": false,
+          "mutating": false,
+          "read_only": true,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        }
+      },
+      "capabilities": {
+        "action_model": "mixed",
+        "high_risk": true,
+        "known_read_only_actions": [
+          "telemetry_ping",
+          "telemetry_status"
+        ],
+        "local_only": false,
+        "mutating": true,
+        "read_only": false,
+        "refresh_if_dirty": true,
+        "requires_explicit_opt_in": false,
+        "requires_no_tests": false,
+        "requires_unity": true,
+        "runtime_only": false,
+        "server_only": false,
+        "supports_dry_run": false,
+        "supports_verification": false,
+        "wait_for_no_compile": true
+      },
+      "default_enabled": true,
+      "description": "Controls and queries the Unity editor's state and settings. Tip: pass booleans as true/false; if your client only sends strings, 'true'/'false' are accepted. Read-only actions: telemetry_status, telemetry_ping. Modifying actions: play, pause, stop, set_active_tool, add_tag, remove_tag, add_layer, remove_layer.",
+      "group": "core",
+      "group_description": "Essential scene, script, asset & editor tools (always on by default)",
+      "name": "manage_editor",
+      "parameters": [
+        {
+          "enum": [
+            "add_layer",
+            "add_tag",
+            "pause",
+            "play",
+            "remove_layer",
+            "remove_tag",
+            "set_active_tool",
+            "stop",
+            "telemetry_ping",
+            "telemetry_status"
+          ],
+          "name": "action",
+          "required": true,
+          "type": "enum"
+        },
+        {
+          "name": "wait_for_completion",
+          "required": false,
+          "type": "boolean | string"
+        },
+        {
+          "name": "tool_name",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "tag_name",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "layer_name",
+          "required": false,
+          "type": "string"
+        }
+      ],
+      "supported_actions": [
+        "add_layer",
+        "add_tag",
+        "pause",
+        "play",
+        "remove_layer",
+        "remove_tag",
+        "set_active_tool",
+        "stop",
+        "telemetry_ping",
+        "telemetry_status"
+      ],
+      "tags": [
+        "group:core"
+      ],
+      "unity_target": "manage_editor"
+    },
+    {
+      "action_capabilities": {
+        "export": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "list": {
+          "high_risk": false,
+          "mutating": false,
+          "read_only": true,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        }
+      },
+      "capabilities": {
+        "action_model": "mixed",
+        "high_risk": true,
+        "known_read_only_actions": [
+          "list"
+        ],
+        "local_only": false,
+        "mutating": true,
+        "read_only": false,
+        "refresh_if_dirty": true,
+        "requires_explicit_opt_in": false,
+        "requires_no_tests": false,
+        "requires_unity": false,
+        "runtime_only": false,
+        "server_only": true,
+        "supports_dry_run": false,
+        "supports_verification": false,
+        "wait_for_no_compile": true
+      },
+      "default_enabled": true,
+      "description": "List or export the generated error-code and operational-contract catalog for this fork.",
+      "group": null,
+      "group_description": null,
+      "name": "manage_error_catalog",
+      "parameters": [
+        {
+          "enum": [
+            "export",
+            "list"
+          ],
+          "name": "action",
+          "required": true,
+          "type": "enum"
+        },
+        {
+          "name": "output_dir",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "enum": [
+            "both",
+            "json",
+            "markdown"
+          ],
+          "name": "format",
+          "required": false,
+          "type": "enum"
+        }
+      ],
+      "supported_actions": [
+        "export",
+        "list"
+      ],
+      "tags": [],
+      "unity_target": null
+    },
+    {
+      "action_capabilities": {
+        "create": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "delete": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "duplicate": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "look_at": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "modify": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "move_relative": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        }
+      },
+      "capabilities": {
+        "action_model": "always_mutating",
+        "high_risk": true,
+        "known_read_only_actions": [],
+        "local_only": false,
+        "mutating": true,
+        "read_only": false,
+        "refresh_if_dirty": true,
+        "requires_explicit_opt_in": false,
+        "requires_no_tests": false,
+        "requires_unity": true,
+        "runtime_only": false,
+        "server_only": false,
+        "supports_dry_run": false,
+        "supports_verification": false,
+        "wait_for_no_compile": true
+      },
+      "default_enabled": true,
+      "description": "Performs CRUD operations on GameObjects. Actions: create, modify, delete, duplicate, move_relative, look_at. NOT for searching \u2014 use the find_gameobjects tool to search by name/tag/layer/component/path. NOT for component management \u2014 use the manage_components tool (add/remove/set_property) or mcpforunity://scene/gameobject/{id}/components resource (read).",
+      "group": "core",
+      "group_description": "Essential scene, script, asset & editor tools (always on by default)",
+      "name": "manage_gameobject",
+      "parameters": [
+        {
+          "enum": [
+            "create",
+            "delete",
+            "duplicate",
+            "look_at",
+            "modify",
+            "move_relative"
+          ],
+          "name": "action",
+          "required": false,
+          "type": "enum"
+        },
+        {
+          "name": "target",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "enum": [
+            "by_component",
+            "by_id",
+            "by_layer",
+            "by_name",
+            "by_path",
+            "by_tag"
+          ],
+          "name": "search_method",
+          "required": false,
+          "type": "enum"
+        },
+        {
+          "name": "name",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "tag",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "parent",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "position",
+          "required": false,
+          "type": "array | object | string"
+        },
+        {
+          "name": "rotation",
+          "required": false,
+          "type": "array | object | string"
+        },
+        {
+          "name": "scale",
+          "required": false,
+          "type": "array | object | string"
+        },
+        {
+          "name": "components_to_add",
+          "required": false,
+          "type": "array | string"
+        },
+        {
+          "name": "primitive_type",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "save_as_prefab",
+          "required": false,
+          "type": "boolean | string"
+        },
+        {
+          "name": "prefab_path",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "prefab_folder",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "set_active",
+          "required": false,
+          "type": "boolean | string"
+        },
+        {
+          "name": "layer",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "components_to_remove",
+          "required": false,
+          "type": "array | string"
+        },
+        {
+          "name": "component_properties",
+          "required": false,
+          "type": "object"
+        },
+        {
+          "name": "new_name",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "offset",
+          "required": false,
+          "type": "array | string"
+        },
+        {
+          "name": "reference_object",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "enum": [
+            "back",
+            "backward",
+            "behind",
+            "down",
+            "forward",
+            "front",
+            "left",
+            "right",
+            "up"
+          ],
+          "name": "direction",
+          "required": false,
+          "type": "enum"
+        },
+        {
+          "name": "distance",
+          "required": false,
+          "type": "number"
+        },
+        {
+          "name": "world_space",
+          "required": false,
+          "type": "boolean | string"
+        },
+        {
+          "name": "look_at_target",
+          "required": false,
+          "type": "array | string"
+        },
+        {
+          "name": "look_at_up",
+          "required": false,
+          "type": "array | string"
+        }
+      ],
+      "supported_actions": [
+        "create",
+        "delete",
+        "duplicate",
+        "look_at",
+        "modify",
+        "move_relative"
+      ],
+      "tags": [
+        "group:core"
+      ],
+      "unity_target": "manage_gameobject"
+    },
+    {
+      "action_capabilities": {
+        "assign_material_to_renderer": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "create": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "get_material_info": {
+          "high_risk": false,
+          "mutating": false,
+          "read_only": true,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "ping": {
+          "high_risk": false,
+          "mutating": false,
+          "read_only": true,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "set_material_color": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "set_material_shader_property": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "set_renderer_color": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        }
+      },
+      "capabilities": {
+        "action_model": "mixed",
+        "high_risk": true,
+        "known_read_only_actions": [
+          "get_material_info",
+          "ping"
+        ],
+        "local_only": false,
+        "mutating": true,
+        "read_only": false,
+        "refresh_if_dirty": true,
+        "requires_explicit_opt_in": false,
+        "requires_no_tests": false,
+        "requires_unity": true,
+        "runtime_only": false,
+        "server_only": false,
+        "supports_dry_run": false,
+        "supports_verification": false,
+        "wait_for_no_compile": true
+      },
+      "default_enabled": true,
+      "description": "Manages Unity materials (set properties, colors, shaders, etc). Read-only actions: ping, get_material_info. Modifying actions: create, set_material_shader_property, set_material_color, assign_material_to_renderer, set_renderer_color.",
+      "group": "core",
+      "group_description": "Essential scene, script, asset & editor tools (always on by default)",
+      "name": "manage_material",
+      "parameters": [
+        {
+          "enum": [
+            "assign_material_to_renderer",
+            "create",
+            "get_material_info",
+            "ping",
+            "set_material_color",
+            "set_material_shader_property",
+            "set_renderer_color"
+          ],
+          "name": "action",
+          "required": true,
+          "type": "enum"
+        },
+        {
+          "name": "material_path",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "property",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "shader",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "properties",
+          "required": false,
+          "type": "object"
+        },
+        {
+          "name": "value",
+          "required": false,
+          "type": "boolean | integer | list | number | string"
+        },
+        {
+          "name": "color",
+          "required": false,
+          "type": "array | object | string"
+        },
+        {
+          "name": "target",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "enum": [
+            "by_component",
+            "by_layer",
+            "by_name",
+            "by_path",
+            "by_tag"
+          ],
+          "name": "search_method",
+          "required": false,
+          "type": "enum"
+        },
+        {
+          "name": "slot",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "enum": [
+            "instance",
+            "property_block",
+            "shared"
+          ],
+          "name": "mode",
+          "required": false,
+          "type": "enum"
+        }
+      ],
+      "supported_actions": [
+        "assign_material_to_renderer",
+        "create",
+        "get_material_info",
+        "ping",
+        "set_material_color",
+        "set_material_shader_property",
+        "set_renderer_color"
+      ],
+      "tags": [
+        "group:core"
+      ],
+      "unity_target": "manage_material"
+    },
+    {
+      "action_capabilities": {
+        "create_from_gameobject": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "get_hierarchy": {
+          "high_risk": false,
+          "mutating": false,
+          "read_only": true,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "get_info": {
+          "high_risk": false,
+          "mutating": false,
+          "read_only": true,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "modify_contents": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        }
+      },
+      "capabilities": {
+        "action_model": "mixed",
+        "high_risk": true,
+        "known_read_only_actions": [
+          "get_hierarchy",
+          "get_info"
+        ],
+        "local_only": false,
+        "mutating": true,
+        "read_only": false,
+        "refresh_if_dirty": true,
+        "requires_explicit_opt_in": false,
+        "requires_no_tests": false,
+        "requires_unity": true,
+        "runtime_only": false,
+        "server_only": false,
+        "supports_dry_run": false,
+        "supports_verification": false,
+        "wait_for_no_compile": true
+      },
+      "default_enabled": true,
+      "description": "Manages Unity Prefab assets via headless operations (no UI, no prefab stages). Actions: get_info, get_hierarchy, create_from_gameobject, modify_contents. Use modify_contents for headless prefab editing - ideal for automated workflows. Use create_child parameter with modify_contents to add child GameObjects to a prefab (single object or array for batch creation in one save). Example: create_child=[{\"name\": \"Child1\", \"primitive_type\": \"Sphere\", \"position\": [1,0,0]}, {\"name\": \"Child2\", \"primitive_type\": \"Cube\", \"parent\": \"Child1\"}]. Use component_properties with modify_contents to set serialized fields on existing components (e.g. component_properties={\"Rigidbody\": {\"mass\": 5.0}, \"MyScript\": {\"health\": 100}}). Supports object references via {\"guid\": \"...\"}, {\"path\": \"Assets/...\"}, or {\"instanceID\": 123}. Use manage_asset action=search filterType=Prefab to list prefabs.",
+      "group": "core",
+      "group_description": "Essential scene, script, asset & editor tools (always on by default)",
+      "name": "manage_prefabs",
+      "parameters": [
+        {
+          "enum": [
+            "create_from_gameobject",
+            "get_hierarchy",
+            "get_info",
+            "modify_contents"
+          ],
+          "name": "action",
+          "required": true,
+          "type": "enum"
+        },
+        {
+          "name": "prefab_path",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "target",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "allow_overwrite",
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "name": "search_inactive",
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "name": "unlink_if_instance",
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "name": "position",
+          "required": false,
+          "type": "array | object | string"
+        },
+        {
+          "name": "rotation",
+          "required": false,
+          "type": "array | object | string"
+        },
+        {
+          "name": "scale",
+          "required": false,
+          "type": "array | object | string"
+        },
+        {
+          "name": "name",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "tag",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "layer",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "set_active",
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "name": "parent",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "components_to_add",
+          "required": false,
+          "type": "array"
+        },
+        {
+          "name": "components_to_remove",
+          "required": false,
+          "type": "array"
+        },
+        {
+          "name": "create_child",
+          "required": false,
+          "type": "array | object"
+        },
+        {
+          "name": "component_properties",
+          "required": false,
+          "type": "object"
+        }
+      ],
+      "supported_actions": [
+        "create_from_gameobject",
+        "get_hierarchy",
+        "get_info",
+        "modify_contents"
+      ],
+      "tags": [
+        "group:core"
+      ],
+      "unity_target": "manage_prefabs"
+    },
+    {
+      "action_capabilities": {
+        "create": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "get_active": {
+          "high_risk": false,
+          "mutating": false,
+          "read_only": true,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "get_build_settings": {
+          "high_risk": false,
+          "mutating": false,
+          "read_only": true,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "get_hierarchy": {
+          "high_risk": false,
+          "mutating": false,
+          "read_only": true,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "load": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "save": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "scene_view_frame": {
+          "high_risk": false,
+          "mutating": false,
+          "read_only": true,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "screenshot": {
+          "high_risk": false,
+          "mutating": false,
+          "read_only": true,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        }
+      },
+      "capabilities": {
+        "action_model": "mixed",
+        "high_risk": true,
+        "known_read_only_actions": [
+          "get_active",
+          "get_build_settings",
+          "get_hierarchy",
+          "scene_view_frame",
+          "screenshot"
+        ],
+        "local_only": false,
+        "mutating": true,
+        "read_only": false,
+        "refresh_if_dirty": true,
+        "requires_explicit_opt_in": false,
+        "requires_no_tests": false,
+        "requires_unity": true,
+        "runtime_only": false,
+        "server_only": false,
+        "supports_dry_run": false,
+        "supports_verification": false,
+        "wait_for_no_compile": true
+      },
+      "default_enabled": true,
+      "description": "Performs CRUD operations on Unity scenes. Read-only actions: get_hierarchy, get_active, get_build_settings, screenshot, scene_view_frame. Modifying actions: create, load, save. screenshot supports include_image=true to return an inline base64 PNG for AI vision. screenshot with batch='surround' captures 6 angles around the scene (no file saved) for comprehensive scene understanding. screenshot with batch='orbit' captures configurable azimuth x elevation grid for visual QA (use orbit_angles, orbit_elevations, orbit_distance, orbit_fov). screenshot with look_at/view_position creates a temp camera at that viewpoint and returns an inline image.",
+      "group": "core",
+      "group_description": "Essential scene, script, asset & editor tools (always on by default)",
+      "name": "manage_scene",
+      "parameters": [
+        {
+          "enum": [
+            "create",
+            "get_active",
+            "get_build_settings",
+            "get_hierarchy",
+            "load",
+            "save",
+            "scene_view_frame",
+            "screenshot"
+          ],
+          "name": "action",
+          "required": true,
+          "type": "enum"
+        },
+        {
+          "name": "name",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "path",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "build_index",
+          "required": false,
+          "type": "integer | string"
+        },
+        {
+          "name": "screenshot_file_name",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "screenshot_super_size",
+          "required": false,
+          "type": "integer | string"
+        },
+        {
+          "name": "camera",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "include_image",
+          "required": false,
+          "type": "boolean | string"
+        },
+        {
+          "name": "max_resolution",
+          "required": false,
+          "type": "integer | string"
+        },
+        {
+          "name": "batch",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "look_at",
+          "required": false,
+          "type": "array | integer | string"
+        },
+        {
+          "name": "view_position",
+          "required": false,
+          "type": "array | string"
+        },
+        {
+          "name": "view_rotation",
+          "required": false,
+          "type": "array | string"
+        },
+        {
+          "name": "orbit_angles",
+          "required": false,
+          "type": "integer | string"
+        },
+        {
+          "name": "orbit_elevations",
+          "required": false,
+          "type": "array | string"
+        },
+        {
+          "name": "orbit_distance",
+          "required": false,
+          "type": "number | string"
+        },
+        {
+          "name": "orbit_fov",
+          "required": false,
+          "type": "number | string"
+        },
+        {
+          "name": "scene_view_target",
+          "required": false,
+          "type": "integer | string"
+        },
+        {
+          "name": "parent",
+          "required": false,
+          "type": "integer | string"
+        },
+        {
+          "name": "page_size",
+          "required": false,
+          "type": "integer | string"
+        },
+        {
+          "name": "cursor",
+          "required": false,
+          "type": "integer | string"
+        },
+        {
+          "name": "max_nodes",
+          "required": false,
+          "type": "integer | string"
+        },
+        {
+          "name": "max_depth",
+          "required": false,
+          "type": "integer | string"
+        },
+        {
+          "name": "max_children_per_node",
+          "required": false,
+          "type": "integer | string"
+        },
+        {
+          "name": "include_transform",
+          "required": false,
+          "type": "boolean | string"
+        }
+      ],
+      "supported_actions": [
+        "create",
+        "get_active",
+        "get_build_settings",
+        "get_hierarchy",
+        "load",
+        "save",
+        "scene_view_frame",
+        "screenshot"
+      ],
+      "tags": [
+        "group:core"
+      ],
+      "unity_target": "manage_scene"
+    },
+    {
+      "action_capabilities": {
+        "create": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "delete": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "read": {
+          "high_risk": false,
+          "mutating": false,
+          "read_only": true,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        }
+      },
+      "capabilities": {
+        "action_model": "mixed",
+        "high_risk": true,
+        "known_read_only_actions": [
+          "read"
+        ],
+        "local_only": false,
+        "mutating": true,
+        "read_only": false,
+        "refresh_if_dirty": true,
+        "requires_explicit_opt_in": false,
+        "requires_no_tests": false,
+        "requires_unity": true,
+        "runtime_only": false,
+        "server_only": false,
+        "supports_dry_run": false,
+        "supports_verification": true,
+        "wait_for_no_compile": true
+      },
+      "default_enabled": true,
+      "description": "Compatibility router for legacy script operations. Prefer apply_text_edits (ranges) or script_apply_edits (structured) for edits. Read-only action: read. Modifying actions: create, delete.",
+      "group": "core",
+      "group_description": "Essential scene, script, asset & editor tools (always on by default)",
+      "name": "manage_script",
+      "parameters": [
+        {
+          "enum": [
+            "create",
+            "delete",
+            "read"
+          ],
+          "name": "action",
+          "required": true,
+          "type": "enum"
+        },
+        {
+          "name": "name",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "contents",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "script_type",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "namespace",
+          "required": false,
+          "type": "string"
+        }
+      ],
+      "supported_actions": [
+        "create",
+        "delete",
+        "read"
+      ],
+      "tags": [
+        "group:core"
+      ],
+      "unity_target": "manage_script"
+    },
+    {
+      "action_capabilities": {},
+      "capabilities": {
+        "action_model": "always_read_only",
+        "high_risk": false,
+        "known_read_only_actions": [],
+        "local_only": false,
+        "mutating": false,
+        "read_only": true,
+        "refresh_if_dirty": true,
+        "requires_explicit_opt_in": false,
+        "requires_no_tests": false,
+        "requires_unity": false,
+        "runtime_only": false,
+        "server_only": true,
+        "supports_dry_run": false,
+        "supports_verification": false,
+        "wait_for_no_compile": true
+      },
+      "default_enabled": true,
+      "description": "Get manage_script capabilities (supported ops, limits, and guards).\n    Returns:\n        - ops: list of supported structured ops\n        - text_ops: list of supported text ops\n        - max_edit_payload_bytes: server edit payload cap\n        - guards: header/using guard enabled flag",
+      "group": null,
+      "group_description": null,
+      "name": "manage_script_capabilities",
+      "parameters": [],
+      "supported_actions": [],
+      "tags": [],
+      "unity_target": null
+    },
+    {
+      "action_capabilities": {
+        "create": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "modify": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        }
+      },
+      "capabilities": {
+        "action_model": "always_mutating",
+        "high_risk": true,
+        "known_read_only_actions": [],
+        "local_only": false,
+        "mutating": true,
+        "read_only": false,
+        "refresh_if_dirty": true,
+        "requires_explicit_opt_in": false,
+        "requires_no_tests": false,
+        "requires_unity": true,
+        "runtime_only": false,
+        "server_only": false,
+        "supports_dry_run": false,
+        "supports_verification": false,
+        "wait_for_no_compile": true
+      },
+      "default_enabled": false,
+      "description": "Creates and modifies ScriptableObject assets using Unity SerializedObject property paths.",
+      "group": "scripting_ext",
+      "group_description": "ScriptableObject management",
+      "name": "manage_scriptable_object",
+      "parameters": [
+        {
+          "enum": [
+            "create",
+            "modify"
+          ],
+          "name": "action",
+          "required": true,
+          "type": "enum"
+        },
+        {
+          "name": "type_name",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "folder_path",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "asset_name",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "overwrite",
+          "required": false,
+          "type": "boolean | string"
+        },
+        {
+          "name": "target",
+          "required": false,
+          "type": "object | string"
+        },
+        {
+          "name": "patches",
+          "required": false,
+          "type": "array | string"
+        },
+        {
+          "name": "dry_run",
+          "required": false,
+          "type": "boolean | string"
+        }
+      ],
+      "supported_actions": [
+        "create",
+        "modify"
+      ],
+      "tags": [
+        "group:scripting_ext"
+      ],
+      "unity_target": "manage_scriptable_object"
+    },
+    {
+      "action_capabilities": {
+        "create": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "delete": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "read": {
+          "high_risk": false,
+          "mutating": false,
+          "read_only": true,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "update": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        }
+      },
+      "capabilities": {
+        "action_model": "mixed",
+        "high_risk": true,
+        "known_read_only_actions": [
+          "read"
+        ],
+        "local_only": false,
+        "mutating": true,
+        "read_only": false,
+        "refresh_if_dirty": true,
+        "requires_explicit_opt_in": false,
+        "requires_no_tests": false,
+        "requires_unity": true,
+        "runtime_only": false,
+        "server_only": false,
+        "supports_dry_run": false,
+        "supports_verification": false,
+        "wait_for_no_compile": true
+      },
+      "default_enabled": false,
+      "description": "Manages shader scripts in Unity (create, read, update, delete). Read-only action: read. Modifying actions: create, update, delete.",
+      "group": "vfx",
+      "group_description": "Visual effects \u2013 VFX Graph, shaders, procedural textures",
+      "name": "manage_shader",
+      "parameters": [
+        {
+          "enum": [
+            "create",
+            "delete",
+            "read",
+            "update"
+          ],
+          "name": "action",
+          "required": true,
+          "type": "enum"
+        },
+        {
+          "name": "name",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "contents",
+          "required": false,
+          "type": "string"
+        }
+      ],
+      "supported_actions": [
+        "create",
+        "delete",
+        "read",
+        "update"
+      ],
+      "tags": [
+        "group:vfx"
+      ],
+      "unity_target": "manage_shader"
+    },
+    {
+      "action_capabilities": {
+        "export": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "list": {
+          "high_risk": false,
+          "mutating": false,
+          "read_only": true,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        }
+      },
+      "capabilities": {
+        "action_model": "mixed",
+        "high_risk": true,
+        "known_read_only_actions": [
+          "list"
+        ],
+        "local_only": false,
+        "mutating": true,
+        "read_only": false,
+        "refresh_if_dirty": true,
+        "requires_explicit_opt_in": false,
+        "requires_no_tests": false,
+        "requires_unity": false,
+        "runtime_only": false,
+        "server_only": true,
+        "supports_dry_run": false,
+        "supports_verification": false,
+        "wait_for_no_compile": true
+      },
+      "default_enabled": true,
+      "description": "List or export generated Unity MCP subagent artifacts built from the live tool registry. Use action='list' to inspect the current catalog. Use action='export' to write JSON and/or Markdown subagent files to disk.",
+      "group": null,
+      "group_description": null,
+      "name": "manage_subagents",
+      "parameters": [
+        {
+          "enum": [
+            "export",
+            "list"
+          ],
+          "name": "action",
+          "required": true,
+          "type": "enum"
+        },
+        {
+          "name": "output_dir",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "enum": [
+            "both",
+            "json",
+            "markdown"
+          ],
+          "name": "format",
+          "required": false,
+          "type": "enum"
+        }
+      ],
+      "supported_actions": [
+        "export",
+        "list"
+      ],
+      "tags": [],
+      "unity_target": null
+    },
+    {
+      "action_capabilities": {
+        "apply_gradient": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "apply_noise": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "apply_pattern": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "create": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "create_sprite": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "delete": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "modify": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        }
+      },
+      "capabilities": {
+        "action_model": "always_mutating",
+        "high_risk": true,
+        "known_read_only_actions": [],
+        "local_only": false,
+        "mutating": true,
+        "read_only": false,
+        "refresh_if_dirty": true,
+        "requires_explicit_opt_in": false,
+        "requires_no_tests": false,
+        "requires_unity": true,
+        "runtime_only": false,
+        "server_only": false,
+        "supports_dry_run": false,
+        "supports_verification": false,
+        "wait_for_no_compile": true
+      },
+      "default_enabled": false,
+      "description": "Procedural texture generation for Unity. Creates textures with solid fills, patterns (checkerboard, stripes, dots, grid, brick), gradients, and noise. Actions: create, modify, delete, create_sprite, apply_pattern, apply_gradient, apply_noise",
+      "group": "vfx",
+      "group_description": "Visual effects \u2013 VFX Graph, shaders, procedural textures",
+      "name": "manage_texture",
+      "parameters": [
+        {
+          "enum": [
+            "apply_gradient",
+            "apply_noise",
+            "apply_pattern",
+            "create",
+            "create_sprite",
+            "delete",
+            "modify"
+          ],
+          "name": "action",
+          "required": true,
+          "type": "enum"
+        },
+        {
+          "name": "path",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "width",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "height",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "fill_color",
+          "required": false,
+          "type": "array | object | string"
+        },
+        {
+          "enum": [
+            "brick",
+            "checkerboard",
+            "dots",
+            "grid",
+            "stripes",
+            "stripes_diag",
+            "stripes_h",
+            "stripes_v"
+          ],
+          "name": "pattern",
+          "required": false,
+          "type": "enum"
+        },
+        {
+          "name": "palette",
+          "required": false,
+          "type": "array | string"
+        },
+        {
+          "name": "pattern_size",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "pixels",
+          "required": false,
+          "type": "array | string"
+        },
+        {
+          "name": "image_path",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "enum": [
+            "linear",
+            "radial"
+          ],
+          "name": "gradient_type",
+          "required": false,
+          "type": "enum"
+        },
+        {
+          "name": "gradient_angle",
+          "required": false,
+          "type": "number"
+        },
+        {
+          "name": "noise_scale",
+          "required": false,
+          "type": "number"
+        },
+        {
+          "name": "octaves",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "set_pixels",
+          "required": false,
+          "type": "dict"
+        },
+        {
+          "name": "as_sprite",
+          "required": false,
+          "type": "boolean | dict"
+        },
+        {
+          "name": "import_settings",
+          "required": false,
+          "type": "dict"
+        }
+      ],
+      "supported_actions": [
+        "apply_gradient",
+        "apply_noise",
+        "apply_pattern",
+        "create",
+        "create_sprite",
+        "delete",
+        "modify"
+      ],
+      "tags": [
+        "group:vfx"
+      ],
+      "unity_target": "manage_texture"
+    },
+    {
+      "action_capabilities": {
+        "activate": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "deactivate": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "list_groups": {
+          "high_risk": false,
+          "mutating": false,
+          "read_only": true,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "reset": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "sync": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        }
+      },
+      "capabilities": {
+        "action_model": "mixed",
+        "high_risk": true,
+        "known_read_only_actions": [
+          "list_groups"
+        ],
+        "local_only": false,
+        "mutating": true,
+        "read_only": false,
+        "refresh_if_dirty": true,
+        "requires_explicit_opt_in": false,
+        "requires_no_tests": false,
+        "requires_unity": false,
+        "runtime_only": false,
+        "server_only": true,
+        "supports_dry_run": false,
+        "supports_verification": false,
+        "wait_for_no_compile": true
+      },
+      "default_enabled": true,
+      "description": "Manage which tool groups are visible in this session. Actions: list_groups (show all groups and their status), activate (enable a group), deactivate (disable a group), sync (refresh visibility from Unity Editor's toggle states), reset (restore defaults). Activating a group makes its tools appear; deactivating hides them. Use sync after toggling tools in the Unity Editor GUI.",
+      "group": null,
+      "group_description": null,
+      "name": "manage_tools",
+      "parameters": [
+        {
+          "enum": [
+            "activate",
+            "deactivate",
+            "list_groups",
+            "reset",
+            "sync"
+          ],
+          "name": "action",
+          "required": true,
+          "type": "enum"
+        },
+        {
+          "name": "group",
+          "required": false,
+          "type": "string"
+        }
+      ],
+      "supported_actions": [
+        "activate",
+        "deactivate",
+        "list_groups",
+        "reset",
+        "sync"
+      ],
+      "tags": [],
+      "unity_target": null
+    },
+    {
+      "action_capabilities": {
+        "attach_ui_document": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "create": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "create_panel_settings": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "delete": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "detach_ui_document": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "get_visual_tree": {
+          "high_risk": false,
+          "mutating": false,
+          "read_only": true,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "link_stylesheet": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "list": {
+          "high_risk": false,
+          "mutating": false,
+          "read_only": true,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "modify_visual_element": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "ping": {
+          "high_risk": false,
+          "mutating": false,
+          "read_only": true,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "read": {
+          "high_risk": false,
+          "mutating": false,
+          "read_only": true,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "render_ui": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "update": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "update_panel_settings": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        }
+      },
+      "capabilities": {
+        "action_model": "mixed",
+        "high_risk": true,
+        "known_read_only_actions": [
+          "get_visual_tree",
+          "list",
+          "ping",
+          "read"
+        ],
+        "local_only": false,
+        "mutating": true,
+        "read_only": false,
+        "refresh_if_dirty": true,
+        "requires_explicit_opt_in": false,
+        "requires_no_tests": false,
+        "requires_unity": true,
+        "runtime_only": false,
+        "server_only": false,
+        "supports_dry_run": false,
+        "supports_verification": false,
+        "wait_for_no_compile": true
+      },
+      "default_enabled": false,
+      "description": "Manages Unity UI Toolkit elements (UXML documents, USS stylesheets, UIDocument components). Read-only actions: ping, read, get_visual_tree, list. Modifying actions: create, update, delete, attach_ui_document, detach_ui_document, create_panel_settings, update_panel_settings, modify_visual_element.\nVisual actions: render_ui (captures UI panel to a PNG screenshot for self-evaluation).\nStructural actions: link_stylesheet (adds a Style src reference to a UXML file).\n\nUI Toolkit workflow:\n1. Use list to discover existing UI assets\n2. Create a UXML file (structure, like HTML)\n3. Create a USS file (styling, like CSS)\n4. Link stylesheet to UXML via link_stylesheet\n5. Attach UIDocument to a GameObject with the UXML source\n6. Use get_visual_tree to inspect the result\n7. Use modify_visual_element to change text, classes, or inline styles on live elements\n8. Use render_ui to capture a visual preview for self-evaluation\n   - In play mode: first call queues a WaitForEndOfFrame screen capture and returns pending=true;\n     call render_ui a second time to retrieve the saved PNG (hasContent will be true).\n   - In editor mode: assigns a RenderTexture to PanelSettings (best-effort; may stay blank).\n9. Use detach_ui_document to remove UIDocument from a GameObject\n10. Use delete to remove .uxml/.uss files",
+      "group": "ui",
+      "group_description": "UI Toolkit (UXML, USS, UIDocument)",
+      "name": "manage_ui",
+      "parameters": [
+        {
+          "enum": [
+            "attach_ui_document",
+            "create",
+            "create_panel_settings",
+            "delete",
+            "detach_ui_document",
+            "get_visual_tree",
+            "link_stylesheet",
+            "list",
+            "modify_visual_element",
+            "ping",
+            "read",
+            "render_ui",
+            "update",
+            "update_panel_settings"
+          ],
+          "name": "action",
+          "required": true,
+          "type": "enum"
+        },
+        {
+          "name": "path",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "contents",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "target",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "source_asset",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "panel_settings",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "sort_order",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "enum": [
+            "ConstantPhysicalSize",
+            "ConstantPixelSize",
+            "ScaleWithScreenSize"
+          ],
+          "name": "scale_mode",
+          "required": false,
+          "type": "enum"
+        },
+        {
+          "name": "reference_resolution",
+          "required": false,
+          "type": "object"
+        },
+        {
+          "name": "settings",
+          "required": false,
+          "type": "object"
+        },
+        {
+          "name": "max_depth",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "width",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "height",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "include_image",
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "name": "max_resolution",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "screenshot_file_name",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "stylesheet",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "filter_type",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "page_size",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "page_number",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "element_name",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "text",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "add_classes",
+          "required": false,
+          "type": "array"
+        },
+        {
+          "name": "remove_classes",
+          "required": false,
+          "type": "array"
+        },
+        {
+          "name": "toggle_classes",
+          "required": false,
+          "type": "array"
+        },
+        {
+          "name": "style",
+          "required": false,
+          "type": "object"
+        },
+        {
+          "name": "enabled",
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "name": "visible",
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "name": "tooltip",
+          "required": false,
+          "type": "string"
+        }
+      ],
+      "supported_actions": [
+        "attach_ui_document",
+        "create",
+        "create_panel_settings",
+        "delete",
+        "detach_ui_document",
+        "get_visual_tree",
+        "link_stylesheet",
+        "list",
+        "modify_visual_element",
+        "ping",
+        "read",
+        "render_ui",
+        "update",
+        "update_panel_settings"
+      ],
+      "tags": [
+        "group:ui"
+      ],
+      "unity_target": "manage_ui"
+    },
+    {
+      "action_capabilities": {},
+      "capabilities": {
+        "action_model": "mixed",
+        "high_risk": true,
+        "known_read_only_actions": [
+          "line_get_info",
+          "particle_get_info",
+          "ping",
+          "trail_get_info",
+          "vfx_get_info",
+          "vfx_list_assets",
+          "vfx_list_templates"
+        ],
+        "local_only": false,
+        "mutating": true,
+        "read_only": false,
+        "refresh_if_dirty": true,
+        "requires_explicit_opt_in": false,
+        "requires_no_tests": false,
+        "requires_unity": true,
+        "runtime_only": false,
+        "server_only": false,
+        "supports_dry_run": false,
+        "supports_verification": false,
+        "wait_for_no_compile": true
+      },
+      "default_enabled": false,
+      "description": "Manage Unity VFX components (ParticleSystem, VisualEffect, LineRenderer, TrailRenderer). Action prefixes: particle_*, vfx_*, line_*, trail_*. Action-specific parameters go in `properties` (keys match ManageVFX.cs).",
+      "group": "vfx",
+      "group_description": "Visual effects \u2013 VFX Graph, shaders, procedural textures",
+      "name": "manage_vfx",
+      "parameters": [
+        {
+          "name": "action",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "target",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "enum": [
+            "by_id",
+            "by_layer",
+            "by_name",
+            "by_path",
+            "by_tag"
+          ],
+          "name": "search_method",
+          "required": false,
+          "type": "enum"
+        },
+        {
+          "name": "properties",
+          "required": false,
+          "type": "object | string"
+        }
+      ],
+      "supported_actions": [],
+      "tags": [
+        "group:vfx"
+      ],
+      "unity_target": "manage_vfx"
+    },
+    {
+      "action_capabilities": {},
+      "capabilities": {
+        "action_model": "always_read_only",
+        "high_risk": false,
+        "known_read_only_actions": [],
+        "local_only": false,
+        "mutating": false,
+        "read_only": true,
+        "refresh_if_dirty": true,
+        "requires_explicit_opt_in": false,
+        "requires_no_tests": false,
+        "requires_unity": true,
+        "runtime_only": false,
+        "server_only": false,
+        "supports_dry_run": false,
+        "supports_verification": false,
+        "wait_for_no_compile": true
+      },
+      "default_enabled": false,
+      "description": "Run a combined read-only preflight audit: compile health, scene integrity, and prefab integrity. Use this before broad mutations or test runs.",
+      "group": "testing",
+      "group_description": "Test runner & async test jobs",
+      "name": "preflight_audit",
+      "parameters": [
+        {
+          "name": "scene_scope",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "prefab_root_folder",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "prefab_scan_limit",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "max_issue_samples",
+          "required": false,
+          "type": "integer"
+        }
+      ],
+      "supported_actions": [],
+      "tags": [
+        "group:testing"
+      ],
+      "unity_target": "preflight_audit"
+    },
+    {
+      "action_capabilities": {
+        "clear": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        },
+        "get": {
+          "high_risk": false,
+          "mutating": false,
+          "read_only": true,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "wait_for_no_compile": true
+        }
+      },
+      "capabilities": {
+        "action_model": "mixed",
+        "high_risk": true,
+        "known_read_only_actions": [
+          "get"
+        ],
+        "local_only": false,
+        "mutating": true,
+        "read_only": false,
+        "refresh_if_dirty": true,
+        "requires_explicit_opt_in": false,
+        "requires_no_tests": false,
+        "requires_unity": true,
+        "runtime_only": false,
+        "server_only": false,
+        "supports_dry_run": false,
+        "supports_verification": false,
+        "wait_for_no_compile": true
+      },
+      "default_enabled": true,
+      "description": "Gets messages from or clears the Unity Editor console. Defaults to 10 most recent entries. Use page_size/cursor for paging. Note: For maximum client compatibility, pass count as a quoted string (e.g., '5'). The 'get' action is read-only; 'clear' modifies ephemeral UI state (not project data).",
+      "group": "core",
+      "group_description": "Essential scene, script, asset & editor tools (always on by default)",
+      "name": "read_console",
+      "parameters": [
+        {
+          "enum": [
+            "clear",
+            "get"
+          ],
+          "name": "action",
+          "required": false,
+          "type": "enum"
+        },
+        {
+          "enum": [
+            "all",
+            "error",
+            "log",
+            "warning"
+          ],
+          "name": "types",
+          "required": false,
+          "type": "array | string"
+        },
+        {
+          "name": "count",
+          "required": false,
+          "type": "integer | string"
+        },
+        {
+          "name": "filter_text",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "page_size",
+          "required": false,
+          "type": "integer | string"
+        },
+        {
+          "name": "cursor",
+          "required": false,
+          "type": "integer | string"
+        },
+        {
+          "enum": [
+            "detailed",
+            "json",
+            "plain"
+          ],
+          "name": "format",
+          "required": false,
+          "type": "enum"
+        },
+        {
+          "name": "include_stacktrace",
+          "required": false,
+          "type": "boolean | string"
+        }
+      ],
+      "supported_actions": [
+        "clear",
+        "get"
+      ],
+      "tags": [
+        "group:core"
+      ],
+      "unity_target": "read_console"
+    },
+    {
+      "action_capabilities": {},
+      "capabilities": {
+        "action_model": "always_mutating",
+        "high_risk": true,
+        "known_read_only_actions": [],
+        "local_only": false,
+        "mutating": true,
+        "read_only": false,
+        "refresh_if_dirty": true,
+        "requires_explicit_opt_in": false,
+        "requires_no_tests": false,
+        "requires_unity": true,
+        "runtime_only": false,
+        "server_only": false,
+        "supports_dry_run": false,
+        "supports_verification": false,
+        "wait_for_no_compile": true
+      },
+      "default_enabled": true,
+      "description": "Request a Unity asset database refresh and optionally a script compilation. Can optionally wait for readiness.",
+      "group": "core",
+      "group_description": "Essential scene, script, asset & editor tools (always on by default)",
+      "name": "refresh_unity",
+      "parameters": [
+        {
+          "enum": [
+            "force",
+            "if_dirty"
+          ],
+          "name": "mode",
+          "required": false,
+          "type": "enum"
+        },
+        {
+          "enum": [
+            "all",
+            "assets",
+            "scripts"
+          ],
+          "name": "scope",
+          "required": false,
+          "type": "enum"
+        },
+        {
+          "enum": [
+            "none",
+            "request"
+          ],
+          "name": "compile",
+          "required": false,
+          "type": "enum"
+        },
+        {
+          "name": "wait_for_ready",
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "supported_actions": [],
+      "tags": [
+        "group:core"
+      ],
+      "unity_target": "refresh_unity"
+    },
+    {
+      "action_capabilities": {},
+      "capabilities": {
+        "action_model": "always_mutating",
+        "high_risk": true,
+        "known_read_only_actions": [],
+        "local_only": false,
+        "mutating": true,
+        "read_only": false,
+        "refresh_if_dirty": true,
+        "requires_explicit_opt_in": false,
+        "requires_no_tests": false,
+        "requires_unity": true,
+        "runtime_only": false,
+        "server_only": false,
+        "supports_dry_run": false,
+        "supports_verification": false,
+        "wait_for_no_compile": true
+      },
+      "default_enabled": false,
+      "description": "Starts a Unity test run asynchronously and returns a job_id immediately. Poll with get_test_job for progress.",
+      "group": "testing",
+      "group_description": "Test runner & async test jobs",
+      "name": "run_tests",
+      "parameters": [
+        {
+          "enum": [
+            "EditMode",
+            "PlayMode"
+          ],
+          "name": "mode",
+          "required": false,
+          "type": "enum"
+        },
+        {
+          "name": "test_names",
+          "required": false,
+          "type": "array | string"
+        },
+        {
+          "name": "group_names",
+          "required": false,
+          "type": "array | string"
+        },
+        {
+          "name": "category_names",
+          "required": false,
+          "type": "array | string"
+        },
+        {
+          "name": "assembly_names",
+          "required": false,
+          "type": "array | string"
+        },
+        {
+          "name": "include_failed_tests",
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "name": "include_details",
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "supported_actions": [],
+      "tags": [
+        "group:testing"
+      ],
+      "unity_target": "run_tests"
+    },
+    {
+      "action_capabilities": {},
+      "capabilities": {
+        "action_model": "always_mutating",
+        "high_risk": true,
+        "known_read_only_actions": [],
+        "local_only": false,
+        "mutating": true,
+        "read_only": false,
+        "refresh_if_dirty": true,
+        "requires_explicit_opt_in": false,
+        "requires_no_tests": false,
+        "requires_unity": true,
+        "runtime_only": false,
+        "server_only": false,
+        "supports_dry_run": false,
+        "supports_verification": true,
+        "wait_for_no_compile": true
+      },
+      "default_enabled": true,
+      "description": "Structured C# edits (methods/classes) with safer boundaries - prefer this over raw text.\n    Best practices:\n    - Prefer anchor_* ops for pattern-based insert/replace near stable markers\n    - Use replace_method/delete_method for whole-method changes (keeps signatures balanced)\n    - Avoid whole-file regex deletes; validators will guard unbalanced braces\n    - For tail insertions, prefer anchor/regex_replace on final brace (class closing)\n    - Pass options.validate='standard' for structural checks; 'relaxed' for interior-only edits\n    Canonical fields (use these exact keys):\n    - op: replace_method | insert_method | delete_method | anchor_insert | anchor_delete | anchor_replace\n    - className: string (defaults to 'name' if omitted on method/class ops)\n    - methodName: string (required for replace_method, delete_method)\n    - replacement: string (required for replace_method, insert_method)\n    - position: start | end | after | before (insert_method only)\n    - afterMethodName / beforeMethodName: string (required when position='after'/'before')\n    - anchor: regex string (for anchor_* ops)\n    - text: string (for anchor_insert/anchor_replace)\n    Examples:\n    1) Replace a method:\n    {\n        \"name\": \"SmartReach\",\n        \"path\": \"Assets/Scripts/Interaction\",\n        \"edits\": [\n        {\n        \"op\": \"replace_method\",\n        \"className\": \"SmartReach\",\n        \"methodName\": \"HasTarget\",\n        \"replacement\": \"public bool HasTarget(){ return currentTarget!=null; }\"\n        }\n    ],\n    \"options\": {\"validate\": \"standard\", \"refresh\": \"immediate\"}\n    }\n    \"2) Insert a method after another:\n    {\n        \"name\": \"SmartReach\",\n        \"path\": \"Assets/Scripts/Interaction\",\n        \"edits\": [\n        {\n        \"op\": \"insert_method\",\n        \"className\": \"SmartReach\",\n        \"replacement\": \"public void PrintSeries(){ Debug.Log(seriesName); }\",\n        \"position\": \"after\",\n        \"afterMethodName\": \"GetCurrentTarget\"\n        }\n    ],\n    }\n    ]",
+      "group": "core",
+      "group_description": "Essential scene, script, asset & editor tools (always on by default)",
+      "name": "script_apply_edits",
+      "parameters": [
+        {
+          "name": "name",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "edits",
+          "required": true,
+          "type": "array | string"
+        },
+        {
+          "name": "options",
+          "required": false,
+          "type": "object"
+        },
+        {
+          "name": "script_type",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "namespace",
+          "required": false,
+          "type": "string"
+        }
+      ],
+      "supported_actions": [],
+      "tags": [
+        "group:core"
+      ],
+      "unity_target": "manage_script"
+    },
+    {
+      "action_capabilities": {},
+      "capabilities": {
+        "action_model": "unknown",
+        "high_risk": true,
+        "known_read_only_actions": [],
+        "local_only": false,
+        "mutating": true,
+        "read_only": false,
+        "refresh_if_dirty": true,
+        "requires_explicit_opt_in": false,
+        "requires_no_tests": false,
+        "requires_unity": false,
+        "runtime_only": false,
+        "server_only": true,
+        "supports_dry_run": false,
+        "supports_verification": false,
+        "wait_for_no_compile": true
+      },
+      "default_enabled": true,
+      "description": "Set the active Unity instance for this client/session. Accepts Name@hash, hash prefix, or port number (stdio only).",
+      "group": null,
+      "group_description": null,
+      "name": "set_active_instance",
+      "parameters": [
+        {
+          "name": "instance",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "supported_actions": [],
+      "tags": [],
+      "unity_target": null
+    },
+    {
+      "action_capabilities": {},
+      "capabilities": {
+        "action_model": "always_read_only",
+        "high_risk": false,
+        "known_read_only_actions": [],
+        "local_only": false,
+        "mutating": false,
+        "read_only": true,
+        "refresh_if_dirty": true,
+        "requires_explicit_opt_in": false,
+        "requires_no_tests": false,
+        "requires_unity": true,
+        "runtime_only": false,
+        "server_only": false,
+        "supports_dry_run": false,
+        "supports_verification": false,
+        "wait_for_no_compile": true
+      },
+      "default_enabled": true,
+      "description": "Check Unity compile readiness and summarize recent compiler diagnostics from editor state and console output.",
+      "group": "core",
+      "group_description": "Essential scene, script, asset & editor tools (always on by default)",
+      "name": "validate_compile_health",
+      "parameters": [
+        {
+          "name": "include_warnings",
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "name": "compiler_only",
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "name": "max_diagnostics",
+          "required": false,
+          "type": "integer"
+        }
+      ],
+      "supported_actions": [],
+      "tags": [
+        "group:core"
+      ],
+      "unity_target": "validate_compile_health"
+    },
+    {
+      "action_capabilities": {},
+      "capabilities": {
+        "action_model": "always_read_only",
+        "high_risk": false,
+        "known_read_only_actions": [],
+        "local_only": false,
+        "mutating": false,
+        "read_only": true,
+        "refresh_if_dirty": true,
+        "requires_explicit_opt_in": false,
+        "requires_no_tests": false,
+        "requires_unity": true,
+        "runtime_only": false,
+        "server_only": false,
+        "supports_dry_run": false,
+        "supports_verification": false,
+        "wait_for_no_compile": true
+      },
+      "default_enabled": true,
+      "description": "Validate a C# script and return diagnostics.",
+      "group": "core",
+      "group_description": "Essential scene, script, asset & editor tools (always on by default)",
+      "name": "validate_script",
+      "parameters": [
+        {
+          "name": "uri",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "enum": [
+            "basic",
+            "standard"
+          ],
+          "name": "level",
+          "required": false,
+          "type": "enum"
+        },
+        {
+          "name": "include_diagnostics",
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "supported_actions": [],
+      "tags": [
+        "group:core"
+      ],
+      "unity_target": "manage_script"
+    }
+  ],
+  "version": 1
+}

@@ -1,0 +1,27 @@
+{
+  "name": "com.customgamedev.unity-mcp",
+  "version": "0.1.0",
+  "displayName": "Custom Unity MCP",
+  "description": "Game-agnostic custom Unity MCP package. Based on CoplayDev/unity-mcp (MIT) with extensible project-specific tools and workflows for any Unity game.",
+  "unity": "2021.3",
+  "documentationUrl": "https://github.com/your-org/custom-unity-mcp",
+  "licensesUrl": "https://github.com/your-org/custom-unity-mcp/blob/main/LICENSE",
+  "dependencies": {
+    "com.unity.nuget.newtonsoft-json": "3.0.2",
+    "com.unity.test-framework": "1.1.31"
+  },
+  "keywords": [
+    "unity",
+    "ai",
+    "llm",
+    "mcp",
+    "model-context-protocol",
+    "mcp-server",
+    "mcp-client"
+  ],
+  "author": {
+    "name": "CustomGameDev",
+    "email": "support@example.com",
+    "url": "https://example.com"
+  }
+}
