@@ -17,6 +17,8 @@ Use a dependency entry shaped like this:
 Notes:
 - `?path=/MCPForUnity` is required because the Unity package is not at repo root.
 - Replace `#main` with a tag, branch, or commit SHA when you want a pinned install.
+- Git installs now derive the Python server source from the same repository automatically.
+- If you are developing the fork locally as a Package Manager local package, the plugin will resolve the sibling `Server` directory automatically.
 
 ## Installer script
 
@@ -48,6 +50,7 @@ with:
 3. Add or update the dependency entry above.
 4. Save the file.
 5. Let Unity resolve and import the package.
+6. If you want to override the inferred server source, open `Window > MCP for Unity > Advanced` and choose `Select server folder...`.
 
 ## Verification
 

@@ -4,6 +4,7 @@ Use this guide to configure and run MCP for Unity inside the Unity Editor. Insta
 
 ## Git install
 - This package can be installed from Git with a Unity Package Manager dependency that points at `?path=/MCPForUnity`.
+- When installed from Git, the Unity plugin derives the Python server source from the same Git repo automatically.
 - Example:
 ```json
 {
@@ -25,7 +26,7 @@ The window includes workflow specialists, tool and resource controls, connection
 1. Open Window > MCP for Unity.
 2. Click “Auto-Setup”.
 3. If prompted:
-   - Select the packaged server folder (`Server`) if you want to run the bundled implementation.
+   - Select the local `Server` folder only if you want to override the automatically derived server source.
    - Install Python and/or uv/uvx if missing so the server can be managed locally.
    - For Claude Code, ensure the `claude` CLI is installed.
 4. Click “Start Bridge” if the Unity Bridge shows “Stopped”.

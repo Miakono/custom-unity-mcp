@@ -222,6 +222,12 @@ namespace MCPForUnity.Editor.Helpers
                 return resolved;
             }
 
+            string derivedSource = TryGetInstalledPackageServerSource();
+            if (!string.IsNullOrEmpty(derivedSource))
+            {
+                return derivedSource;
+            }
+
             // Default to PyPI package (avoids Windows long path issues with git clone)
             string version = GetPackageVersion();
             if (version == "unknown")
@@ -238,6 +244,164 @@ namespace MCPForUnity.Editor.Helpers
             }
 
             return $"mcpforunityserver=={version}";
+        }
+
+        private static string TryGetInstalledPackageServerSource()
+        {
+            try
+            {
+                var packageInfo = PackageInfo.FindForAssembly(typeof(AssetPathUtility).Assembly);
+                if (packageInfo == null)
+                {
+                    return null;
+                }
+
+                if (packageInfo.source == UnityEditor.PackageManager.PackageSource.Git)
+                {
+                    string gitSource = TryGetGitServerSourceFromPackagesLock(packageInfo.name)
+                        ?? TryGetGitServerSourceFromPackageId(packageInfo.packageId);
+
+                    if (!string.IsNullOrEmpty(gitSource))
+                    {
+                        McpLog.Info($"Using Git-derived MCP server source: {gitSource}");
+                        return gitSource;
+                    }
+                }
+
+                if (packageInfo.source == UnityEditor.PackageManager.PackageSource.Local ||
+                    packageInfo.source == UnityEditor.PackageManager.PackageSource.Embedded)
+                {
+                    string localServerPath = TryGetLocalServerSourceFromResolvedPath(packageInfo.resolvedPath);
+                    if (!string.IsNullOrEmpty(localServerPath))
+                    {
+                        McpLog.Info($"Using local MCP server source: {localServerPath}");
+                        return localServerPath;
+                    }
+                }
+
+                return null;
+            }
+            catch (Exception ex)
+            {
+                McpLog.Warn($"Failed to determine installed package server source: {ex.Message}");
+                return null;
+            }
+        }
+
+        private static string TryGetGitServerSourceFromPackagesLock(string packageName)
+        {
+            try
+            {
+                string projectRoot = Directory.GetParent(Application.dataPath)?.FullName;
+                if (string.IsNullOrEmpty(projectRoot))
+                {
+                    return null;
+                }
+
+                string lockPath = Path.Combine(projectRoot, "Packages", "packages-lock.json");
+                if (!File.Exists(lockPath))
+                {
+                    return null;
+                }
+
+                var root = JObject.Parse(File.ReadAllText(lockPath));
+                string source = root["dependencies"]?[packageName]?["source"]?.Value<string>();
+                if (!string.Equals(source, "git", StringComparison.OrdinalIgnoreCase))
+                {
+                    return null;
+                }
+
+                string version = root["dependencies"]?[packageName]?["version"]?.Value<string>();
+                return ConvertUnityGitDependencyToPythonSource(version);
+            }
+            catch (Exception ex)
+            {
+                McpLog.Warn($"Failed to read Git package source from packages-lock.json: {ex.Message}");
+                return null;
+            }
+        }
+
+        private static string TryGetGitServerSourceFromPackageId(string packageId)
+        {
+            if (string.IsNullOrWhiteSpace(packageId))
+            {
+                return null;
+            }
+
+            int atIndex = packageId.IndexOf('@');
+            if (atIndex < 0 || atIndex >= packageId.Length - 1)
+            {
+                return null;
+            }
+
+            string unityGitSource = packageId.Substring(atIndex + 1);
+            return ConvertUnityGitDependencyToPythonSource(unityGitSource);
+        }
+
+        private static string ConvertUnityGitDependencyToPythonSource(string unityGitSource)
+        {
+            if (string.IsNullOrWhiteSpace(unityGitSource))
+            {
+                return null;
+            }
+
+            string working = unityGitSource.Trim();
+            string refName = null;
+
+            int hashIndex = working.LastIndexOf('#');
+            if (hashIndex >= 0 && hashIndex < working.Length - 1)
+            {
+                refName = working.Substring(hashIndex + 1);
+                working = working.Substring(0, hashIndex);
+            }
+
+            int queryIndex = working.IndexOf('?');
+            if (queryIndex >= 0)
+            {
+                working = working.Substring(0, queryIndex);
+            }
+
+            if (!working.StartsWith("git+", StringComparison.OrdinalIgnoreCase))
+            {
+                working = "git+" + working;
+            }
+
+            if (!string.IsNullOrWhiteSpace(refName))
+            {
+                working = $"{working}@{refName}";
+            }
+
+            return $"{working}#subdirectory=Server";
+        }
+
+        private static string TryGetLocalServerSourceFromResolvedPath(string resolvedPath)
+        {
+            if (string.IsNullOrWhiteSpace(resolvedPath))
+            {
+                return null;
+            }
+
+            try
+            {
+                string siblingServer = Path.GetFullPath(Path.Combine(resolvedPath, "..", "Server"));
+                if (File.Exists(Path.Combine(siblingServer, "pyproject.toml")))
+                {
+                    return siblingServer;
+                }
+
+                string childServer = Path.Combine(resolvedPath, "Server");
+                if (File.Exists(Path.Combine(childServer, "pyproject.toml")))
+                {
+                    return childServer;
+                }
+
+                return null;
+            }
+            catch (Exception ex)
+            {
+                McpLog.Warn($"Failed to derive local server source from package path '{resolvedPath}': {ex.Message}");
+                return null;
+            }
         }
 
         /// <summary>
