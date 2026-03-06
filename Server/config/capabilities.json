@@ -1,0 +1,15 @@
+{
+  "_comment": "MCP for Unity Capability Configuration",
+  "enable_dry_run": true,
+  "enable_high_risk_tools": true,
+  "require_explicit_opt_in": false,
+  "enable_runtime_only_tools": true,
+  "enable_local_only_tools": true,
+  "enable_verification": true,
+  "tool_opt_in": {
+    "execute_menu_item": true,
+    "batch_execute": true,
+    "delete_script": true,
+    "execute_custom_tool": true
+  }
+}

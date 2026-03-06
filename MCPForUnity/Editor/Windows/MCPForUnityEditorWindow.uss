@@ -11,14 +11,19 @@
     flex-direction: row;
     align-items: center;
     justify-content: space-between;
-    padding: 12px 18px;
+    padding: 14px 18px 12px 18px;
     margin: 12px 12px 5px 12px;
-    min-height: 44px;
+    min-height: 56px;
     flex-shrink: 0;
-    background-color: rgba(0, 0, 0, 0.05);
+    background-color: rgba(58, 43, 18, 0.12);
     border-radius: 4px;
     border-width: 1px;
-    border-color: rgba(0, 0, 0, 0.15);
+    border-color: rgba(145, 104, 39, 0.35);
+}
+
+.header-copy {
+    flex-direction: column;
+    flex-grow: 1;
 }
 
 .header-title {
@@ -27,14 +32,20 @@
     letter-spacing: 0.5px;
 }
 
+.header-subtitle {
+    margin-top: 2px;
+    font-size: 11px;
+    color: rgba(210, 202, 190, 0.92);
+}
+
 .header-version {
     font-size: 11px;
-    color: rgba(180, 210, 255, 1);
+    color: rgba(255, 229, 187, 1);
     padding: 3px 10px;
-    background-color: rgba(50, 120, 200, 0.25);
+    background-color: rgba(145, 104, 39, 0.18);
     border-radius: 10px;
     border-width: 1px;
-    border-color: rgba(80, 150, 220, 0.4);
+    border-color: rgba(199, 145, 61, 0.4);
 }
 
 /* Update Notification */
@@ -109,12 +120,16 @@
 
 /* Light Theme */
 .unity-theme-light .header-bar {
-    background-color: rgba(0, 0, 0, 0.04);
-    border-color: rgba(0, 0, 0, 0.15);
+    background-color: rgba(192, 149, 78, 0.12);
+    border-color: rgba(126, 88, 26, 0.2);
+}
+
+.unity-theme-light .header-subtitle {
+    color: rgba(74, 56, 27, 0.82);
 }
 
 .unity-theme-light .header-version {
-    background-color: rgba(0, 0, 0, 0.08);
+    background-color: rgba(176, 134, 60, 0.14);
 }
 
 .unity-theme-light .tab-toolbar .unity-toolbar-button:checked {

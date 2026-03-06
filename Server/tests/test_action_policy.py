@@ -147,3 +147,132 @@ async def test_maybe_run_tool_preflight_calls_preflight_for_mutating_batch(monke
 
     assert result is None
     assert called is True
+
+
+# New tests for capability flags
+
+
+def test_tool_action_policy_has_capability_fields():
+    """Test that ToolActionPolicy includes all new capability fields."""
+    policy = action_policy.ToolActionPolicy(
+        mutating=True,
+        high_risk=True,
+        supports_dry_run=True,
+        local_only=False,
+        runtime_only=False,
+        requires_explicit_opt_in=True,
+    )
+
+    assert policy.mutating is True
+    assert policy.high_risk is True
+    assert policy.supports_dry_run is True
+    assert policy.local_only is False
+    assert policy.runtime_only is False
+    assert policy.requires_explicit_opt_in is True
+
+
+def test_get_tool_action_policy_returns_capability_flags():
+    """Test that get_tool_action_policy returns correct capability flags."""
+    # Script editing tools support dry-run
+    policy = action_policy.get_tool_action_policy("apply_text_edits")
+    assert policy.supports_dry_run is True
+    assert policy.mutating is True
+    assert policy.high_risk is True
+
+    # Local-only tools
+    policy = action_policy.get_tool_action_policy("debug_request_context")
+    assert policy.local_only is True
+    assert policy.mutating is False
+
+    # Runtime-only tools
+    policy = action_policy.get_tool_action_policy("read_console")
+    assert policy.runtime_only is True
+
+    # Read-only actions don't support dry-run (no need)
+    policy = action_policy.get_tool_action_policy("manage_script", action="read")
+    assert policy.mutating is False
+    assert policy.supports_dry_run is False  # Read-only doesn't need dry-run
+
+
+def test_get_tool_action_policy_high_risk_classification():
+    """Test that high-risk tools are properly classified."""
+    high_risk_tools = ["delete_script", "execute_menu_item", "batch_execute"]
+
+    for tool in high_risk_tools:
+        policy = action_policy.get_tool_action_policy(tool)
+        assert policy.high_risk is True, f"{tool} should be high-risk"
+
+
+def test_get_tool_action_policy_safe_tools():
+    """Test that read-only tools are not marked as high-risk."""
+    safe_tools = ["find_gameobjects", "get_sha", "validate_script"]
+
+    for tool in safe_tools:
+        policy = action_policy.get_tool_action_policy(tool)
+        assert policy.high_risk is False, f"{tool} should not be high-risk"
+        assert policy.mutating is False, f"{tool} should be read-only"
+
+
+def test_get_batch_policy_aggregates_capabilities():
+    """Test that batch policy aggregates capabilities from children."""
+    # Mixed batch with dry-run supported and not supported
+    policy = action_policy.get_batch_policy([
+        {"tool": "apply_text_edits", "params": {}},  # supports dry-run
+        {"tool": "execute_menu_item", "params": {}},  # doesn't support dry-run
+    ])
+
+    # Batch doesn't support dry-run if any child doesn't
+    assert policy.supports_dry_run is False
+    assert policy.mutating is True  # Because execute_menu_item is mutating
+    assert policy.high_risk is True
+
+
+def test_get_batch_policy_all_dry_run_supported():
+    """Test batch where all children support dry-run."""
+    policy = action_policy.get_batch_policy([
+        {"tool": "apply_text_edits", "params": {}},
+        {"tool": "create_script", "params": {}},
+    ])
+
+    assert policy.supports_dry_run is True
+
+
+def test_get_tool_capabilities_function():
+    """Test the get_tool_capabilities helper function."""
+    caps = action_policy.get_tool_capabilities("apply_text_edits")
+
+    assert "supports_dry_run" in caps
+    assert "local_only" in caps
+    assert "runtime_only" in caps
+    assert "requires_explicit_opt_in" in caps
+
+    assert caps["supports_dry_run"] is True
+    assert caps["local_only"] is False
+    assert caps["runtime_only"] is False
+
+
+def test_get_tool_capabilities_local_tool():
+    """Test get_tool_capabilities for local-only tools."""
+    caps = action_policy.get_tool_capabilities("debug_request_context")
+
+    assert caps["local_only"] is True
+    assert caps["supports_dry_run"] is False
+
+
+def test_unknown_tool_defaults_to_safe_mutating():
+    """Test that unknown tools default to mutating/high-risk for safety."""
+    policy = action_policy.get_tool_action_policy("unknown_tool_xyz")
+
+    assert policy.mutating is True
+    assert policy.high_risk is True
+    assert policy.supports_dry_run is False
+    assert policy.requires_explicit_opt_in is True
+
+
+def test_empty_tool_name_defaults_to_safe():
+    """Test that empty/None tool name defaults to safe values."""
+    policy = action_policy.get_tool_action_policy(None)
+
+    assert policy.mutating is True
+    assert policy.high_risk is True
+    assert policy.requires_explicit_opt_in is True

@@ -10,6 +10,7 @@ from core.telemetry import record_milestone, record_telemetry, MilestoneType, Re
 from services.resources import register_all_resources
 from transport.plugin_registry import PluginRegistry
 from transport.plugin_hub import PluginHub
+from services.runtime_connection import RuntimeHub
 from services.custom_tool_service import (
     CustomToolService,
     resolve_project_id_for_unity_instance,
@@ -85,7 +86,7 @@ logging.basicConfig(
     stream=None,  # None -> defaults to sys.stderr; avoid stdout used by MCP stdio
     force=True    # Ensure our handler replaces any prior stdout handlers
 )
-logger = logging.getLogger("mcp-for-unity-server")
+logger = logging.getLogger("miakono-unity-mcp-server")
 
 # Also write logs to a rotating file so logs are available when launched via stdio
 try:
@@ -150,7 +151,7 @@ async def server_lifespan(server: FastMCP) -> AsyncIterator[dict[str, Any]]:
     """Handle server startup and shutdown."""
     global _unity_connection_pool, _server_version
     _server_version = get_package_version()
-    logger.info(f"MCP for Unity Server v{_server_version} starting up")
+    logger.info(f"Miakono Unity MCP Server v{_server_version} starting up")
 
     # Register custom tool management endpoints with FastMCP
     # Routes are declared globally below after FastMCP initialization
@@ -282,7 +283,7 @@ async def server_lifespan(server: FastMCP) -> AsyncIterator[dict[str, Any]]:
     finally:
         if _unity_connection_pool:
             _unity_connection_pool.disconnect_all()
-        logger.info("MCP for Unity Server shut down")
+        logger.info("Miakono Unity MCP Server shut down")
 
 
 def _build_instructions(project_scoped_tools: bool) -> str:
@@ -376,7 +377,7 @@ def create_mcp_server(project_scoped_tools: bool) -> FastMCP:
             "status": "healthy",
             "timestamp": time.time(),
             "version": _server_version or "unknown",
-            "message": "MCP for Unity server is running"
+            "message": "Miakono Unity MCP server is running"
         })
 
     @mcp.custom_route("/api/auth/login-url", methods=["GET"])
@@ -629,6 +630,17 @@ def create_mcp_server(project_scoped_tools: bool) -> FastMCP:
     if not existing_routes:
         mcp._additional_http_routes.append(
             WebSocketRoute("/hub/plugin", PluginHub))
+    
+    # Mount runtime websocket hub at /runtime for Runtime MCP (Play Mode/Built Games)
+    # This provides a separate endpoint for runtime/in-game MCP connections
+    existing_runtime_routes = [
+        route for route in mcp._get_additional_http_routes()
+        if isinstance(route, WebSocketRoute) and route.path == "/runtime"
+    ]
+    if not existing_runtime_routes:
+        mcp._additional_http_routes.append(
+            WebSocketRoute("/runtime", RuntimeHub))
+        logger.info("Registered Runtime MCP WebSocket endpoint at /runtime")
 
     # Register all tools
     register_all_tools(mcp, project_scoped_tools=project_scoped_tools)
@@ -642,7 +654,7 @@ def create_mcp_server(project_scoped_tools: bool) -> FastMCP:
 def main():
     """Entry point for uvx and console scripts."""
     parser = argparse.ArgumentParser(
-        description="MCP for Unity Server",
+        description="Miakono Unity MCP Server",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Environment Variables:

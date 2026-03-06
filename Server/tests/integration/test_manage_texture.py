@@ -94,6 +94,27 @@ class TestManageTextureIntegration:
         assert captured["params"]["pattern"] == "checkerboard"
         assert captured["params"]["spriteSettings"]["pixelsPerUnit"] == 100.0
 
+    def test_create_texture_accepts_explicit_as_sprite_false(self, monkeypatch):
+        """Explicit false should behave like omitting sprite mode, not error."""
+        captured = {}
+
+        async def fake_send(func, instance, cmd, params, **kwargs):
+            captured["params"] = params
+            return {"success": True, "message": "Created texture"}
+
+        monkeypatch.setattr(manage_texture_mod, "send_with_unity_instance", fake_send)
+        monkeypatch.setattr(manage_texture_mod, "maybe_run_tool_preflight", noop_preflight)
+
+        resp = run_async(manage_texture_mod.manage_texture(
+            ctx=DummyContext(),
+            action="create",
+            path="Assets/TestTextures/Plain.png",
+            as_sprite=False,
+        ))
+
+        assert resp["success"] is True
+        assert "spriteSettings" not in captured["params"]
+
     def test_create_texture_with_import_settings(self, monkeypatch):
         """Test creating a texture with import settings (conversion of snake_case to camelCase)."""
         captured = {}

@@ -7,7 +7,9 @@ namespace MCPForUnity.Editor.MenuItems
 {
     public static class MCPForUnityMenu
     {
-        [MenuItem("Window/MCP For Unity/Toggle MCP Window %#m", priority = 1)]
+        private const string MenuRoot = "Window/Miakono Unity MCP";
+
+        [MenuItem(MenuRoot + "/Toggle MCP Window %#m", priority = 1)]
         public static void ToggleMCPWindow()
         {
             if (MCPForUnityEditorWindow.HasAnyOpenWindow())
@@ -20,14 +22,14 @@ namespace MCPForUnity.Editor.MenuItems
             }
         }
 
-        [MenuItem("Window/MCP For Unity/Local Setup Window", priority = 2)]
+        [MenuItem(MenuRoot + "/Local Setup Window", priority = 2)]
         public static void ShowSetupWindow()
         {
             SetupWindowService.ShowSetupWindow();
         }
 
 
-        [MenuItem("Window/MCP For Unity/Edit EditorPrefs", priority = 3)]
+        [MenuItem(MenuRoot + "/Edit EditorPrefs", priority = 3)]
         public static void ShowEditorPrefsWindow()
         {
             EditorPrefsWindow.ShowWindow();

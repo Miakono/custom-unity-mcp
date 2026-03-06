@@ -1,14 +1,16 @@
 {
   "name": "com.customgamedev.unity-mcp",
   "version": "0.1.0",
-  "displayName": "Custom Unity MCP",
-  "description": "Game-agnostic custom Unity MCP package. Based on CoplayDev/unity-mcp (MIT) with extensible project-specific tools and workflows for any Unity game.",
+  "displayName": "Miakono Unity MCP",
+  "description": "Game-agnostic Unity MCP bridge with extensible project-specific tools, workflows, and local editor automation.",
   "unity": "2021.3",
+  "repositoryUrl": "https://github.com/Miakono/custom-unity-mcp",
   "documentationUrl": "https://github.com/Miakono/custom-unity-mcp",
   "licensesUrl": "https://github.com/Miakono/custom-unity-mcp/blob/main/LICENSE",
   "dependencies": {
     "com.unity.nuget.newtonsoft-json": "3.0.2",
-    "com.unity.test-framework": "1.1.31"
+    "com.unity.test-framework": "1.1.31",
+    "com.unity.inputsystem": "1.7.0"
   },
   "keywords": [
     "unity",

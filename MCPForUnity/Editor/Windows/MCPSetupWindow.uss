@@ -6,6 +6,11 @@
     flex-grow: 1;
 }
 
+.title-note {
+    margin-top: 4px;
+    margin-bottom: 14px;
+}
+
 /* Dependency list */
 #dependency-list {
     margin-top: 8px;

@@ -5,7 +5,7 @@ from mcp.types import ToolAnnotations
 
 from services.registry import mcp_for_unity_tool
 from services.tools import get_unity_instance_from_context
-from services.tools.utils import coerce_bool, normalize_vector3
+from services.tools.utils import coerce_bool, normalize_vector3, parse_json_payload
 from transport.unity_transport import send_with_unity_instance
 from transport.legacy.unity_connection import async_send_command_with_retry
 from services.tools.action_policy import maybe_run_tool_preflight
@@ -66,8 +66,8 @@ async def manage_prefabs(
     parent: Annotated[str, "New parent object name/path within prefab for modify_contents."] | None = None,
     components_to_add: Annotated[list[str], "Component types to add in modify_contents."] | None = None,
     components_to_remove: Annotated[list[str], "Component types to remove in modify_contents."] | None = None,
-    create_child: Annotated[dict[str, Any] | list[dict[str, Any]], "Create child GameObject(s) in the prefab. Single object or array of objects, each with: name (required), parent (optional, defaults to target), primitive_type (optional: Cube, Sphere, Capsule, Cylinder, Plane, Quad), position, rotation, scale, components_to_add, tag, layer, set_active."] | None = None,
-    component_properties: Annotated[dict[str, dict[str, Any]], "Set properties on existing components in modify_contents. Keys are component type names, values are dicts of property name to value. Example: {\"Rigidbody\": {\"mass\": 5.0}, \"MyScript\": {\"health\": 100}}. Supports object references via {\"guid\": \"...\"}, {\"path\": \"Assets/...\"}, or {\"instanceID\": 123}."] | None = None,
+    create_child: Annotated[dict[str, Any] | list[dict[str, Any]] | str, "Create child GameObject(s) in the prefab. Single object or array of objects, each with: name (required), parent (optional, defaults to target), primitive_type (optional: Cube, Sphere, Capsule, Cylinder, Plane, Quad), position, rotation, scale, components_to_add, tag, layer, set_active."] | None = None,
+    component_properties: Annotated[dict[str, dict[str, Any]] | str, "Set properties on existing components in modify_contents. Keys are component type names, values are dicts of property name to value. Example: {\"Rigidbody\": {\"mass\": 5.0}, \"MyScript\": {\"health\": 100}}. Supports object references via {\"guid\": \"...\"}, {\"path\": \"Assets/...\"}, or {\"instanceID\": 123}."] | None = None,
 ) -> dict[str, Any]:
     # Back-compat: map 'name' → 'target' for create_from_gameobject (Unity accepts both)
     if action == "create_from_gameobject" and target is None and name is not None:
@@ -99,6 +99,16 @@ async def manage_prefabs(
         }
 
     try:
+        if isinstance(create_child, str):
+            create_child = parse_json_payload(create_child)
+        if create_child is not None and not isinstance(create_child, (dict, list)):
+            return {"success": False, "message": f"create_child must be an object, list, or JSON string of either; got {type(create_child).__name__}"}
+
+        if isinstance(component_properties, str):
+            component_properties = parse_json_payload(component_properties)
+        if component_properties is not None and not isinstance(component_properties, dict):
+            return {"success": False, "message": f"component_properties must be a dict or JSON string of a dict; got {type(component_properties).__name__}"}
+
         # Build parameters dictionary
         params: dict[str, Any] = {"action": action}
 

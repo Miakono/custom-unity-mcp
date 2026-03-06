@@ -87,6 +87,30 @@ async def test_execute_custom_tool_threads_user_id_from_context(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_execute_custom_tool_accepts_stringified_parameters(monkeypatch):
+    monkeypatch.setattr(config, "http_remote_hosted", True)
+
+    ctx = Mock()
+    state = {"unity_instance": "Project@project-hash", "user_id": "user-1"}
+    ctx.get_state = AsyncMock(side_effect=lambda key, default=None: state.get(key, default))
+
+    service = Mock()
+    service.execute_tool = AsyncMock(return_value=MCPResponse(success=True, message="ok"))
+
+    with patch("services.tools.execute_custom_tool.resolve_project_id_for_unity_instance", return_value="project-hash"):
+        with patch("services.tools.execute_custom_tool.CustomToolService.get_instance", return_value=service):
+            await execute_custom_tool(ctx, "my_tool", '{"x": 1}')
+
+    service.execute_tool.assert_awaited_once_with(
+        "project-hash",
+        "my_tool",
+        "Project@project-hash",
+        {"x": 1},
+        user_id="user-1",
+    )
+
+
+@pytest.mark.asyncio
 async def test_custom_tools_resource_threads_user_id_from_context(monkeypatch):
     monkeypatch.setattr(config, "http_remote_hosted", True)
 

@@ -45,6 +45,6 @@ async def test_tool_catalog_resource_returns_catalog():
 
     result = await get_tool_catalog(ctx)
 
-    assert result["group_count"] == 6
+    assert result["group_count"] == 7
     assert result["tool_count"] >= 2
     assert any(item["name"] == "_manage_scene" for item in result["tools"])

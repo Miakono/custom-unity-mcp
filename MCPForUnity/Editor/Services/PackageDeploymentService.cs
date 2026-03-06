@@ -113,10 +113,10 @@ namespace MCPForUnity.Editor.Services
 
             try
             {
-                EditorUtility.DisplayProgressBar("Deploy MCP for Unity", "Creating backup...", 0.25f);
+                EditorUtility.DisplayProgressBar("Deploy Miakono Unity MCP", "Creating backup...", 0.25f);
                 string backupPath = CreateBackup(targetPath);
 
-                EditorUtility.DisplayProgressBar("Deploy MCP for Unity", "Replacing package contents...", 0.7f);
+                EditorUtility.DisplayProgressBar("Deploy Miakono Unity MCP", "Replacing package contents...", 0.7f);
                 CopyCoreFolders(sourcePath, targetPath);
 
                 EditorPrefs.SetString(EditorPrefKeys.PackageDeployLastBackupPath, backupPath);
@@ -159,7 +159,7 @@ namespace MCPForUnity.Editor.Services
 
             try
             {
-                EditorUtility.DisplayProgressBar("Restore MCP for Unity", "Restoring backup...", 0.5f);
+                EditorUtility.DisplayProgressBar("Restore Miakono Unity MCP", "Restoring backup...", 0.5f);
                 ReplaceDirectory(backupPath, targetPath);
 
                 AssetDatabase.Refresh(ImportAssetOptions.ForceUpdate);

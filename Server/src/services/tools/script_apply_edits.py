@@ -730,7 +730,7 @@ async def script_apply_edits(
     name: Annotated[str, "Name of the script to edit"],
     path: Annotated[str, "Path to the script to edit under Assets/ directory"],
     edits: Annotated[Union[list[dict[str, Any]], str], "List of edits to apply to the script (JSON list or stringified JSON)"],
-    options: Annotated[dict[str, Any],
+    options: Annotated[dict[str, Any] | str,
                        "Options for the script edit"] | None = None,
     script_type: Annotated[str,
                            "Type of the script to edit"] = "MonoBehaviour",
@@ -749,6 +749,10 @@ async def script_apply_edits(
     edits = parse_json_payload(edits)
     if not isinstance(edits, list):
         return {"success": False, "message": f"Edits must be a list or JSON string of a list, got {type(edits)}"}
+    if isinstance(options, str):
+        options = parse_json_payload(options)
+    if options is not None and not isinstance(options, dict):
+        return {"success": False, "message": f"options must be a dict or JSON string of a dict, got {type(options)}"}
 
     # Normalize locator first so downstream calls target the correct script file.
     name, path = _normalize_script_locator(name, path)

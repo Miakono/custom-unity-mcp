@@ -111,6 +111,33 @@ async def test_apply_text_edits_forwards_options(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_apply_text_edits_accepts_stringified_options(monkeypatch):
+    tools = setup_script_tools()
+    apply_edits = tools["apply_text_edits"]
+    captured = {}
+
+    async def fake_send(cmd, params, **kwargs):
+        captured["params"] = params
+        return {"success": True}
+
+    import transport.legacy.unity_connection
+    monkeypatch.setattr(
+        transport.legacy.unity_connection,
+        "async_send_command_with_retry",
+        fake_send,
+    )
+
+    await apply_edits(
+        DummyContext(),
+        "mcpforunity://path/Assets/Scripts/File.cs",
+        [{"startLine": 1, "startCol": 1, "endLine": 1, "endCol": 1, "newText": "x"}],
+        options='{"validate":"relaxed","refresh":"immediate"}',
+    )
+
+    assert captured["params"]["options"]["validate"] == "relaxed"
+
+
+@pytest.mark.asyncio
 async def test_apply_text_edits_defaults_atomic_for_multi_span(monkeypatch):
     tools = setup_script_tools()
     apply_edits = tools["apply_text_edits"]

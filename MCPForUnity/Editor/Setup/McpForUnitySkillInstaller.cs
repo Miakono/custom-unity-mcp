@@ -28,16 +28,16 @@ namespace MCPForUnity.Editor.Setup
         private readonly ConcurrentQueue<string> _pendingLogs = new();
         private readonly StringBuilder _logBuilder = new(4096);
 
-        [MenuItem("Window/MCP For Unity/Install(Sync) MCP Skill")]
+        [MenuItem("Window/Miakono Unity MCP/Install(Sync) MCP Skill")]
         public static void OpenWindow()
         {
-            GetWindow<McpForUnitySkillInstaller>("Unity MCP Skill Install(Sync)");
+            GetWindow<McpForUnitySkillInstaller>("Miakono MCP Skill Sync");
         }
 
         private void OnEnable()
         {
             var userHome = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-            _repoUrl = EditorPrefs.GetString(RepoUrlKey, "https://github.com/CoplayDev/unity-mcp");
+            _repoUrl = EditorPrefs.GetString(RepoUrlKey, "https://github.com/Miakono/custom-unity-mcp");
             _targetBranch = EditorPrefs.GetString(BranchKey, "beta");
             if (!BranchOptions.Contains(_targetBranch))
             {
@@ -64,7 +64,7 @@ namespace MCPForUnity.Editor.Setup
         private void OnGUI()
         {
             FlushPendingLogs();
-            EditorGUILayout.HelpBox("Sync Unity MCP Skill to the latest on the selected branch and output the changed file list.", MessageType.Info);
+            EditorGUILayout.HelpBox("Sync the Miakono MCP skill from the selected branch and review the changed file list before use.", MessageType.Info);
             EditorGUILayout.Space(4f);
 
             EditorGUILayout.LabelField("Config", EditorStyles.boldLabel);

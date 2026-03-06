@@ -10,6 +10,7 @@ from services.registry import mcp_for_unity_tool
 from services.tools import get_unity_instance_from_context
 from services.tools.action_policy import maybe_run_tool_preflight
 from services.tools.refresh_unity import send_mutation, verify_edit_by_sha
+from services.tools.utils import parse_json_payload
 from transport.unity_transport import send_with_unity_instance
 import transport.legacy.unity_connection
 
@@ -98,12 +99,16 @@ async def apply_text_edits(
                                    "Optional SHA256 of the script to edit, used to prevent concurrent edits"] | None = None,
     strict: Annotated[bool,
                       "Optional strict flag, used to enforce strict mode"] | None = None,
-    options: Annotated[dict[str, Any],
+    options: Annotated[dict[str, Any] | str,
                        "Optional options, used to pass additional options to the script editor"] | None = None,
 ) -> dict[str, Any]:
     unity_instance = await get_unity_instance_from_context(ctx)
     await ctx.info(
         f"Processing apply_text_edits: {uri} (unity_instance={unity_instance or 'default'})")
+    if isinstance(options, str):
+        options = parse_json_payload(options)
+    if options is not None and not isinstance(options, dict):
+        return {"success": False, "message": f"options must be a dict or JSON string of a dict, got {type(options).__name__}"}
     name, directory = _split_uri(uri)
 
     # Normalize common aliases/misuses for resilience:

@@ -18,6 +18,15 @@ from services.tools.action_policy import (
     get_known_read_only_actions,
     get_tool_action_model,
     get_tool_action_policy,
+    ToolActionPolicy,
+)
+from core.capability_flags import (
+    supports_dry_run,
+    is_local_only_tool,
+    is_runtime_only_tool,
+    requires_explicit_opt_in,
+    supports_verification,
+    get_tool_capability_flags,
 )
 
 
@@ -30,27 +39,29 @@ def default_catalog_output_dir() -> Path:
 
 
 def _get_tool_capabilities(tool_name: str, unity_target: str | None) -> dict[str, Any]:
+    """Get comprehensive capability metadata for a tool.
+
+    Uses actual implementation from capability_flags and action_policy
+    rather than hardcoded values.
+    """
     policy = get_tool_action_policy(tool_name)
     action_model = get_tool_action_model(tool_name)
 
-    supports_verification = tool_name in {
-        "manage_script",
-        "script_apply_edits",
-        "create_script",
-        "delete_script",
-    }
+    # Get capabilities from the central capability registry
+    capability_flags = get_tool_capability_flags(tool_name)
 
+    # Override with policy-specific values where appropriate
     return {
         "read_only": not policy.mutating,
         "mutating": policy.mutating,
         "high_risk": policy.high_risk,
-        "requires_unity": unity_target is not None,
-        "server_only": unity_target is None,
-        "supports_verification": supports_verification,
-        "supports_dry_run": False,
-        "local_only": False,
-        "runtime_only": False,
-        "requires_explicit_opt_in": False,
+        "requires_unity": unity_target is not None and not capability_flags["local_only"],
+        "server_only": unity_target is None or capability_flags["local_only"],
+        "supports_verification": capability_flags["supports_verification"],
+        "supports_dry_run": capability_flags["supports_dry_run"],
+        "local_only": capability_flags["local_only"],
+        "runtime_only": capability_flags["runtime_only"],
+        "requires_explicit_opt_in": capability_flags["requires_explicit_opt_in"],
         "action_model": action_model,
         "known_read_only_actions": get_known_read_only_actions(tool_name),
         "wait_for_no_compile": policy.wait_for_no_compile,
@@ -153,6 +164,7 @@ def _get_tool_signature_details(func: Any, tool_name: str) -> dict[str, Any]:
             "read_only": not policy.mutating,
             "mutating": policy.mutating,
             "high_risk": policy.high_risk,
+            "supports_dry_run": policy.supports_dry_run,
             "wait_for_no_compile": policy.wait_for_no_compile,
             "refresh_if_dirty": policy.refresh_if_dirty,
             "requires_no_tests": policy.requires_no_tests,
@@ -230,6 +242,10 @@ def _render_catalog_markdown(catalog: dict[str, Any]) -> str:
             f"- Action model: `{caps['action_model']}`",
             f"- Mutating: `{str(caps['mutating']).lower()}`",
             f"- High risk: `{str(caps['high_risk']).lower()}`",
+            f"- Supports dry-run: `{str(caps['supports_dry_run']).lower()}`",
+            f"- Local only: `{str(caps['local_only']).lower()}`",
+            f"- Runtime only: `{str(caps['runtime_only']).lower()}`",
+            f"- Requires explicit opt-in: `{str(caps['requires_explicit_opt_in']).lower()}`",
         ])
         if tool["supported_actions"]:
             lines.append(
@@ -264,7 +280,8 @@ def _render_catalog_markdown(catalog: dict[str, Any]) -> str:
                         f"  - `{action}`: "
                         f"read_only=`{str(details['read_only']).lower()}`, "
                         f"mutating=`{str(details['mutating']).lower()}`, "
-                        f"high_risk=`{str(details['high_risk']).lower()}`"
+                        f"high_risk=`{str(details['high_risk']).lower()}`, "
+                        f"supports_dry_run=`{str(details.get('supports_dry_run', False)).lower()}`"
                     )
                     for action, details in sorted(tool["action_capabilities"].items())
                 ],
@@ -300,4 +317,80 @@ def export_tool_catalog_artifacts(
         "output_dir": str(target_dir),
         "written_files": written_files,
         "tool_count": catalog["tool_count"],
+    }
+
+
+def get_tool_capabilities_query(tool_name: str) -> dict[str, Any]:
+    """Query capabilities for a specific tool programmatically.
+
+    This function allows external callers to query tool capabilities
+    without needing to build the entire catalog.
+
+    Args:
+        tool_name: Name of the tool to query
+
+    Returns:
+        Dictionary containing all capability metadata for the tool
+    """
+    ensure_tool_registry_populated()
+
+    # Find the tool in the registry
+    for tool in get_registered_tools():
+        if tool["name"] == tool_name:
+            unity_target = tool.get("unity_target")
+            return {
+                "tool_name": tool_name,
+                "found": True,
+                "capabilities": _get_tool_capabilities(tool_name, unity_target),
+            }
+
+    return {
+        "tool_name": tool_name,
+        "found": False,
+        "capabilities": None,
+    }
+
+
+def query_capabilities(
+    tool_name: str | None = None,
+    capability_filter: str | None = None,
+) -> dict[str, Any]:
+    """Query tool capabilities with optional filtering.
+
+    Args:
+        tool_name: Optional specific tool to query. If None, returns all tools.
+        capability_filter: Optional capability to filter by (e.g., "supports_dry_run",
+                          "local_only", "runtime_only", "requires_explicit_opt_in")
+
+    Returns:
+        Dictionary with matching tools and their capabilities
+    """
+    ensure_tool_registry_populated()
+
+    if tool_name:
+        result = get_tool_capabilities_query(tool_name)
+        if not result["found"]:
+            return {"error": f"Tool '{tool_name}' not found"}
+        return result
+
+    # Return all tools, optionally filtered
+    tools = []
+    for tool in get_registered_tools():
+        unity_target = tool.get("unity_target")
+        capabilities = _get_tool_capabilities(tool["name"], unity_target)
+
+        # Apply filter if specified
+        if capability_filter:
+            if not capabilities.get(capability_filter, False):
+                continue
+
+        tools.append({
+            "name": tool["name"],
+            "capabilities": capabilities,
+        })
+
+    return {
+        "tool_count": len(tools),
+        "capability_filter": capability_filter,
+        "tools": tools,
     }

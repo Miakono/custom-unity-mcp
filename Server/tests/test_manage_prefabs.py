@@ -1,8 +1,12 @@
 """Tests for manage_prefabs tool - component_properties parameter."""
 
 import inspect
+from unittest.mock import AsyncMock
+
+import pytest
 
 from services.tools.manage_prefabs import manage_prefabs
+from tests.integration.test_helpers import DummyContext
 
 
 class TestManagePrefabsComponentProperties:
@@ -36,3 +40,25 @@ class TestManagePrefabsComponentProperties:
         from services.tools.manage_prefabs import REQUIRED_PARAMS
         assert "modify_contents" in REQUIRED_PARAMS
         assert "prefab_path" in REQUIRED_PARAMS["modify_contents"]
+
+    @pytest.mark.asyncio
+    async def test_create_child_accepts_json_string(self, monkeypatch):
+        captured = {}
+
+        async def fake_send(*args, **kwargs):
+            captured["params"] = args[3]
+            return {"success": True}
+
+        monkeypatch.setattr("services.tools.manage_prefabs.send_with_unity_instance", fake_send)
+        monkeypatch.setattr("services.tools.manage_prefabs.get_unity_instance_from_context", AsyncMock(return_value="Project@hash"))
+        monkeypatch.setattr("services.tools.manage_prefabs.maybe_run_tool_preflight", AsyncMock(return_value=None))
+
+        resp = await manage_prefabs(
+            DummyContext(),
+            action="modify_contents",
+            prefab_path="Assets/Test.prefab",
+            create_child='[{"name":"Child","position":[1,2,3]}]',
+        )
+
+        assert resp["success"] is True
+        assert captured["params"]["createChild"][0]["position"] == [1.0, 2.0, 3.0]

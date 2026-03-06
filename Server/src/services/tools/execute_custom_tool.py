@@ -10,6 +10,7 @@ from services.custom_tool_service import (
 from services.registry import mcp_for_unity_tool
 from services.tools import get_unity_instance_from_context
 from services.tools.action_policy import maybe_run_tool_preflight
+from services.tools.utils import parse_json_payload
 
 
 @mcp_for_unity_tool(
@@ -22,7 +23,7 @@ from services.tools.action_policy import maybe_run_tool_preflight
         destructiveHint=True,
     ),
 )
-async def execute_custom_tool(ctx: Context, tool_name: str, parameters: dict | None = None) -> MCPResponse:
+async def execute_custom_tool(ctx: Context, tool_name: str, parameters: dict | str | None = None) -> MCPResponse:
     gate = await maybe_run_tool_preflight(ctx, "execute_custom_tool")
     if gate is not None:
         return MCPResponse(**gate.model_dump())
@@ -40,6 +41,11 @@ async def execute_custom_tool(ctx: Context, tool_name: str, parameters: dict | N
             success=False,
             message=f"Could not resolve project id for {unity_instance}. Ensure Unity is running and reachable.",
         )
+
+    if parameters is None:
+        parameters = {}
+    elif isinstance(parameters, str):
+        parameters = parse_json_payload(parameters)
 
     if not isinstance(parameters, dict):
         return MCPResponse(

@@ -27,6 +27,7 @@ TOOL_GROUPS: dict[str, str] = {
     "ui": "UI Toolkit (UXML, USS, UIDocument)",
     "scripting_ext": "ScriptableObject management",
     "testing": "Test runner & async test jobs",
+    "input": "Unity Input System - Action Maps, Actions, Bindings, and Runtime Simulation",
 }
 
 DEFAULT_ENABLED_GROUPS: set[str] = {"core"}
@@ -37,10 +38,10 @@ def mcp_for_unity_tool(
     description: str | None = None,
     unity_target: str | None = "self",
     group: str | None = "core",
+    capabilities: dict[str, bool] | None = None,
     **kwargs
 ) -> Callable:
-    """
-    Decorator for registering MCP tools in the server's tools directory.
+    """Decorator for registering MCP tools in the server's tools directory.
 
     Tools are registered in the global tool registry.
 
@@ -55,6 +56,11 @@ def mcp_for_unity_tool(
             - A group name string (e.g. "core", "vfx") assigns the tool to
               that group and adds a ``tags={"group:<name>"}`` entry.
             - None: the tool is *always visible* (server meta-tools).
+        capabilities: Optional capability overrides for this tool.
+            - supports_dry_run: Whether tool supports preview mode
+            - local_only: Whether tool is server-only
+            - runtime_only: Whether tool requires play mode
+            - requires_explicit_opt_in: Whether tool requires user opt-in
         **kwargs: Additional arguments passed to @mcp.tool()
 
     Example:
@@ -70,6 +76,8 @@ def mcp_for_unity_tool(
             del tool_kwargs["unity_target"]
         if "group" in tool_kwargs:
             del tool_kwargs["group"]
+        if "capabilities" in tool_kwargs:
+            del tool_kwargs["capabilities"]
 
         # Validate and normalize group
         resolved_group: str | None = None
@@ -104,6 +112,7 @@ def mcp_for_unity_tool(
             'unity_target': normalized_unity_target,
             'group': resolved_group,
             'kwargs': tool_kwargs,
+            'capabilities': capabilities or {},
         })
 
         return func
@@ -124,6 +133,36 @@ def get_group_tool_names() -> dict[str, list[str]]:
         if g and g in result:
             result[g].append(tool["name"])
     return result
+
+
+def get_tool_by_name(tool_name: str) -> dict[str, Any] | None:
+    """Get a specific tool by name.
+
+    Args:
+        tool_name: Name of the tool to find
+
+    Returns:
+        Tool dictionary or None if not found
+    """
+    for tool in _tool_registry:
+        if tool["name"] == tool_name:
+            return tool.copy()
+    return None
+
+
+def get_tool_capabilities(tool_name: str) -> dict[str, Any]:
+    """Get declared capabilities for a specific tool.
+
+    Args:
+        tool_name: Name of the tool
+
+    Returns:
+        Dictionary of capability flags
+    """
+    tool = get_tool_by_name(tool_name)
+    if tool:
+        return tool.get("capabilities", {})
+    return {}
 
 
 def clear_tool_registry():

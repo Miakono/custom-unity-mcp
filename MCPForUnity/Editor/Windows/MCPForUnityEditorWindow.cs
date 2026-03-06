@@ -79,7 +79,7 @@ namespace MCPForUnity.Editor.Windows
 
         public static void ShowWindow()
         {
-            var window = GetWindow<MCPForUnityEditorWindow>("MCP For Unity");
+            var window = GetWindow<MCPForUnityEditorWindow>("Miakono Unity MCP");
             window.minSize = new Vector2(500, 340);
         }
 
@@ -360,8 +360,8 @@ namespace MCPForUnity.Editor.Windows
             string version = AssetPathUtility.GetPackageVersion();
             versionLabel.text = $"v{version}";
             versionLabel.tooltip = AssetPathUtility.IsPreReleaseVersion()
-                ? $"MCP For Unity v{version} (pre-release package, using prerelease server channel)"
-                : $"MCP For Unity v{version}";
+                ? $"Miakono Unity MCP v{version} (pre-release package, using prerelease server channel)"
+                : $"Miakono Unity MCP v{version}";
         }
 
         private void QueueUpdateCheck()

@@ -62,6 +62,12 @@ class ServerConfig:
     # Align with telemetry.py default Cloud Run endpoint
     telemetry_endpoint: str = "https://api-prod.coplay.dev/telemetry/events"
 
+    # Reflection/Introspection settings
+    # WARNING: Enabling reflection allows runtime examination and invocation of
+    # arbitrary types and methods. This is a powerful but potentially dangerous
+    # feature that should only be enabled in trusted environments.
+    reflection_enabled: bool = False
+
 
 # Create a global config instance
 config = ServerConfig()

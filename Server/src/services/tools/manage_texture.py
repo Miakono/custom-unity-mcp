@@ -141,6 +141,9 @@ def _normalize_sprite_settings(value: Any) -> tuple[dict | None, str | None]:
     if isinstance(value, bool) and value:
         # Just enable sprite mode with defaults
         return {"pivot": [0.5, 0.5], "pixelsPerUnit": 100}, None
+    if isinstance(value, bool) and not value:
+        # Explicitly disabled sprite mode is valid and should behave the same as omission.
+        return None, None
 
     return None, f"as_sprite must be a dict or boolean, got {type(value).__name__}"
 

@@ -1,7 +1,7 @@
 [project]
 name = "mcpforunityserver"
-version = "9.4.7"
-description = "MCP for Unity Server: A Unity package for Unity Editor integration via the Model Context Protocol (MCP)."
+version = "0.1.0"
+description = "Miakono Unity MCP Server: Unity Editor integration via the Model Context Protocol (MCP)."
 readme = "README.md"
 license = "MIT"
 authors = [
@@ -37,6 +37,7 @@ dependencies = [
  "fastapi>=0.104.0",
  "uvicorn>=0.35.0",
  "click>=8.1.0",
+ "pyyaml>=6.0",
 ]
 
 [project.optional-dependencies]

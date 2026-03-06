@@ -26,7 +26,7 @@ namespace MCPForUnity.Editor.Services.Server
             bool useHttpTransport = EditorConfigurationCache.Instance.UseHttpTransport;
             if (!useHttpTransport)
             {
-                error = "HTTP transport is disabled. Enable it in the MCP For Unity window first.";
+                error = "HTTP transport is disabled. Enable it in the Miakono Unity MCP window first.";
                 return false;
             }
 

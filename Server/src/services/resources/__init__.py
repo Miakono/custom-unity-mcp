@@ -2,6 +2,7 @@
 MCP Resources package - Auto-discovers and registers all resources in this directory.
 """
 import inspect
+import json
 import logging
 from pathlib import Path
 
@@ -16,6 +17,22 @@ logger = logging.getLogger("mcp-for-unity-server")
 
 # Export decorator for easy imports within tools
 __all__ = ['register_all_resources']
+
+
+def _serialize_resource_result(result):
+    """
+    Normalize resource handler results for FastMCP.
+
+    FastMCP resource handlers must return str, bytes, or ResourceContent blocks.
+    Many Unity resources in this fork return dicts or MCPResponse models so they are
+    convenient to call directly in tests. Serialize those structured payloads to JSON
+    only at the MCP registration boundary so both call sites continue to work.
+    """
+    if isinstance(result, (str, bytes)):
+        return result
+    if hasattr(result, "model_dump"):
+        result = result.model_dump()
+    return json.dumps(result, indent=2, sort_keys=True, default=str)
 
 
 def register_all_resources(mcp: FastMCP, *, project_scoped_tools: bool = True):
@@ -55,7 +72,10 @@ def register_all_resources(mcp: FastMCP, *, project_scoped_tools: bool = True):
         has_query_params = '{?' in uri
 
         if has_query_params:
-            wrapped_template = log_execution(resource_name, "Resource")(func)
+            async def _template_adapter(*args, _func=func, **inner_kwargs):
+                return _serialize_resource_result(await _func(*args, **inner_kwargs))
+
+            wrapped_template = log_execution(resource_name, "Resource")(_template_adapter)
             wrapped_template = telemetry_resource(
                 resource_name)(wrapped_template)
             wrapped_template = mcp.resource(
@@ -69,7 +89,10 @@ def register_all_resources(mcp: FastMCP, *, project_scoped_tools: bool = True):
             registered_count += 1
             resource_info['func'] = wrapped_template
         else:
-            wrapped = log_execution(resource_name, "Resource")(func)
+            async def _resource_adapter(*args, _func=func, **inner_kwargs):
+                return _serialize_resource_result(await _func(*args, **inner_kwargs))
+
+            wrapped = log_execution(resource_name, "Resource")(_resource_adapter)
             wrapped = telemetry_resource(resource_name)(wrapped)
             wrapped = mcp.resource(
                 uri=uri,

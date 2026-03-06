@@ -72,7 +72,7 @@ namespace MCPForUnity.Runtime.Helpers
             "The Screen Capture module (com.unity.modules.screencapture) is not enabled. " +
             "To use screenshot capture with ScreenCapture API, please enable it in Unity: " +
             "Window > Package Manager > Built-in > Screen Capture > Enable. " +
-            "Alternatively, MCP for Unity will use camera-based capture as a fallback if a Camera exists in the scene.";
+            "Alternatively, Miakono Unity MCP will use camera-based capture as a fallback if a Camera exists in the scene.";
 
         private static Camera FindAvailableCamera()
         {
@@ -84,8 +84,8 @@ namespace MCPForUnity.Runtime.Helpers
 
             try
             {
-                // Use FindObjectsOfType for Unity 2021 compatibility.
-                var cams = UnityEngine.Object.FindObjectsOfType<Camera>();
+                // Use FindObjectsByType for modern Unity API.
+                var cams = UnityEngine.Object.FindObjectsByType<Camera>(FindObjectsSortMode.None);
                 return cams.FirstOrDefault();
             }
             catch
@@ -107,7 +107,7 @@ namespace MCPForUnity.Runtime.Helpers
             else
             {
                 // Module disabled - try camera fallback
-                Debug.LogWarning("[MCP for Unity] " + ScreenCaptureModuleNotAvailableError);
+                Debug.LogWarning("[Miakono Unity MCP] " + ScreenCaptureModuleNotAvailableError);
                 return CaptureWithCameraFallback(fileName, superSize, ensureUniqueFileName);
             }
 #else
@@ -120,7 +120,7 @@ namespace MCPForUnity.Runtime.Helpers
         {
             if (!s_loggedLegacyScreenCaptureFallback)
             {
-                Debug.Log("[MCP for Unity] Using camera-based screenshot capture. " +
+                Debug.Log("[Miakono Unity MCP] Using camera-based screenshot capture. " +
                     "This requires a Camera in the scene. For best results on Unity 2022.1+, ensure the Screen Capture module is enabled: " +
                     "Window > Package Manager > Built-in > Screen Capture > Enable.");
                 s_loggedLegacyScreenCaptureFallback = true;

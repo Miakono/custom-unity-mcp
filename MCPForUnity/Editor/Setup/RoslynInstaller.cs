@@ -19,7 +19,7 @@ namespace MCPForUnity.Editor.Setup
             ("system.reflection.metadata",       "8.0.0",  "lib/netstandard2.0/System.Reflection.Metadata.dll",   "System.Reflection.Metadata.dll"),
         };
 
-        [MenuItem("Window/MCP For Unity/Install Roslyn DLLs", priority = 20)]
+        [MenuItem("Window/Miakono Unity MCP/Install Roslyn DLLs", priority = 20)]
         public static void InstallViaMenu()
         {
             Install(interactive: true);

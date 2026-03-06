@@ -20,8 +20,7 @@ namespace MCPForUnity.Editor.Services
         private const string CachedBetaVersionKey = EditorPrefKeys.LatestKnownVersion + ".beta";
         private const string LastAssetStoreCheckDateKey = EditorPrefKeys.LastAssetStoreUpdateCheck;
         private const string CachedAssetStoreVersionKey = EditorPrefKeys.LatestKnownAssetStoreVersion;
-        private const string MainPackageJsonUrl = "https://raw.githubusercontent.com/CoplayDev/unity-mcp/main/MCPForUnity/package.json";
-        private const string BetaPackageJsonUrl = "https://raw.githubusercontent.com/CoplayDev/unity-mcp/beta/MCPForUnity/package.json";
+        private const string DefaultRepositoryUrl = "https://github.com/Miakono/custom-unity-mcp";
         private const string AssetStoreVersionUrl = "https://gqoqjkkptwfbkwyssmnj.supabase.co/storage/v1/object/public/coplay-images/assetstoreversion.json";
 
         /// <inheritdoc/>
@@ -256,21 +255,10 @@ namespace MCPForUnity.Editor.Services
         {
             try
             {
-                // GitHub API endpoint (Option 1 - has rate limits):
-                // https://api.github.com/repos/CoplayDev/unity-mcp/releases/latest
-                //
-                // We use Option 2 (package.json directly) because:
-                // - No API rate limits (GitHub serves raw files freely)
-                // - Simpler - just parse JSON for version field
-                // - More reliable - doesn't require releases to be published
-                // - Direct source of truth from the main branch
-
                 using (var client = new WebClient())
                 {
                     client.Headers.Add("User-Agent", "Unity-MCPForUnity-UpdateChecker");
-                    string packageJsonUrl = string.Equals(branch, "beta", StringComparison.OrdinalIgnoreCase)
-                        ? BetaPackageJsonUrl
-                        : MainPackageJsonUrl;
+                    string packageJsonUrl = BuildPackageJsonUrl(branch);
                     string jsonContent = client.DownloadString(packageJsonUrl);
 
                     var packageJson = JObject.Parse(jsonContent);
@@ -285,6 +273,78 @@ namespace MCPForUnity.Editor.Services
                 McpLog.Info($"Update check failed (this is normal if offline): {ex.Message}");
                 return null;
             }
+        }
+
+        private static string BuildPackageJsonUrl(string branch)
+        {
+            string repoUrl = GetRepositoryUrl();
+            if (!TryParseGitHubRepo(repoUrl, out string owner, out string repo))
+            {
+                throw new InvalidOperationException($"Package repository URL is not a supported GitHub URL: {repoUrl}");
+            }
+
+            string normalizedBranch = string.IsNullOrWhiteSpace(branch) ? "main" : branch.Trim();
+            return $"https://raw.githubusercontent.com/{Uri.EscapeDataString(owner)}/{Uri.EscapeDataString(repo)}/{Uri.EscapeDataString(normalizedBranch)}/MCPForUnity/package.json";
+        }
+
+        private static string GetRepositoryUrl()
+        {
+            try
+            {
+                var packageJson = AssetPathUtility.GetPackageJson();
+                string repositoryUrl = packageJson?["repositoryUrl"]?.ToString();
+                if (!string.IsNullOrWhiteSpace(repositoryUrl))
+                {
+                    return repositoryUrl;
+                }
+
+                string documentationUrl = packageJson?["documentationUrl"]?.ToString();
+                if (!string.IsNullOrWhiteSpace(documentationUrl))
+                {
+                    return documentationUrl;
+                }
+            }
+            catch (Exception ex)
+            {
+                McpLog.Info($"Failed to resolve repository URL from package.json: {ex.Message}");
+            }
+
+            return DefaultRepositoryUrl;
+        }
+
+        private static bool TryParseGitHubRepo(string repoUrl, out string owner, out string repo)
+        {
+            owner = null;
+            repo = null;
+
+            if (string.IsNullOrWhiteSpace(repoUrl))
+            {
+                return false;
+            }
+
+            string trimmed = repoUrl.Trim();
+            if (trimmed.StartsWith("git@github.com:", StringComparison.OrdinalIgnoreCase))
+            {
+                trimmed = "https://github.com/" + trimmed.Substring("git@github.com:".Length);
+            }
+
+            if (!Uri.TryCreate(trimmed, UriKind.Absolute, out var uri) ||
+                !string.Equals(uri.Host, "github.com", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            string[] segments = uri.AbsolutePath.Trim('/').Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries);
+            if (segments.Length < 2)
+            {
+                return false;
+            }
+
+            owner = segments[0];
+            repo = segments[1].EndsWith(".git", StringComparison.OrdinalIgnoreCase)
+                ? segments[1].Substring(0, segments[1].Length - 4)
+                : segments[1];
+            return !string.IsNullOrWhiteSpace(owner) && !string.IsNullOrWhiteSpace(repo);
         }
 
         private struct ParsedVersion

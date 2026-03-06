@@ -1037,14 +1037,21 @@ namespace MCPForUnity.Editor.Tools
                     s_panelRTs[psId] = rt;
                     rtJustAssigned = true;
 
-                    // Mark dirty and force editor repaint so the panel renders into the RT
-                    uiDoc.rootVisualElement?.MarkDirtyRepaint();
-                    EditorUtility.SetDirty(panelSettings);
-                    UnityEditorInternal.InternalEditorUtility.RepaintAllViews();
-
-                    // Force a synchronous layout + repaint pass
-                    Canvas.ForceUpdateCanvases();
                 }
+                else
+                {
+                    // Reattach the cached RT on subsequent calls. The previous call clears
+                    // targetTexture after capture so the UI returns to the normal display.
+                    panelSettings.targetTexture = rt;
+                }
+
+                // Mark dirty and force editor repaint so the panel renders into the RT.
+                uiDoc.rootVisualElement?.MarkDirtyRepaint();
+                EditorUtility.SetDirty(panelSettings);
+                UnityEditorInternal.InternalEditorUtility.RepaintAllViews();
+
+                // Force a synchronous layout + repaint pass before reading pixels.
+                Canvas.ForceUpdateCanvases();
 
                 // Read pixels from the RT
                 RenderTexture prevActive = RenderTexture.active;

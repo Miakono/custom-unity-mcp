@@ -32,7 +32,7 @@ namespace MCPForUnity.Editor.Windows
 
         public static void ShowWindow(DependencyCheckResult dependencyResult = null)
         {
-            var window = GetWindow<MCPSetupWindow>("MCP Setup");
+            var window = GetWindow<MCPSetupWindow>("Miakono MCP Setup");
             window.minSize = new Vector2(480, 320);
             window._dependencyResult = dependencyResult ?? DependencyManager.CheckAllDependencies();
             window.Show();
@@ -134,13 +134,13 @@ namespace MCPForUnity.Editor.Windows
             // Update overall status
             if (_dependencyResult.IsSystemReady)
             {
-                statusMessage.text = "✓ All requirements met! MCP for Unity is ready to use.";
+                statusMessage.text = "All requirements met. Miakono Unity MCP is ready to use.";
                 statusMessage.style.color = new StyleColor(Color.green);
                 installationSection.style.display = DisplayStyle.None;
             }
             else
             {
-                statusMessage.text = "⚠ Missing dependencies. MCP for Unity requires all dependencies to function.";
+                statusMessage.text = "Missing dependencies. Miakono Unity MCP needs Python and uv available before local launch.";
                 statusMessage.style.color = new StyleColor(new Color(1f, 0.6f, 0f)); // Orange
                 installationSection.style.display = DisplayStyle.Flex;
                 installationInstructions.text = DependencyManager.GetInstallationRecommendations();
