@@ -47,8 +47,8 @@ dev = [
 ]
 
 [project.urls]
-Repository = "https://github.com/CoplayDev/unity-mcp.git"
-Issues = "https://github.com/CoplayDev/unity-mcp/issues"
+Repository = "https://github.com/Miakono/custom-unity-mcp.git"
+Issues = "https://github.com/Miakono/custom-unity-mcp/issues"
 
 [project.scripts]
 mcp-for-unity = "main:main"

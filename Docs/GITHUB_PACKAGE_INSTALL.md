@@ -9,7 +9,7 @@ Use a dependency entry shaped like this:
 ```json
 {
   "dependencies": {
-    "com.customgamedev.unity-mcp": "https://github.com/OWNER/REPO.git?path=/MCPForUnity#main"
+    "com.customgamedev.unity-mcp": "https://github.com/Miakono/custom-unity-mcp.git?path=/MCPForUnity#main"
   }
 }
 ```
@@ -29,7 +29,7 @@ Example:
 ```powershell
 .\Scripts\Install-MCPForUnityGitPackage.ps1 `
   -UnityProjectPath "C:\Projects\MyGame" `
-  -GitUrl "https://github.com/OWNER/REPO" `
+  -GitUrl "https://github.com/Miakono/custom-unity-mcp" `
   -GitRef "main"
 ```
 
@@ -39,7 +39,7 @@ That updates:
 
 with:
 
-`com.customgamedev.unity-mcp = https://github.com/OWNER/REPO.git?path=/MCPForUnity#main`
+`com.customgamedev.unity-mcp = https://github.com/Miakono/custom-unity-mcp.git?path=/MCPForUnity#main`
 
 ## Manual install
 

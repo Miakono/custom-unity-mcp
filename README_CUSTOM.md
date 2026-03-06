@@ -3,7 +3,7 @@
 This project is derived from CoplayDev/unity-mcp (MIT License).
 
 Upstream source:
-- https://github.com/CoplayDev/unity-mcp
+- https://github.com/Miakono/custom-unity-mcp (forked from https://github.com/CoplayDev/unity-mcp)
 
 Included upstream files:
 - MCPForUnity/
