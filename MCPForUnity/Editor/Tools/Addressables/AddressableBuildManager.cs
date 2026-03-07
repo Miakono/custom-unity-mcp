@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using UnityEditor;
@@ -115,9 +116,7 @@ namespace MCPForUnity.Editor.Tools.Addressables
                 if (buildScript == null)
                     return new ErrorResponse("Could not find Addressables build script.");
 
-                result = buildScript.BuildData<AddressableAssetBuildResult>(
-                    settings,
-                    buildScriptPath: AssetDatabase.GetAssetPath(buildScript));
+                result = InvokeBuildData(buildScript, settings);
 
                 // Build result
                 var buildReport = new
@@ -301,19 +300,61 @@ namespace MCPForUnity.Editor.Tools.Addressables
 
         #region Private Helper Methods
 
-        private static AddressableDataBuilderInput GetBuildScript(AddressableAssetSettings settings)
+        private static UnityEngine.Object GetBuildScript(AddressableAssetSettings settings)
         {
             // Find the default build script
             var buildScript = settings.DataBuilders.Find(
-                db => db.GetType() == typeof(BuildScriptPackedMode));
+                db => db != null && db.GetType().Name == nameof(BuildScriptPackedMode));
             
             if (buildScript == null)
             {
                 // Try to find any build script
-                buildScript = settings.DataBuilders.FirstOrDefault();
+                buildScript = settings.DataBuilders.FirstOrDefault(db => db != null);
             }
 
-            return buildScript as AddressableDataBuilderInput;
+            return buildScript as UnityEngine.Object;
+        }
+
+        private static AddressableAssetBuildResult InvokeBuildData(UnityEngine.Object buildScript, AddressableAssetSettings settings)
+        {
+            if (buildScript == null)
+                return null;
+
+            var type = buildScript.GetType();
+            var methods = type
+                .GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+                .Where(m => m.Name == "BuildData" && m.IsGenericMethodDefinition)
+                .ToList();
+
+            foreach (var method in methods)
+            {
+                var parameters = method.GetParameters();
+                if (parameters.Length == 0)
+                    continue;
+
+                if (!parameters[0].ParameterType.IsAssignableFrom(typeof(AddressableAssetSettings))
+                    && !typeof(AddressableAssetSettings).IsAssignableFrom(parameters[0].ParameterType))
+                    continue;
+
+                var generic = method.MakeGenericMethod(typeof(AddressableAssetBuildResult));
+                object[] args;
+
+                if (parameters.Length == 1)
+                {
+                    args = new object[] { settings };
+                }
+                else
+                {
+                    args = new object[] { settings, AssetDatabase.GetAssetPath(buildScript) };
+                }
+
+                var invokeResult = generic.Invoke(buildScript, args);
+                if (invokeResult is AddressableAssetBuildResult typedResult)
+                    return typedResult;
+            }
+
+            throw new MissingMethodException(
+                $"Could not find a compatible BuildData<T>(...) method on {type.FullName}.");
         }
 
         private static object GetDryRunInfo(AddressableAssetSettings settings, BuildTarget target, string platformName)
