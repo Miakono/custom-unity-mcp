@@ -9,20 +9,37 @@ Tool group: `core`
 Activate with: `manage_tools(action="activate", group="core")`
 
 Shared meta-tools:
+- `clear_traces`
+- `compare_benchmarks`
+- `configure_replay_scenario`
 - `debug_request_context`
+- `delete_fixture`
 - `execute_custom_tool`
+- `get_benchmark_results`
+- `get_benchmark_trends`
+- `get_captured_fixtures`
+- `get_trace_summary`
+- `import_fixtures`
+- `list_benchmarks`
+- `list_replay_sessions`
+- `list_traces`
 - `manage_catalog`
 - `manage_error_catalog`
 - `manage_script_capabilities`
 - `manage_subagents`
 - `manage_tools`
+- `replay_request`
 - `set_active_instance`
+- `stop_fixture_capture`
+- `stop_fixture_replay`
+- `stop_trace`
 
 Primary tools:
 - `batch_execute`
 - `execute_menu_item`
 - `find_gameobjects`
 - `find_in_file`
+- `get_command_stats`
 - `get_diagnostics`
 - `manage_addressables`
 - `manage_asset`
@@ -49,7 +66,10 @@ Primary tools:
 - `validate_script`
 - `manage_script`
 - `get_sha`
+- `manage_selection`
 - `manage_video_capture`
+- `manage_windows`
+- `ping`
 - `read_console`
 - `validate_compile_health`
 - `get_runtime_status`
@@ -57,6 +77,8 @@ Primary tools:
 - `execute_runtime_command`
 - `get_runtime_connection_info`
 - `script_apply_edits`
+- `list_event_subscriptions`
+- `poll_subscription_events`
 
 Use when:
 - Scene composition, hierarchy edits, and asset inspection.

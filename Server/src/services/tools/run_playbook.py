@@ -18,8 +18,19 @@ from transport.legacy.unity_connection import async_send_command_with_retry
 BUILT_IN_PLAYBOOKS_DIR = Path(__file__).parent / "playbooks"
 
 
+def _ensure_built_in_playbooks() -> None:
+    try:
+        from services.tools import create_playbook as cp_module
+
+        cp_module._ensure_built_in_playbooks()
+    except Exception:
+        pass
+
+
 def _find_playbook(name: str) -> tuple[dict[str, Any] | None, Path | None]:
     """Find a playbook by name."""
+    _ensure_built_in_playbooks()
+
     # Check built-in first
     built_in_path = BUILT_IN_PLAYBOOKS_DIR / f"{name}.json"
     if built_in_path.exists():

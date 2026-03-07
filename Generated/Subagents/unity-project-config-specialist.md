@@ -1,53 +1,47 @@
-# Unity Project Config Specialist
+# Unity Project_Config Specialist
 
 ID: `unity-project-config-specialist`
 Kind: `specialist`
 
-Owns project configuration, asset intelligence, package registry management, and project memory/rules.
+Project and Asset Intelligence – settings, registries, dependencies, built-in assets
 
 Tool group: `project_config`
 Activate with: `manage_tools(action="activate", group="project_config")`
 
 Shared meta-tools:
+- `clear_traces`
+- `compare_benchmarks`
+- `configure_replay_scenario`
 - `debug_request_context`
+- `delete_fixture`
 - `execute_custom_tool`
+- `get_benchmark_results`
+- `get_benchmark_trends`
+- `get_captured_fixtures`
+- `get_trace_summary`
+- `import_fixtures`
+- `list_benchmarks`
+- `list_replay_sessions`
+- `list_traces`
 - `manage_catalog`
 - `manage_error_catalog`
 - `manage_script_capabilities`
 - `manage_subagents`
 - `manage_tools`
+- `replay_request`
 - `set_active_instance`
+- `stop_fixture_capture`
+- `stop_fixture_replay`
+- `stop_trace`
 
 Primary tools:
-- `manage_project_settings`
-- `manage_editor_settings`
-- `manage_registry_config`
 - `analyze_asset_dependencies`
-- `manage_asset_import_settings`
-- `list_shaders`
 - `find_builtin_assets`
 - `get_component_types`
 - `get_object_references`
+- `list_shaders`
+- `manage_asset_import_settings`
+- `manage_editor_settings`
 - `manage_project_memory`
-
-Use when:
-- Project settings inspection or mutation
-- Editor preferences configuration
-- Package registry management
-- Asset dependency graph analysis
-- Import settings inspection and configuration
-- Shader and built-in asset discovery
-- Component type enumeration
-- Object reference graph inspection
-- Project rules and conventions management
-
-Workflow:
-- Activate the project_config group for the current session.
-- Inspect current configuration before making targeted updates.
-- Make changes through the appropriate configuration tools.
-- Validate changes compile and work correctly.
-- Route asset operations to core builder, validation to testing specialist.
-
-Handoff targets:
-- `unity-core-builder` (for asset operations)
-- `unity-testing-specialist` (for validation)
+- `manage_project_settings`
+- `manage_registry_config`

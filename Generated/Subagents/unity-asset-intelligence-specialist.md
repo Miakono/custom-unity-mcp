@@ -1,12 +1,12 @@
-# Unity Input Specialist
+# Unity Asset_Intelligence Specialist
 
-ID: `unity-input-specialist`
+ID: `unity-asset-intelligence-specialist`
 Kind: `specialist`
 
-Unity Input System - Action Maps, Actions, Bindings, and Runtime Simulation
+Advanced asset search, indexing, and analysis
 
-Tool group: `input`
-Activate with: `manage_tools(action="activate", group="input")`
+Tool group: `asset_intelligence`
+Activate with: `manage_tools(action="activate", group="asset_intelligence")`
 
 Shared meta-tools:
 - `clear_traces`
@@ -35,4 +35,8 @@ Shared meta-tools:
 - `stop_trace`
 
 Primary tools:
-- `manage_input_system`
+- `asset_index_status`
+- `build_asset_index`
+- `find_asset_references`
+- `search_assets_advanced`
+- `summarize_asset`

@@ -8,9 +8,7 @@ Date: 2026-03-05
 - Current validation workflow reference: [Docs/V2_V3_VALIDATION_PLAN.md](Docs/V2_V3_VALIDATION_PLAN.md)
 - Current subagent/catalog usage reference: [Docs/SUBAGENTS.md](Docs/SUBAGENTS.md)
 - Supporting live smoke and task-specific operational references: [Docs/LIVE_TEST_MATRIX.md](Docs/LIVE_TEST_MATRIX.md), [Docs/MAGE_FIREBALL_VFX.md](Docs/MAGE_FIREBALL_VFX.md)
-- Historical archive index: [Docs/Archive/README.md](Docs/Archive/README.md)
-- Historical premium planning records: [Docs/Archive/PREMIUM_FEATURE_PLAN.md](Docs/Archive/PREMIUM_FEATURE_PLAN.md), [Docs/Archive/PREMIUM_FEATURE_PLAN_V2.md](Docs/Archive/PREMIUM_FEATURE_PLAN_V2.md), [Docs/Archive/PREMIUM_FEATURE_PLAN_V3.md](Docs/Archive/PREMIUM_FEATURE_PLAN_V3.md)
-- Historical implementation/planning records: [Docs/Archive/V2_IMPLEMENTATION_SUMMARY.md](Docs/Archive/V2_IMPLEMENTATION_SUMMARY.md), [Docs/Archive/SUBAGENT_V2_IMPLEMENTATION_PLAN.md](Docs/Archive/SUBAGENT_V2_IMPLEMENTATION_PLAN.md), [Docs/Archive/V2_V3_IMPLEMENTATION_REPORT.md](Docs/Archive/V2_V3_IMPLEMENTATION_REPORT.md), [Docs/Archive/HANDOFF_2026-03-05.md](Docs/Archive/HANDOFF_2026-03-05.md)
+- Historical archive index (superseded plans and handoffs): [Docs/Archive/README.md](Docs/Archive/README.md)
 
 Use this roadmap as the top-level index. Do not treat all plan documents as equally current.
 
@@ -19,7 +17,10 @@ Use this roadmap as the top-level index. Do not treat all plan documents as equa
 - Improve reliability before adding higher-level automation.
 - Add observable acceptance checks for each phase.
 - See [Docs/GAP_CLOSURE_PLAN.md](Docs/GAP_CLOSURE_PLAN.md) for the current repo-grounded remediation plan.
-- See [Docs/Archive/PREMIUM_FEATURE_PLAN.md](Docs/Archive/PREMIUM_FEATURE_PLAN.md), [Docs/Archive/PREMIUM_FEATURE_PLAN_V2.md](Docs/Archive/PREMIUM_FEATURE_PLAN_V2.md), and [Docs/Archive/PREMIUM_FEATURE_PLAN_V3.md](Docs/Archive/PREMIUM_FEATURE_PLAN_V3.md) for the historical premium roadmap sequence.
+- See [Docs/Archive/README.md](Docs/Archive/README.md) for superseded premium and implementation planning docs.
+
+Archive guardrail:
+- If guidance in an archived planning document conflicts with this roadmap or current docs in `Docs/`, treat archived guidance as historical context only.
 
 ## v0.1 Safety and Reliability (Current)
 Status: Complete

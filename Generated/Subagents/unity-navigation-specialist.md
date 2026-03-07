@@ -1,12 +1,12 @@
-# Unity Input Specialist
+# Unity Navigation Specialist
 
-ID: `unity-input-specialist`
+ID: `unity-navigation-specialist`
 Kind: `specialist`
 
-Unity Input System - Action Maps, Actions, Bindings, and Runtime Simulation
+Editor navigation and focus tools
 
-Tool group: `input`
-Activate with: `manage_tools(action="activate", group="input")`
+Tool group: `navigation`
+Activate with: `manage_tools(action="activate", group="navigation")`
 
 Shared meta-tools:
 - `clear_traces`
@@ -35,4 +35,8 @@ Shared meta-tools:
 - `stop_trace`
 
 Primary tools:
-- `manage_input_system`
+- `focus_hierarchy`
+- `frame_scene_target`
+- `navigate_editor`
+- `open_inspector_target`
+- `reveal_asset`

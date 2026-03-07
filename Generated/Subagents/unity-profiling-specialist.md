@@ -1,12 +1,12 @@
-# Unity Input Specialist
+# Unity Profiling Specialist
 
-ID: `unity-input-specialist`
+ID: `unity-profiling-specialist`
 Kind: `specialist`
 
-Unity Input System - Action Maps, Actions, Bindings, and Runtime Simulation
+Unity Profiler capture, analysis, and performance diagnostics
 
-Tool group: `input`
-Activate with: `manage_tools(action="activate", group="input")`
+Tool group: `profiling`
+Activate with: `manage_tools(action="activate", group="profiling")`
 
 Shared meta-tools:
 - `clear_traces`
@@ -35,4 +35,5 @@ Shared meta-tools:
 - `stop_trace`
 
 Primary tools:
-- `manage_input_system`
+- `manage_profiler`
+- `record_profiler_session`

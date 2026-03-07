@@ -1,12 +1,12 @@
-# Unity Input Specialist
+# Unity Events Specialist
 
-ID: `unity-input-specialist`
+ID: `unity-events-specialist`
 Kind: `specialist`
 
-Unity Input System - Action Maps, Actions, Bindings, and Runtime Simulation
+Editor event subscription and condition waiting
 
-Tool group: `input`
-Activate with: `manage_tools(action="activate", group="input")`
+Tool group: `events`
+Activate with: `manage_tools(action="activate", group="events")`
 
 Shared meta-tools:
 - `clear_traces`
@@ -35,4 +35,6 @@ Shared meta-tools:
 - `stop_trace`
 
 Primary tools:
-- `manage_input_system`
+- `subscribe_editor_events`
+- `unsubscribe_editor_events`
+- `wait_for_editor_condition`

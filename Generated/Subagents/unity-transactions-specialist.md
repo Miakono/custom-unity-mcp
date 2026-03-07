@@ -1,12 +1,12 @@
-# Unity Input Specialist
+# Unity Transactions Specialist
 
-ID: `unity-input-specialist`
+ID: `unity-transactions-specialist`
 Kind: `specialist`
 
-Unity Input System - Action Maps, Actions, Bindings, and Runtime Simulation
+Transaction management with rollback and preview capabilities
 
-Tool group: `input`
-Activate with: `manage_tools(action="activate", group="input")`
+Tool group: `transactions`
+Activate with: `manage_tools(action="activate", group="transactions")`
 
 Shared meta-tools:
 - `clear_traces`
@@ -35,4 +35,6 @@ Shared meta-tools:
 - `stop_trace`
 
 Primary tools:
-- `manage_input_system`
+- `manage_transactions`
+- `preview_changes`
+- `rollback_changes`

@@ -59,6 +59,30 @@ namespace MCPForUnity.Editor.Tools
             public List<Dictionary<string, object>> Results = new List<Dictionary<string, object>>();
         }
 
+        internal sealed class AssetIndexEntry
+        {
+            public string Guid;
+            public string Path;
+            public string Type;
+            public string ImporterType;
+            public long SizeBytes;
+            public DateTime ModifiedAtUtc;
+            public List<string> Dependencies = new List<string>();
+            public List<string> ReferencedBy = new List<string>();
+            public List<string> Labels = new List<string>();
+        }
+
+        internal sealed class AssetIndexSnapshot
+        {
+            public string SnapshotId;
+            public string Scope;
+            public DateTime BuiltAtUtc;
+            public bool IncludeDependencies;
+            public bool IncludeReferences;
+            public bool IncludeImportSettings;
+            public Dictionary<string, AssetIndexEntry> Entries = new Dictionary<string, AssetIndexEntry>(StringComparer.OrdinalIgnoreCase);
+        }
+
         internal static readonly Dictionary<string, TraceSession> ActiveTraces = new Dictionary<string, TraceSession>();
         internal static readonly Dictionary<string, TraceSession> CompletedTraces = new Dictionary<string, TraceSession>();
         internal static readonly Dictionary<string, TransactionSession> Transactions = new Dictionary<string, TransactionSession>();
@@ -66,6 +90,7 @@ namespace MCPForUnity.Editor.Tools
         internal static readonly Dictionary<string, BenchmarkRun> Benchmarks = new Dictionary<string, BenchmarkRun>();
         internal static string CurrentTraceId;
         internal static bool ImportPaused;
+        internal static AssetIndexSnapshot CurrentAssetIndex;
     }
 
     internal static class LiveV2V3ToolCommon
@@ -592,6 +617,1214 @@ namespace MCPForUnity.Editor.Tools
 
             buildTarget = EditorUserBuildSettings.activeBuildTarget;
             return false;
+        }
+    }
+
+    internal static class LiveV2V3AssetUtility
+    {
+        private static readonly string[] DefaultBuiltinMeshNames =
+        {
+            "Cube",
+            "Sphere",
+            "Capsule",
+            "Cylinder",
+            "Plane",
+            "Quad",
+        };
+
+        private static readonly string[] DefaultBuiltinShaderNames =
+        {
+            "Standard",
+            "Sprites/Default",
+            "UI/Default",
+            "Unlit/Color",
+            "Universal Render Pipeline/Lit",
+            "Universal Render Pipeline/Unlit",
+        };
+
+        internal static string ResolveAssetPath(JObject @params, params string[] names)
+        {
+            foreach (string name in names)
+            {
+                string raw = LiveV2V3ToolCommon.GetStringParam(@params, name);
+                if (string.IsNullOrWhiteSpace(raw))
+                {
+                    continue;
+                }
+
+                string sanitized = LiveV2V3ToolCommon.SanitizeAssetPath(raw);
+                if (!string.IsNullOrWhiteSpace(sanitized))
+                {
+                    return sanitized;
+                }
+
+                return raw;
+            }
+
+            string guid = LiveV2V3ToolCommon.GetStringParam(@params, "assetGuid", "asset_guid", "targetAssetGuid", "target_asset_guid");
+            if (!string.IsNullOrWhiteSpace(guid))
+            {
+                return AssetDatabase.GUIDToAssetPath(guid);
+            }
+
+            return null;
+        }
+
+        internal static List<string> EnumerateAssetPaths(string scope, IEnumerable<string> excludePaths = null)
+        {
+            string[] searchFolders = ResolveSearchFolders(scope);
+            HashSet<string> excluded = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (excludePaths != null)
+            {
+                foreach (string excludePath in excludePaths)
+                {
+                    if (!string.IsNullOrWhiteSpace(excludePath))
+                    {
+                        excluded.Add(LiveV2V3ToolCommon.SanitizeAssetPath(excludePath) ?? excludePath);
+                    }
+                }
+            }
+
+            List<string> paths = new List<string>();
+            foreach (string guid in AssetDatabase.FindAssets(string.Empty, searchFolders))
+            {
+                string path = AssetDatabase.GUIDToAssetPath(guid);
+                if (string.IsNullOrWhiteSpace(path) || AssetDatabase.IsValidFolder(path) || path.EndsWith(".meta", StringComparison.OrdinalIgnoreCase) || excluded.Contains(path))
+                {
+                    continue;
+                }
+
+                paths.Add(path);
+            }
+
+            return paths.Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(path => path, StringComparer.OrdinalIgnoreCase).ToList();
+        }
+
+        internal static string[] ResolveSearchFolders(string scope)
+        {
+            if (string.IsNullOrWhiteSpace(scope) || scope.Equals("project", StringComparison.OrdinalIgnoreCase) || scope.Equals("all", StringComparison.OrdinalIgnoreCase))
+            {
+                return null;
+            }
+
+            string[] folders = scope.Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(folder => LiveV2V3ToolCommon.SanitizeAssetPath(folder.Trim()) ?? folder.Trim())
+                .Where(folder => !string.IsNullOrWhiteSpace(folder) && AssetDatabase.IsValidFolder(folder))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            return folders.Length == 0 ? null : folders;
+        }
+
+        internal static LiveV2V3ToolState.AssetIndexSnapshot BuildSnapshot(string scope, bool includeDependencies, bool includeReferences, bool includeImportSettings, IEnumerable<string> excludePaths = null)
+        {
+            List<string> assetPaths = EnumerateAssetPaths(scope, excludePaths);
+            LiveV2V3ToolState.AssetIndexSnapshot snapshot = new LiveV2V3ToolState.AssetIndexSnapshot
+            {
+                SnapshotId = $"asset_index_{Guid.NewGuid():N}",
+                Scope = string.IsNullOrWhiteSpace(scope) ? "project" : scope,
+                BuiltAtUtc = DateTime.UtcNow,
+                IncludeDependencies = includeDependencies,
+                IncludeReferences = includeReferences,
+                IncludeImportSettings = includeImportSettings,
+            };
+
+            foreach (string assetPath in assetPaths)
+            {
+                LiveV2V3ToolState.AssetIndexEntry entry = BuildEntry(assetPath, includeDependencies);
+                if (includeImportSettings)
+                {
+                    AssetImporter importer = AssetImporter.GetAtPath(assetPath);
+                    entry.ImporterType = importer != null ? importer.GetType().Name : null;
+                }
+
+                snapshot.Entries[assetPath] = entry;
+            }
+
+            if (includeReferences)
+            {
+                PopulateReferencedBy(snapshot);
+            }
+
+            return snapshot;
+        }
+
+        internal static LiveV2V3ToolState.AssetIndexEntry BuildEntry(string assetPath, bool includeDependencies)
+        {
+            string fullPath = Path.GetFullPath(assetPath);
+            LiveV2V3ToolState.AssetIndexEntry entry = new LiveV2V3ToolState.AssetIndexEntry
+            {
+                Guid = AssetDatabase.AssetPathToGUID(assetPath),
+                Path = assetPath,
+                Type = AssetDatabase.GetMainAssetTypeAtPath(assetPath)?.Name ?? "Unknown",
+                SizeBytes = File.Exists(fullPath) ? new FileInfo(fullPath).Length : 0L,
+                ModifiedAtUtc = File.Exists(fullPath) ? File.GetLastWriteTimeUtc(fullPath) : DateTime.MinValue,
+                Labels = AssetDatabase.GetLabels(AssetDatabase.LoadMainAssetAtPath(assetPath)).ToList(),
+            };
+
+            if (includeDependencies)
+            {
+                entry.Dependencies = AssetDatabase.GetDependencies(assetPath, false)
+                    .Where(path => !string.Equals(path, assetPath, StringComparison.OrdinalIgnoreCase))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+            }
+
+            return entry;
+        }
+
+        internal static void PopulateReferencedBy(LiveV2V3ToolState.AssetIndexSnapshot snapshot)
+        {
+            foreach (LiveV2V3ToolState.AssetIndexEntry entry in snapshot.Entries.Values)
+            {
+                entry.ReferencedBy.Clear();
+            }
+
+            foreach (KeyValuePair<string, LiveV2V3ToolState.AssetIndexEntry> pair in snapshot.Entries)
+            {
+                string assetPath = pair.Key;
+                IEnumerable<string> dependencies = pair.Value.Dependencies.Count > 0
+                    ? pair.Value.Dependencies
+                    : AssetDatabase.GetDependencies(assetPath, false).Where(path => !string.Equals(path, assetPath, StringComparison.OrdinalIgnoreCase));
+
+                foreach (string dependency in dependencies)
+                {
+                    if (snapshot.Entries.TryGetValue(dependency, out LiveV2V3ToolState.AssetIndexEntry referencedEntry))
+                    {
+                        referencedEntry.ReferencedBy.Add(assetPath);
+                    }
+                }
+            }
+
+            foreach (LiveV2V3ToolState.AssetIndexEntry entry in snapshot.Entries.Values)
+            {
+                entry.ReferencedBy = entry.ReferencedBy
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+            }
+        }
+
+        internal static Dictionary<string, int> BuildTypeBreakdown(IEnumerable<LiveV2V3ToolState.AssetIndexEntry> entries)
+        {
+            return entries
+                .GroupBy(entry => entry.Type ?? "Unknown", StringComparer.OrdinalIgnoreCase)
+                .OrderBy(group => group.Key, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(group => group.Key, group => group.Count(), StringComparer.OrdinalIgnoreCase);
+        }
+
+        internal static bool MatchesAssetType(string actualType, string requestedType)
+        {
+            if (string.IsNullOrWhiteSpace(requestedType))
+            {
+                return true;
+            }
+
+            string normalizedRequested = requestedType.Trim().ToLowerInvariant();
+            string normalizedActual = (actualType ?? string.Empty).Trim().ToLowerInvariant();
+
+            if (normalizedActual.Contains(normalizedRequested))
+            {
+                return true;
+            }
+
+            return normalizedRequested switch
+            {
+                "mesh" => normalizedActual == "mesh" || normalizedActual == "gameobject",
+                "material" => normalizedActual == "material",
+                "texture" => normalizedActual.Contains("texture") || normalizedActual == "sprite",
+                "shader" => normalizedActual == "shader",
+                "prefab" => normalizedActual == "gameobject",
+                "scene" => normalizedActual == "sceneasset",
+                _ => false,
+            };
+        }
+
+        internal static string ComputeDependencyHash(string assetPath)
+        {
+            return AssetDatabase.GetAssetDependencyHash(assetPath).ToString();
+        }
+
+        internal static List<string> FindDependents(string assetPath, string scope, bool includeIndirect, int maxResults)
+        {
+            List<string> matches = new List<string>();
+            LiveV2V3ToolState.AssetIndexSnapshot snapshot = LiveV2V3ToolState.CurrentAssetIndex;
+            if (snapshot != null && snapshot.Entries.TryGetValue(assetPath, out LiveV2V3ToolState.AssetIndexEntry indexedEntry) && snapshot.IncludeReferences)
+            {
+                IEnumerable<string> indexedMatches = indexedEntry.ReferencedBy;
+                if (!string.IsNullOrWhiteSpace(scope) && !scope.Equals("project", StringComparison.OrdinalIgnoreCase) && !scope.Equals("all", StringComparison.OrdinalIgnoreCase))
+                {
+                    indexedMatches = indexedMatches.Where(path => path.StartsWith(scope, StringComparison.OrdinalIgnoreCase));
+                }
+
+                return indexedMatches
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .Take(maxResults > 0 ? maxResults : int.MaxValue)
+                    .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+            }
+
+            string assetFolder = Path.GetDirectoryName(assetPath)?.Replace('\\', '/');
+            if (!string.IsNullOrWhiteSpace(assetFolder) && AssetDatabase.IsValidFolder(assetFolder))
+            {
+                LiveV2V3ToolState.AssetIndexSnapshot folderSnapshot = BuildSnapshot(assetFolder, includeDependencies: true, includeReferences: true, includeImportSettings: false);
+                if (folderSnapshot.Entries.TryGetValue(assetPath, out indexedEntry))
+                {
+                    return indexedEntry.ReferencedBy
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .Take(maxResults > 0 ? maxResults : int.MaxValue)
+                        .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+                        .ToList();
+                }
+            }
+
+            foreach (string candidate in EnumerateReferenceCandidatePaths(scope))
+            {
+                if (string.Equals(candidate, assetPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                string[] dependencies = AssetDatabase.GetDependencies(candidate, includeIndirect);
+                if (!dependencies.Contains(assetPath, StringComparer.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                matches.Add(candidate);
+                if (maxResults > 0 && matches.Count >= maxResults)
+                {
+                    break;
+                }
+            }
+
+            return matches;
+        }
+
+        internal static IEnumerable<string> EnumerateReferenceCandidatePaths(string scope)
+        {
+            HashSet<string> likelyExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ".prefab",
+                ".unity",
+                ".asset",
+                ".mat",
+                ".controller",
+                ".overridecontroller",
+                ".anim",
+                ".playable",
+                ".shadergraph",
+                ".vfx",
+            };
+
+            return EnumerateAssetPaths(scope)
+                .Where(path => likelyExtensions.Contains(Path.GetExtension(path)));
+        }
+
+        internal static List<string> GetDependencies(string assetPath, bool includeIndirect, int maxDepth)
+        {
+            if (!includeIndirect || maxDepth <= 1)
+            {
+                return AssetDatabase.GetDependencies(assetPath, false)
+                    .Where(path => !string.Equals(path, assetPath, StringComparison.OrdinalIgnoreCase))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+            }
+
+            HashSet<string> visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            Queue<(string Path, int Depth)> queue = new Queue<(string Path, int Depth)>();
+            queue.Enqueue((assetPath, 0));
+
+            while (queue.Count > 0)
+            {
+                (string currentPath, int depth) = queue.Dequeue();
+                if (depth >= maxDepth)
+                {
+                    continue;
+                }
+
+                foreach (string dependency in AssetDatabase.GetDependencies(currentPath, false))
+                {
+                    if (string.Equals(dependency, currentPath, StringComparison.OrdinalIgnoreCase) || string.Equals(dependency, assetPath, StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    if (visited.Add(dependency))
+                    {
+                        queue.Enqueue((dependency, depth + 1));
+                    }
+                }
+            }
+
+            return visited.OrderBy(path => path, StringComparer.OrdinalIgnoreCase).ToList();
+        }
+
+        internal static Dictionary<string, object> BuildAssetDescriptor(string assetPath, bool includeImportSettings)
+        {
+            UnityEngine.Object asset = AssetDatabase.LoadMainAssetAtPath(assetPath);
+            AssetImporter importer = AssetImporter.GetAtPath(assetPath);
+            string fullPath = Path.GetFullPath(assetPath);
+            string guid = AssetDatabase.AssetPathToGUID(assetPath);
+            string typeName = asset != null ? asset.GetType().Name : AssetDatabase.GetMainAssetTypeAtPath(assetPath)?.Name ?? "Unknown";
+            string assetName = asset != null ? asset.name : Path.GetFileNameWithoutExtension(assetPath);
+            string hash = ComputeDependencyHash(assetPath);
+
+            return new Dictionary<string, object>
+            {
+                ["path"] = assetPath,
+                ["guid"] = guid,
+                ["name"] = assetName,
+                ["type"] = typeName,
+                ["fileHash"] = hash,
+                ["importSettings"] = includeImportSettings && importer != null ? LiveV2V3ToolCommon.CaptureImporterSettings(importer) : new Dictionary<string, object>(),
+                ["properties"] = new Dictionary<string, object>
+                {
+                    ["name"] = assetName,
+                    ["type"] = typeName,
+                    ["labels"] = AssetDatabase.GetLabels(asset).ToList(),
+                },
+                ["asset_path"] = assetPath,
+                ["asset_guid"] = guid,
+                ["hash"] = hash,
+                ["file_size_bytes"] = File.Exists(fullPath) ? new FileInfo(fullPath).Length : 0L,
+                ["last_modified_utc"] = File.Exists(fullPath) ? File.GetLastWriteTimeUtc(fullPath).ToString("o") : null,
+                ["import_settings"] = includeImportSettings && importer != null ? LiveV2V3ToolCommon.CaptureImporterSettings(importer) : null,
+            };
+        }
+
+        internal static List<Dictionary<string, object>> GetBuiltinAssets(string assetType, int maxResults)
+        {
+            List<Dictionary<string, object>> results = new List<Dictionary<string, object>>();
+            if (string.Equals(assetType, "mesh", StringComparison.OrdinalIgnoreCase))
+            {
+                foreach (string name in DefaultBuiltinMeshNames)
+                {
+                    results.Add(new Dictionary<string, object>
+                    {
+                        ["name"] = name,
+                        ["asset_type"] = "mesh",
+                        ["source"] = "builtin",
+                    });
+                }
+            }
+            else if (string.Equals(assetType, "shader", StringComparison.OrdinalIgnoreCase) || string.IsNullOrWhiteSpace(assetType))
+            {
+                foreach (string shaderName in EnumerateShaderNames())
+                {
+                    results.Add(new Dictionary<string, object>
+                    {
+                        ["name"] = shaderName,
+                        ["asset_type"] = "shader",
+                        ["source"] = "builtin_or_loaded",
+                    });
+                }
+            }
+
+            if (maxResults > 0)
+            {
+                results = results.Take(maxResults).ToList();
+            }
+
+            return results;
+        }
+
+        internal static List<string> EnumerateShaderNames()
+        {
+            HashSet<string> names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (Shader shader in UnityEngine.Resources.FindObjectsOfTypeAll<Shader>())
+            {
+                if (shader != null && !string.IsNullOrWhiteSpace(shader.name))
+                {
+                    names.Add(shader.name);
+                }
+            }
+
+            foreach (string shaderName in DefaultBuiltinShaderNames)
+            {
+                Shader shader = Shader.Find(shaderName);
+                if (shader != null)
+                {
+                    names.Add(shader.name);
+                }
+            }
+
+            return names.OrderBy(name => name, StringComparer.OrdinalIgnoreCase).ToList();
+        }
+
+        internal static Transform FindTransformByPath(Transform root, string relativePath)
+        {
+            if (root == null)
+            {
+                return null;
+            }
+
+            if (string.IsNullOrWhiteSpace(relativePath) || relativePath == "/" || string.Equals(relativePath, root.name, StringComparison.OrdinalIgnoreCase))
+            {
+                return root;
+            }
+
+            string[] parts = relativePath.Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries);
+            int index = parts.Length > 0 && string.Equals(parts[0], root.name, StringComparison.OrdinalIgnoreCase) ? 1 : 0;
+            Transform current = root;
+            for (; index < parts.Length; index++)
+            {
+                current = current.Find(parts[index]);
+                if (current == null)
+                {
+                    return null;
+                }
+            }
+
+            return current;
+        }
+    }
+
+    [McpForUnityTool("build_asset_index", AutoRegister = false)]
+    public static class BuildAssetIndex
+    {
+        public static object HandleCommand(JObject @params)
+        {
+            string action = (LiveV2V3ToolCommon.GetStringParam(@params, "action") ?? "build").ToLowerInvariant();
+            string scope = LiveV2V3ToolCommon.GetStringParam(@params, "scope") ?? "project";
+            bool includeDependencies = LiveV2V3ToolCommon.GetBoolParam(@params, "includeDependencies", "include_dependencies") ?? true;
+            bool includeReferences = LiveV2V3ToolCommon.GetBoolParam(@params, "includeReferences", "include_references") ?? true;
+            bool includeImportSettings = LiveV2V3ToolCommon.GetBoolParam(@params, "includeImportSettings", "include_import_settings") ?? false;
+            bool forceRebuild = LiveV2V3ToolCommon.GetBoolParam(@params, "forceRebuild", "force_rebuild") ?? false;
+            List<string> excludedPaths = (LiveV2V3ToolCommon.GetParam(@params, "excludePaths", "exclude_paths") as JArray)?.Values<string>().ToList() ?? new List<string>();
+
+            if (action == "clear")
+            {
+                LiveV2V3ToolState.CurrentAssetIndex = null;
+                return new SuccessResponse("Cleared asset index.", new { index_cleared = true });
+            }
+
+            Stopwatch stopwatch = Stopwatch.StartNew();
+            LiveV2V3ToolState.AssetIndexSnapshot snapshot = forceRebuild || LiveV2V3ToolState.CurrentAssetIndex == null || action == "build" || action == "update"
+                ? LiveV2V3AssetUtility.BuildSnapshot(scope, includeDependencies, includeReferences, includeImportSettings, excludedPaths)
+                : LiveV2V3ToolState.CurrentAssetIndex;
+            stopwatch.Stop();
+
+            if (action == "build" || action == "update" || action == "rebuild")
+            {
+                LiveV2V3ToolState.CurrentAssetIndex = snapshot;
+                return new SuccessResponse(
+                    action == "update" ? "Updated asset index." : "Built asset index.",
+                    new
+                    {
+                        snapshot_id = snapshot.SnapshotId,
+                        scope = snapshot.Scope,
+                        assets_indexed = snapshot.Entries.Count,
+                        dependencies_tracked = snapshot.Entries.Values.Sum(entry => entry.Dependencies.Count),
+                        references_tracked = snapshot.Entries.Values.Sum(entry => entry.ReferencedBy.Count),
+                        duration_seconds = Math.Round(stopwatch.Elapsed.TotalSeconds, 3),
+                        built_at = snapshot.BuiltAtUtc.ToString("o"),
+                        index_path = "memory://live-v2v3-asset-index",
+                        type_breakdown = LiveV2V3AssetUtility.BuildTypeBreakdown(snapshot.Entries.Values),
+                    }
+                );
+            }
+
+            if (action == "validate")
+            {
+                LiveV2V3ToolState.AssetIndexSnapshot current = LiveV2V3ToolState.CurrentAssetIndex;
+                if (current == null)
+                {
+                    current = snapshot;
+                    LiveV2V3ToolState.CurrentAssetIndex = current;
+                }
+
+                LiveV2V3ToolState.AssetIndexSnapshot fresh = LiveV2V3AssetUtility.BuildSnapshot(current.Scope, current.IncludeDependencies, current.IncludeReferences, current.IncludeImportSettings, excludedPaths);
+                HashSet<string> previousPaths = new HashSet<string>(current.Entries.Keys, StringComparer.OrdinalIgnoreCase);
+                HashSet<string> freshPaths = new HashSet<string>(fresh.Entries.Keys, StringComparer.OrdinalIgnoreCase);
+                List<string> missingAssets = previousPaths.Except(freshPaths, StringComparer.OrdinalIgnoreCase).OrderBy(path => path, StringComparer.OrdinalIgnoreCase).ToList();
+                List<string> newAssets = freshPaths.Except(previousPaths, StringComparer.OrdinalIgnoreCase).OrderBy(path => path, StringComparer.OrdinalIgnoreCase).ToList();
+                List<string> updatedAssets = fresh.Entries.Values
+                    .Where(entry => current.Entries.TryGetValue(entry.Path, out LiveV2V3ToolState.AssetIndexEntry existing) && (existing.ModifiedAtUtc != entry.ModifiedAtUtc || existing.SizeBytes != entry.SizeBytes || !string.Equals(existing.Guid, entry.Guid, StringComparison.OrdinalIgnoreCase)))
+                    .Select(entry => entry.Path)
+                    .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+                return new SuccessResponse(
+                    missingAssets.Count == 0 && newAssets.Count == 0 && updatedAssets.Count == 0 ? "Asset index is current." : "Asset index validation detected drift.",
+                    new
+                    {
+                        index_exists = LiveV2V3ToolState.CurrentAssetIndex != null,
+                        is_fresh = missingAssets.Count == 0 && newAssets.Count == 0 && updatedAssets.Count == 0,
+                        total_indexed = current.Entries.Count,
+                        assets_needing_update = updatedAssets.Count,
+                        missing_assets = missingAssets,
+                        new_assets = newAssets,
+                        updated_assets = updatedAssets,
+                        last_build_time = current.BuiltAtUtc.ToString("o"),
+                        coverage_percentage = fresh.Entries.Count == 0 ? 100.0 : Math.Round((double)(fresh.Entries.Count - missingAssets.Count) / fresh.Entries.Count * 100.0, 2),
+                    }
+                );
+            }
+
+            return new ErrorResponse("Unsupported action for build_asset_index.");
+        }
+    }
+
+    [McpForUnityTool("asset_index_status", AutoRegister = false)]
+    public static class AssetIndexStatus
+    {
+        public static object HandleCommand(JObject @params)
+        {
+            bool detailed = LiveV2V3ToolCommon.GetBoolParam(@params, "detailed") ?? false;
+            LiveV2V3ToolState.AssetIndexSnapshot snapshot = LiveV2V3ToolState.CurrentAssetIndex;
+            if (snapshot == null)
+            {
+                snapshot = LiveV2V3AssetUtility.BuildSnapshot("project", includeDependencies: true, includeReferences: true, includeImportSettings: false);
+                LiveV2V3ToolState.CurrentAssetIndex = snapshot;
+            }
+
+            object entryPreview = detailed
+                ? snapshot.Entries.Values.Take(25).Select(entry => new
+                {
+                    path = entry.Path,
+                    guid = entry.Guid,
+                    type = entry.Type,
+                    dependency_count = entry.Dependencies.Count,
+                    referenced_by_count = entry.ReferencedBy.Count,
+                    size_bytes = entry.SizeBytes,
+                    modified_at = entry.ModifiedAtUtc.ToString("o"),
+                }).ToList()
+                : null;
+
+            return new SuccessResponse(
+                "Retrieved asset index status.",
+                new
+                {
+                    index_exists = snapshot != null,
+                    snapshot_id = snapshot.SnapshotId,
+                    built_at = snapshot.BuiltAtUtc.ToString("o"),
+                    scope = snapshot.Scope,
+                    total_assets = snapshot.Entries.Count,
+                    type_breakdown = LiveV2V3AssetUtility.BuildTypeBreakdown(snapshot.Entries.Values),
+                    dependency_edges = snapshot.Entries.Values.Sum(entry => entry.Dependencies.Count),
+                    reference_edges = snapshot.Entries.Values.Sum(entry => entry.ReferencedBy.Count),
+                    entries = entryPreview,
+                }
+            );
+        }
+    }
+
+    [McpForUnityTool("find_asset_references", AutoRegister = false)]
+    public static class FindAssetReferences
+    {
+        public static object HandleCommand(JObject @params)
+        {
+            string action = (LiveV2V3ToolCommon.GetStringParam(@params, "action") ?? "find_dependents").ToLowerInvariant();
+            string assetPath = LiveV2V3AssetUtility.ResolveAssetPath(@params, "assetPath", "asset_path", "targetAssetPath", "target_asset_path");
+            if (string.IsNullOrWhiteSpace(assetPath) || !File.Exists(Path.GetFullPath(assetPath)))
+            {
+                return new ErrorResponse("Valid asset_path is required.");
+            }
+
+            string scope = LiveV2V3ToolCommon.GetStringParam(@params, "searchScope", "search_scope") ?? "project";
+            bool includeIndirect = LiveV2V3ToolCommon.GetBoolParam(@params, "includeIndirect", "include_indirect") ?? false;
+            int maxDepth = LiveV2V3ToolCommon.GetIntParam(@params, "maxDepth", "max_depth") ?? 3;
+            int maxResults = LiveV2V3ToolCommon.GetIntParam(@params, "maxResults", "max_results") ?? 100;
+
+            if (action == "find_dependents" || action == "dependents")
+            {
+                List<string> dependents = LiveV2V3AssetUtility.FindDependents(assetPath, scope, includeIndirect, maxResults);
+                return new SuccessResponse(
+                    "Found asset dependents.",
+                    new
+                    {
+                        asset_path = assetPath,
+                        asset_guid = AssetDatabase.AssetPathToGUID(assetPath),
+                        action,
+                        total_results = dependents.Count,
+                        references = dependents.Select(path => new { path, type = AssetDatabase.GetMainAssetTypeAtPath(path)?.Name ?? "Unknown" }).ToList(),
+                    }
+                );
+            }
+
+            if (action == "find_dependencies" || action == "dependencies")
+            {
+                List<string> dependencies = LiveV2V3AssetUtility.GetDependencies(assetPath, includeIndirect, maxDepth);
+                return new SuccessResponse(
+                    "Found asset dependencies.",
+                    new
+                    {
+                        asset_path = assetPath,
+                        asset_guid = AssetDatabase.AssetPathToGUID(assetPath),
+                        total_results = dependencies.Count,
+                        references = dependencies.Select(path => new { path, type = AssetDatabase.GetMainAssetTypeAtPath(path)?.Name ?? "Unknown" }).ToList(),
+                    }
+                );
+            }
+
+            return new ErrorResponse("Unsupported action for find_asset_references.");
+        }
+    }
+
+    [McpForUnityTool("analyze_asset_dependencies", AutoRegister = false)]
+    public static class AnalyzeAssetDependencies
+    {
+        public static object HandleCommand(JObject @params)
+        {
+            string action = (LiveV2V3ToolCommon.GetStringParam(@params, "action") ?? "get_dependencies").ToLowerInvariant();
+            string assetPath = LiveV2V3AssetUtility.ResolveAssetPath(@params, "assetPath", "asset_path", "targetAssetPath", "target_asset_path");
+            if (string.IsNullOrWhiteSpace(assetPath) || !File.Exists(Path.GetFullPath(assetPath)))
+            {
+                return new ErrorResponse("Valid asset_path is required.");
+            }
+
+            bool includeIndirect = LiveV2V3ToolCommon.GetBoolParam(@params, "includeIndirect", "include_indirect") ?? false;
+            int maxDepth = LiveV2V3ToolCommon.GetIntParam(@params, "maxDepth", "max_depth") ?? 3;
+            string scope = LiveV2V3ToolCommon.GetStringParam(@params, "searchScope", "search_scope") ?? "project";
+            List<string> dependencies = LiveV2V3AssetUtility.GetDependencies(assetPath, includeIndirect, maxDepth);
+
+            if (action == "get_dependencies")
+            {
+                return new SuccessResponse(
+                    "Analyzed asset dependencies.",
+                    new
+                    {
+                        asset_path = assetPath,
+                        direct_dependencies = AssetDatabase.GetDependencies(assetPath, false).Where(path => !string.Equals(path, assetPath, StringComparison.OrdinalIgnoreCase)).ToList(),
+                        all_dependencies = dependencies,
+                        dependency_count = dependencies.Count,
+                        dependency_hash = LiveV2V3AssetUtility.ComputeDependencyHash(assetPath),
+                    }
+                );
+            }
+
+            if (action == "analyze_impact")
+            {
+                List<string> dependents = LiveV2V3AssetUtility.FindDependents(assetPath, scope, includeIndirect, maxResults: 250);
+                return new SuccessResponse(
+                    "Analyzed asset impact.",
+                    new
+                    {
+                        asset_path = assetPath,
+                        dependent_assets = dependents,
+                        dependent_count = dependents.Count,
+                        dependency_count = dependencies.Count,
+                        impact_level = dependents.Count > 20 ? "high" : dependents.Count > 5 ? "medium" : "low",
+                    }
+                );
+            }
+
+            return new ErrorResponse("Unsupported action for analyze_asset_dependencies.");
+        }
+    }
+
+    [McpForUnityTool("find_builtin_assets", AutoRegister = false)]
+    public static class FindBuiltinAssets
+    {
+        public static object HandleCommand(JObject @params)
+        {
+            string action = (LiveV2V3ToolCommon.GetStringParam(@params, "action") ?? "list_by_type").ToLowerInvariant();
+            string assetType = LiveV2V3ToolCommon.GetStringParam(@params, "assetType", "asset_type") ?? "mesh";
+            int maxResults = LiveV2V3ToolCommon.GetIntParam(@params, "maxResults", "max_results") ?? 25;
+            string searchPattern = LiveV2V3ToolCommon.GetStringParam(@params, "searchPattern", "search_pattern");
+            List<Dictionary<string, object>> results = LiveV2V3AssetUtility.GetBuiltinAssets(assetType, maxResults)
+                .Where(item => string.IsNullOrWhiteSpace(searchPattern) || item["name"].ToString().IndexOf(searchPattern, StringComparison.OrdinalIgnoreCase) >= 0)
+                .Take(maxResults)
+                .ToList();
+
+            if (action == "list_by_type" || action == "search")
+            {
+                return new SuccessResponse(
+                    "Retrieved builtin assets.",
+                    new
+                    {
+                        asset_type = assetType,
+                        total_results = results.Count,
+                        assets = results,
+                    }
+                );
+            }
+
+            return new ErrorResponse("Unsupported action for find_builtin_assets.");
+        }
+    }
+
+    [McpForUnityTool("get_component_types", AutoRegister = false)]
+    public static class GetComponentTypes
+    {
+        public static object HandleCommand(JObject @params)
+        {
+            string action = (LiveV2V3ToolCommon.GetStringParam(@params, "action") ?? "search").ToLowerInvariant();
+            string componentName = LiveV2V3ToolCommon.GetStringParam(@params, "componentName", "component_name") ?? string.Empty;
+            bool includeBuiltin = LiveV2V3ToolCommon.GetBoolParam(@params, "includeBuiltin", "include_builtin") ?? true;
+            bool includeCustom = LiveV2V3ToolCommon.GetBoolParam(@params, "includeCustom", "include_custom") ?? true;
+            bool includeProperties = LiveV2V3ToolCommon.GetBoolParam(@params, "includeProperties", "include_properties") ?? false;
+            bool includeMethods = LiveV2V3ToolCommon.GetBoolParam(@params, "includeMethods", "include_methods") ?? false;
+            int maxResults = LiveV2V3ToolCommon.GetIntParam(@params, "maxResults", "max_results") ?? 50;
+
+            IEnumerable<Type> matches = TypeCache.GetTypesDerivedFrom<Component>()
+                .Where(type => !type.IsAbstract)
+                .Where(type => string.IsNullOrWhiteSpace(componentName) || type.Name.IndexOf(componentName, StringComparison.OrdinalIgnoreCase) >= 0)
+                .Where(type =>
+                {
+                    bool isBuiltin = type.Namespace != null && type.Namespace.StartsWith("Unity", StringComparison.Ordinal);
+                    return (isBuiltin && includeBuiltin) || (!isBuiltin && includeCustom);
+                })
+                .OrderBy(type => type.Name, StringComparer.OrdinalIgnoreCase)
+                .Take(maxResults);
+
+            if (action == "search" || action == "list")
+            {
+                return new SuccessResponse(
+                    "Retrieved component types.",
+                    new
+                    {
+                        total_results = matches.Count(),
+                        component_types = matches.Select(type => new
+                        {
+                            name = type.Name,
+                            full_name = type.FullName,
+                            assembly = type.Assembly.GetName().Name,
+                            is_builtin = type.Namespace != null && type.Namespace.StartsWith("Unity", StringComparison.Ordinal),
+                            properties = includeProperties ? type.GetProperties(BindingFlags.Public | BindingFlags.Instance).Select(property => property.Name).Take(25).ToList() : null,
+                            methods = includeMethods ? type.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly).Where(method => !method.IsSpecialName).Select(method => method.Name).Distinct().Take(25).ToList() : null,
+                        }).ToList(),
+                    }
+                );
+            }
+
+            return new ErrorResponse("Unsupported action for get_component_types.");
+        }
+    }
+
+    [McpForUnityTool("get_object_references", AutoRegister = false)]
+    public static class GetObjectReferences
+    {
+        public static object HandleCommand(JObject @params)
+        {
+            string action = (LiveV2V3ToolCommon.GetStringParam(@params, "action") ?? "get_referenced_by").ToLowerInvariant();
+            string target = LiveV2V3ToolCommon.GetStringParam(@params, "target");
+            if (string.IsNullOrWhiteSpace(target))
+            {
+                return new ErrorResponse("'target' is required.");
+            }
+
+            string assetPath = LiveV2V3ToolCommon.SanitizeAssetPath(target) ?? target;
+            bool includeIndirect = LiveV2V3ToolCommon.GetBoolParam(@params, "includeIndirect", "include_indirect") ?? true;
+            string scope = LiveV2V3ToolCommon.GetStringParam(@params, "searchScope", "search_scope") ?? "project";
+            int maxResults = LiveV2V3ToolCommon.GetIntParam(@params, "maxResults", "max_results") ?? 50;
+
+            if (action == "get_referenced_by")
+            {
+                List<string> references = LiveV2V3AssetUtility.FindDependents(assetPath, scope, includeIndirect, maxResults);
+                return new SuccessResponse(
+                    "Retrieved object references.",
+                    new
+                    {
+                        target = assetPath,
+                        reference_type = "referenced_by",
+                        total_results = references.Count,
+                        references = references.Select(path => new { path, type = AssetDatabase.GetMainAssetTypeAtPath(path)?.Name ?? "Unknown" }).ToList(),
+                    }
+                );
+            }
+
+            if (action == "get_references")
+            {
+                List<string> references = LiveV2V3AssetUtility.GetDependencies(assetPath, includeIndirect, maxDepth: 3).Take(maxResults).ToList();
+                return new SuccessResponse(
+                    "Retrieved object dependency references.",
+                    new
+                    {
+                        target = assetPath,
+                        reference_type = "references",
+                        total_results = references.Count,
+                        references = references.Select(path => new { path, type = AssetDatabase.GetMainAssetTypeAtPath(path)?.Name ?? "Unknown" }).ToList(),
+                    }
+                );
+            }
+
+            return new ErrorResponse("Unsupported action for get_object_references.");
+        }
+    }
+
+    [McpForUnityTool("summarize_asset", AutoRegister = false)]
+    public static class SummarizeAsset
+    {
+        public static object HandleCommand(JObject @params)
+        {
+            string assetPath = LiveV2V3AssetUtility.ResolveAssetPath(@params, "assetPath", "asset_path");
+            if (string.IsNullOrWhiteSpace(assetPath) || !File.Exists(Path.GetFullPath(assetPath)))
+            {
+                return new ErrorResponse("Valid asset_path is required.");
+            }
+
+            string detailLevel = (LiveV2V3ToolCommon.GetStringParam(@params, "detailLevel", "detail_level") ?? "brief").ToLowerInvariant();
+            int maxRelatedAssets = LiveV2V3ToolCommon.GetIntParam(@params, "maxRelatedAssets", "max_related_assets") ?? 5;
+            List<string> dependencies = LiveV2V3AssetUtility.GetDependencies(assetPath, includeIndirect: false, maxDepth: 1);
+            List<string> dependents = LiveV2V3AssetUtility.FindDependents(assetPath, "project", includeIndirect: true, maxResults: maxRelatedAssets);
+            Dictionary<string, object> descriptor = LiveV2V3AssetUtility.BuildAssetDescriptor(assetPath, includeImportSettings: detailLevel != "brief");
+            descriptor["dependencies"] = dependencies.Take(maxRelatedAssets).ToList();
+            descriptor["dependents"] = dependents.Take(maxRelatedAssets).ToList();
+            descriptor["dependency_count"] = dependencies.Count;
+            descriptor["dependent_count"] = dependents.Count;
+
+            return new SuccessResponse(
+                "Summarized asset.",
+                new
+                {
+                    asset = descriptor,
+                    summary = new
+                    {
+                        detail_level = detailLevel,
+                        dependency_count = dependencies.Count,
+                        dependent_count = dependents.Count,
+                        max_related_assets = maxRelatedAssets,
+                    }
+                }
+            );
+        }
+    }
+
+    [McpForUnityTool("list_shaders", AutoRegister = false)]
+    public static class ListShaders
+    {
+        public static object HandleCommand(JObject @params)
+        {
+            string action = (LiveV2V3ToolCommon.GetStringParam(@params, "action") ?? "list_builtin").ToLowerInvariant();
+            string searchPattern = LiveV2V3ToolCommon.GetStringParam(@params, "searchPattern", "search_pattern");
+            bool includeProperties = LiveV2V3ToolCommon.GetBoolParam(@params, "includeProperties", "include_properties") ?? false;
+            string folderPath = LiveV2V3ToolCommon.GetStringParam(@params, "folderPath", "folder_path");
+
+            if (action == "list_builtin")
+            {
+                List<string> names = LiveV2V3AssetUtility.EnumerateShaderNames()
+                    .Where(name => string.IsNullOrWhiteSpace(searchPattern) || name.IndexOf(searchPattern, StringComparison.OrdinalIgnoreCase) >= 0)
+                    .ToList();
+
+                return new SuccessResponse(
+                    "Retrieved shader list.",
+                    new
+                    {
+                        total_results = names.Count,
+                        shaders = names.Select(name =>
+                        {
+                            Shader shader = Shader.Find(name);
+                            return new
+                            {
+                                name,
+                                is_supported = shader != null && shader.isSupported,
+                                properties = includeProperties && shader != null ? Enumerable.Range(0, shader.GetPropertyCount()).Select(index => shader.GetPropertyName(index)).ToList() : null,
+                            };
+                        }).ToList(),
+                    }
+                );
+            }
+
+            if (action == "list_project")
+            {
+                IEnumerable<string> shaderPaths = LiveV2V3AssetUtility.EnumerateAssetPaths(folderPath)
+                    .Where(path => path.EndsWith(".shader", StringComparison.OrdinalIgnoreCase) || path.EndsWith(".shadergraph", StringComparison.OrdinalIgnoreCase));
+
+                return new SuccessResponse(
+                    "Retrieved project shaders.",
+                    new
+                    {
+                        total_results = shaderPaths.Count(),
+                        shaders = shaderPaths.Select(path => new { path, name = Path.GetFileNameWithoutExtension(path) }).ToList(),
+                    }
+                );
+            }
+
+            return new ErrorResponse("Unsupported action for list_shaders.");
+        }
+    }
+
+    [McpForUnityTool("diff_asset", AutoRegister = false)]
+    public static class DiffAsset
+    {
+        public static object HandleCommand(JObject @params)
+        {
+            string action = (LiveV2V3ToolCommon.GetStringParam(@params, "action") ?? "get_asset_data").ToLowerInvariant();
+            string compareMode = (LiveV2V3ToolCommon.GetStringParam(@params, "compareMode", "compare_mode") ?? "current_vs_saved").ToLowerInvariant();
+            string assetPath = LiveV2V3AssetUtility.ResolveAssetPath(@params, "assetPath", "asset_path", "sourceAssetPath", "source_asset_path", "sourcePath", "source_path");
+            string targetPath = LiveV2V3AssetUtility.ResolveAssetPath(@params, "targetAssetPath", "target_asset_path", "targetPath", "target_path") ?? assetPath;
+            bool includeImportSettings = LiveV2V3ToolCommon.GetBoolParam(@params, "includeImportSettings", "include_import_settings") ?? compareMode == "check_import_settings";
+
+            if (string.IsNullOrWhiteSpace(assetPath) || !File.Exists(Path.GetFullPath(assetPath)))
+            {
+                return new ErrorResponse("Valid asset_path is required.");
+            }
+
+            if (action != "get_asset_data")
+            {
+                return new ErrorResponse("Unsupported action for diff_asset.");
+            }
+
+            Dictionary<string, object> source = LiveV2V3AssetUtility.BuildAssetDescriptor(assetPath, includeImportSettings);
+            Dictionary<string, object> target = LiveV2V3AssetUtility.BuildAssetDescriptor(targetPath, includeImportSettings);
+            List<object> changes = new List<object>();
+
+            if (!string.Equals(source["fileHash"]?.ToString(), target["fileHash"]?.ToString(), StringComparison.OrdinalIgnoreCase))
+            {
+                changes.Add(new { path = "asset.fileHash", change_type = "modified", property = "fileHash", old_value = source["fileHash"], new_value = target["fileHash"], value_type = "hash" });
+            }
+
+            if (!Equals(source["file_size_bytes"], target["file_size_bytes"]))
+            {
+                changes.Add(new { path = "asset.file_size_bytes", change_type = "modified", property = "file_size_bytes", old_value = source["file_size_bytes"], new_value = target["file_size_bytes"], value_type = "long" });
+            }
+
+            return new SuccessResponse(
+                changes.Count == 0 ? "Asset states match." : "Computed asset diff.",
+                new
+                {
+                    compare_mode = compareMode,
+                    source,
+                    target,
+                    summary = new { total = changes.Count, import_settings = 0, properties = changes.Count, binary = 0, comparison_limited = compareMode == "current_vs_saved" },
+                    changes,
+                }
+            );
+        }
+    }
+
+    [McpForUnityTool("diff_prefab", AutoRegister = false)]
+    public static class DiffPrefab
+    {
+        public static object HandleCommand(JObject @params)
+        {
+            string action = (LiveV2V3ToolCommon.GetStringParam(@params, "action") ?? "get_prefab_data").ToLowerInvariant();
+            string compareMode = (LiveV2V3ToolCommon.GetStringParam(@params, "compareMode", "compare_mode") ?? "current_vs_saved").ToLowerInvariant();
+            string prefabPath = LiveV2V3AssetUtility.ResolveAssetPath(@params, "prefabPath", "prefab_path", "sourcePrefabPath", "source_prefab_path", "sourcePrefab", "source_prefab");
+            string targetPrefabPath = LiveV2V3AssetUtility.ResolveAssetPath(@params, "targetPrefabPath", "target_prefab_path", "targetPrefab", "target_prefab") ?? prefabPath;
+            if (string.IsNullOrWhiteSpace(prefabPath) || !File.Exists(Path.GetFullPath(prefabPath)))
+            {
+                return new ErrorResponse("Valid prefab_path is required.");
+            }
+
+            if (action != "get_prefab_data")
+            {
+                return new ErrorResponse("Unsupported action for diff_prefab.");
+            }
+
+            GameObject sourcePrefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+            GameObject targetPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(targetPrefabPath);
+            if (sourcePrefab == null || targetPrefab == null)
+            {
+                return new ErrorResponse("Both source and target prefabs must resolve to prefab assets.");
+            }
+
+            List<object> changes = new List<object>();
+            int sourceChildCount = sourcePrefab.transform.childCount;
+            int targetChildCount = targetPrefab.transform.childCount;
+            if (sourceChildCount != targetChildCount)
+            {
+                changes.Add(new { field = "child_count", source = sourceChildCount, target = targetChildCount });
+            }
+
+            return new SuccessResponse(
+                changes.Count == 0 ? "Prefab states match." : "Computed prefab diff.",
+                new
+                {
+                    compare_mode = compareMode,
+                    source = new
+                    {
+                        path = prefabPath,
+                        name = sourcePrefab.name,
+                        child_count = sourceChildCount,
+                        component_count = sourcePrefab.GetComponents<Component>().Length,
+                        objects = new[]
+                        {
+                            new
+                            {
+                                path = sourcePrefab.name,
+                                name = sourcePrefab.name,
+                                active = sourcePrefab.activeSelf,
+                                components = sourcePrefab.GetComponents<Component>().Where(component => component != null).Select(component => new { type = component.GetType().Name }).ToList(),
+                                children = new object[0],
+                            }
+                        },
+                    },
+                    target = new
+                    {
+                        path = targetPrefabPath,
+                        name = targetPrefab.name,
+                        child_count = targetChildCount,
+                        component_count = targetPrefab.GetComponents<Component>().Length,
+                        objects = new[]
+                        {
+                            new
+                            {
+                                path = targetPrefab.name,
+                                name = targetPrefab.name,
+                                active = targetPrefab.activeSelf,
+                                components = targetPrefab.GetComponents<Component>().Where(component => component != null).Select(component => new { type = component.GetType().Name }).ToList(),
+                                children = new object[0],
+                            }
+                        },
+                    },
+                    summary = new { total_changes = changes.Count, added = 0, removed = 0, modified = changes.Count, comparison_limited = compareMode == "current_vs_saved" },
+                    changes,
+                }
+            );
+        }
+    }
+
+    [McpForUnityTool("apply_scene_patch", AutoRegister = false)]
+    public static class ApplyScenePatch
+    {
+        public static object HandleCommand(JObject @params)
+        {
+            JArray operations = LiveV2V3ToolCommon.GetParam(@params, "operations") as JArray;
+            bool dryRun = LiveV2V3ToolCommon.GetBoolParam(@params, "dryRun", "dry_run") ?? false;
+            if (operations == null || operations.Count == 0)
+            {
+                return new ErrorResponse("'operations' is required.");
+            }
+
+            if (dryRun)
+            {
+                return new SuccessResponse(
+                    "Scene patch dry run complete.",
+                    new
+                    {
+                        dry_run = true,
+                        operations = operations.Select(operation => new
+                        {
+                            op = operation["op"]?.ToString(),
+                            path = operation["path"]?.ToString(),
+                            will_apply = true,
+                        }).ToList(),
+                        summary = new { total_operations = operations.Count },
+                    }
+                );
+            }
+
+            List<object> applied = new List<object>();
+            foreach (JObject operation in operations.OfType<JObject>())
+            {
+                string op = operation["op"]?.ToString()?.ToLowerInvariant();
+                string path = operation["path"]?.ToString();
+                switch (op)
+                {
+                    case "add":
+                        JObject value = operation["value"] as JObject;
+                        string name = value? ["name"]?.ToString() ?? path ?? $"PatchedObject_{Guid.NewGuid():N}";
+                        GameObject created = new GameObject(name);
+                        applied.Add(new { op, path = name, instance_id = created.GetInstanceID() });
+                        break;
+                    case "remove":
+                        GameObject target = GameObject.Find(path);
+                        if (target != null)
+                        {
+                            UnityEngine.Object.DestroyImmediate(target);
+                            applied.Add(new { op, path, removed = true });
+                        }
+                        break;
+                    default:
+                        return new ErrorResponse($"Unsupported scene patch operation '{op}'.");
+                }
+            }
+
+            EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
+            return new SuccessResponse("Applied scene patch.", new { dry_run = false, applied, summary = new { total_operations = applied.Count } });
+        }
+    }
+
+    [McpForUnityTool("apply_prefab_patch", AutoRegister = false)]
+    public static class ApplyPrefabPatch
+    {
+        public static object HandleCommand(JObject @params)
+        {
+            string prefabPath = LiveV2V3AssetUtility.ResolveAssetPath(@params, "prefabPath", "prefab_path");
+            JArray operations = LiveV2V3ToolCommon.GetParam(@params, "operations") as JArray;
+            bool dryRun = LiveV2V3ToolCommon.GetBoolParam(@params, "dryRun", "dry_run") ?? false;
+            if (string.IsNullOrWhiteSpace(prefabPath) || !File.Exists(Path.GetFullPath(prefabPath)))
+            {
+                return new ErrorResponse("Valid prefab_path is required.");
+            }
+
+            if (operations == null || operations.Count == 0)
+            {
+                return new ErrorResponse("'operations' is required.");
+            }
+
+            if (dryRun)
+            {
+                return new SuccessResponse(
+                    "Prefab patch dry run complete.",
+                    new
+                    {
+                        dry_run = true,
+                        prefab_path = prefabPath,
+                        operations = operations.Select(operation => new
+                        {
+                            op = operation["op"]?.ToString(),
+                            path = operation["path"]?.ToString(),
+                            will_apply = true,
+                        }).ToList(),
+                        summary = new { total_operations = operations.Count },
+                    }
+                );
+            }
+
+            GameObject prefabRoot = PrefabUtility.LoadPrefabContents(prefabPath);
+            try
+            {
+                List<object> applied = new List<object>();
+                foreach (JObject operation in operations.OfType<JObject>())
+                {
+                    string op = operation["op"]?.ToString()?.ToLowerInvariant();
+                    string path = operation["path"]?.ToString();
+                    Transform target = LiveV2V3AssetUtility.FindTransformByPath(prefabRoot.transform, path);
+                    switch (op)
+                    {
+                        case "add_component":
+                            if (target == null)
+                            {
+                                return new ErrorResponse($"Target path '{path}' was not found in prefab.");
+                            }
+
+                            string componentTypeName = LiveV2V3ToolCommon.GetStringParam(operation, "componentType", "component_type");
+                            Type componentType = TypeCache.GetTypesDerivedFrom<Component>().FirstOrDefault(type => string.Equals(type.Name, componentTypeName, StringComparison.OrdinalIgnoreCase) || string.Equals(type.FullName, componentTypeName, StringComparison.OrdinalIgnoreCase));
+                            if (componentType == null)
+                            {
+                                return new ErrorResponse($"Component type '{componentTypeName}' was not found.");
+                            }
+
+                            if (target.GetComponent(componentType) == null)
+                            {
+                                target.gameObject.AddComponent(componentType);
+                            }
+
+                            applied.Add(new { op, path, component_type = componentType.Name });
+                            break;
+                        case "remove_component":
+                            if (target == null)
+                            {
+                                return new ErrorResponse($"Target path '{path}' was not found in prefab.");
+                            }
+
+                            string removeTypeName = LiveV2V3ToolCommon.GetStringParam(operation, "componentType", "component_type");
+                            Component component = target.GetComponents<Component>().FirstOrDefault(candidate => candidate != null && string.Equals(candidate.GetType().Name, removeTypeName, StringComparison.OrdinalIgnoreCase));
+                            if (component != null)
+                            {
+                                UnityEngine.Object.DestroyImmediate(component, true);
+                            }
+
+                            applied.Add(new { op, path, component_type = removeTypeName });
+                            break;
+                        default:
+                            return new ErrorResponse($"Unsupported prefab patch operation '{op}'.");
+                    }
+                }
+
+                PrefabUtility.SaveAsPrefabAsset(prefabRoot, prefabPath);
+                AssetDatabase.SaveAssets();
+                return new SuccessResponse("Applied prefab patch.", new { dry_run = false, prefab_path = prefabPath, applied, summary = new { total_operations = applied.Count } });
+            }
+            finally
+            {
+                PrefabUtility.UnloadPrefabContents(prefabRoot);
+            }
         }
     }
 

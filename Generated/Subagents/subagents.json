@@ -1,10 +1,28 @@
 {
   "default_enabled_groups": [
-    "core"
+    "animation",
+    "asset_intelligence",
+    "core",
+    "dev_tools",
+    "diff_patch",
+    "events",
+    "input",
+    "navigation",
+    "pipeline",
+    "pipeline_control",
+    "profiling",
+    "project_config",
+    "scripting_ext",
+    "spatial",
+    "testing",
+    "transactions",
+    "ui",
+    "vfx",
+    "visual_qa"
   ],
   "generated_from": "live_tool_registry",
-  "group_count": 11,
-  "subagent_count": 12,
+  "group_count": 19,
+  "subagent_count": 20,
   "subagents": [
     {
       "description": "Routes work to the right Unity specialist, keeps tool groups lean, and coordinates verification after mutations.",
@@ -20,6 +38,17 @@
           "specialist_id": "unity-animation-specialist",
           "tool_count": 1
         },
+        "asset_intelligence": {
+          "activate": {
+            "params": {
+              "action": "activate",
+              "group": "asset_intelligence"
+            },
+            "tool": "manage_tools"
+          },
+          "specialist_id": "unity-asset-intelligence-specialist",
+          "tool_count": 5
+        },
         "core": {
           "activate": {
             "params": {
@@ -29,7 +58,40 @@
             "tool": "manage_tools"
           },
           "specialist_id": "unity-core-specialist",
-          "tool_count": 47
+          "tool_count": 44
+        },
+        "dev_tools": {
+          "activate": {
+            "params": {
+              "action": "activate",
+              "group": "dev_tools"
+            },
+            "tool": "manage_tools"
+          },
+          "specialist_id": "unity-dev-tools-specialist",
+          "tool_count": 4
+        },
+        "diff_patch": {
+          "activate": {
+            "params": {
+              "action": "activate",
+              "group": "diff_patch"
+            },
+            "tool": "manage_tools"
+          },
+          "specialist_id": "unity-diff-patch-specialist",
+          "tool_count": 5
+        },
+        "events": {
+          "activate": {
+            "params": {
+              "action": "activate",
+              "group": "events"
+            },
+            "tool": "manage_tools"
+          },
+          "specialist_id": "unity-events-specialist",
+          "tool_count": 3
         },
         "input": {
           "activate": {
@@ -42,6 +104,61 @@
           "specialist_id": "unity-input-specialist",
           "tool_count": 1
         },
+        "navigation": {
+          "activate": {
+            "params": {
+              "action": "activate",
+              "group": "navigation"
+            },
+            "tool": "manage_tools"
+          },
+          "specialist_id": "unity-navigation-specialist",
+          "tool_count": 5
+        },
+        "pipeline": {
+          "activate": {
+            "params": {
+              "action": "activate",
+              "group": "pipeline"
+            },
+            "tool": "manage_tools"
+          },
+          "specialist_id": "unity-pipeline-specialist",
+          "tool_count": 8
+        },
+        "pipeline_control": {
+          "activate": {
+            "params": {
+              "action": "activate",
+              "group": "pipeline_control"
+            },
+            "tool": "manage_tools"
+          },
+          "specialist_id": "unity-pipeline-control-specialist",
+          "tool_count": 4
+        },
+        "profiling": {
+          "activate": {
+            "params": {
+              "action": "activate",
+              "group": "profiling"
+            },
+            "tool": "manage_tools"
+          },
+          "specialist_id": "unity-profiling-specialist",
+          "tool_count": 2
+        },
+        "project_config": {
+          "activate": {
+            "params": {
+              "action": "activate",
+              "group": "project_config"
+            },
+            "tool": "manage_tools"
+          },
+          "specialist_id": "unity-project-config-specialist",
+          "tool_count": 10
+        },
         "scripting_ext": {
           "activate": {
             "params": {
@@ -53,6 +170,17 @@
           "specialist_id": "unity-scripting-ext-specialist",
           "tool_count": 1
         },
+        "spatial": {
+          "activate": {
+            "params": {
+              "action": "activate",
+              "group": "spatial"
+            },
+            "tool": "manage_tools"
+          },
+          "specialist_id": "unity-spatial-specialist",
+          "tool_count": 2
+        },
         "testing": {
           "activate": {
             "params": {
@@ -62,7 +190,18 @@
             "tool": "manage_tools"
           },
           "specialist_id": "unity-testing-specialist",
-          "tool_count": 7
+          "tool_count": 5
+        },
+        "transactions": {
+          "activate": {
+            "params": {
+              "action": "activate",
+              "group": "transactions"
+            },
+            "tool": "manage_tools"
+          },
+          "specialist_id": "unity-transactions-specialist",
+          "tool_count": 3
         },
         "ui": {
           "activate": {
@@ -86,39 +225,6 @@
           "specialist_id": "unity-vfx-specialist",
           "tool_count": 3
         },
-        "spatial": {
-          "activate": {
-            "params": {
-              "action": "activate",
-              "group": "spatial"
-            },
-            "tool": "manage_tools"
-          },
-          "specialist_id": "unity-spatial-specialist",
-          "tool_count": 2
-        },
-        "project_config": {
-          "activate": {
-            "params": {
-              "action": "activate",
-              "group": "project_config"
-            },
-            "tool": "manage_tools"
-          },
-          "specialist_id": "unity-project-config-specialist",
-          "tool_count": 10
-        },
-        "pipeline": {
-          "activate": {
-            "params": {
-              "action": "activate",
-              "group": "pipeline"
-            },
-            "tool": "manage_tools"
-          },
-          "specialist_id": "unity-pipeline-specialist",
-          "tool_count": 8
-        },
         "visual_qa": {
           "activate": {
             "params": {
@@ -128,7 +234,7 @@
             "tool": "manage_tools"
           },
           "specialist_id": "unity-visual-qa-specialist",
-          "tool_count": 1
+          "tool_count": 2
         }
       },
       "id": "unity-orchestrator",
@@ -141,27 +247,51 @@
       "kind": "orchestrator",
       "manages_groups": [
         "animation",
+        "asset_intelligence",
         "core",
+        "dev_tools",
+        "diff_patch",
+        "events",
         "input",
+        "navigation",
+        "pipeline",
+        "pipeline_control",
+        "profiling",
+        "project_config",
         "scripting_ext",
+        "spatial",
         "testing",
+        "transactions",
         "ui",
         "vfx",
-        "spatial",
-        "project_config",
-        "pipeline",
         "visual_qa"
       ],
       "name": "Unity Orchestrator",
       "shared_meta_tools": [
+        "clear_traces",
+        "compare_benchmarks",
+        "configure_replay_scenario",
         "debug_request_context",
+        "delete_fixture",
         "execute_custom_tool",
+        "get_benchmark_results",
+        "get_benchmark_trends",
+        "get_captured_fixtures",
+        "get_trace_summary",
+        "import_fixtures",
+        "list_benchmarks",
+        "list_replay_sessions",
+        "list_traces",
         "manage_catalog",
         "manage_error_catalog",
         "manage_script_capabilities",
         "manage_subagents",
         "manage_tools",
-        "set_active_instance"
+        "replay_request",
+        "set_active_instance",
+        "stop_fixture_capture",
+        "stop_fixture_replay",
+        "stop_trace"
       ]
     },
     {
@@ -172,7 +302,7 @@
         },
         "tool": "manage_tools"
       },
-      "default_enabled": false,
+      "default_enabled": true,
       "description": "Focuses on animator, clips, and animation editing tasks.",
       "group": "animation",
       "handoff_targets": [
@@ -183,14 +313,30 @@
       "kind": "specialist",
       "name": "Unity Animation Specialist",
       "shared_meta_tools": [
+        "clear_traces",
+        "compare_benchmarks",
+        "configure_replay_scenario",
         "debug_request_context",
+        "delete_fixture",
         "execute_custom_tool",
+        "get_benchmark_results",
+        "get_benchmark_trends",
+        "get_captured_fixtures",
+        "get_trace_summary",
+        "import_fixtures",
+        "list_benchmarks",
+        "list_replay_sessions",
+        "list_traces",
         "manage_catalog",
         "manage_error_catalog",
         "manage_script_capabilities",
         "manage_subagents",
         "manage_tools",
-        "set_active_instance"
+        "replay_request",
+        "set_active_instance",
+        "stop_fixture_capture",
+        "stop_fixture_replay",
+        "stop_trace"
       ],
       "tool_group_description": "Animator control & AnimationClip creation",
       "tools": [
@@ -211,6 +357,58 @@
       "activation": {
         "params": {
           "action": "activate",
+          "group": "asset_intelligence"
+        },
+        "tool": "manage_tools"
+      },
+      "default_enabled": true,
+      "description": "Advanced asset search, indexing, and analysis",
+      "group": "asset_intelligence",
+      "handoff_targets": [],
+      "id": "unity-asset-intelligence-specialist",
+      "kind": "specialist",
+      "name": "Unity Asset_Intelligence Specialist",
+      "shared_meta_tools": [
+        "clear_traces",
+        "compare_benchmarks",
+        "configure_replay_scenario",
+        "debug_request_context",
+        "delete_fixture",
+        "execute_custom_tool",
+        "get_benchmark_results",
+        "get_benchmark_trends",
+        "get_captured_fixtures",
+        "get_trace_summary",
+        "import_fixtures",
+        "list_benchmarks",
+        "list_replay_sessions",
+        "list_traces",
+        "manage_catalog",
+        "manage_error_catalog",
+        "manage_script_capabilities",
+        "manage_subagents",
+        "manage_tools",
+        "replay_request",
+        "set_active_instance",
+        "stop_fixture_capture",
+        "stop_fixture_replay",
+        "stop_trace"
+      ],
+      "tool_group_description": "Advanced asset search, indexing, and analysis",
+      "tools": [
+        "asset_index_status",
+        "build_asset_index",
+        "find_asset_references",
+        "search_assets_advanced",
+        "summarize_asset"
+      ],
+      "when_to_use": [],
+      "workflow": []
+    },
+    {
+      "activation": {
+        "params": {
+          "action": "activate",
           "group": "core"
         },
         "tool": "manage_tools"
@@ -226,14 +424,30 @@
       "kind": "specialist",
       "name": "Unity Core Builder",
       "shared_meta_tools": [
+        "clear_traces",
+        "compare_benchmarks",
+        "configure_replay_scenario",
         "debug_request_context",
+        "delete_fixture",
         "execute_custom_tool",
+        "get_benchmark_results",
+        "get_benchmark_trends",
+        "get_captured_fixtures",
+        "get_trace_summary",
+        "import_fixtures",
+        "list_benchmarks",
+        "list_replay_sessions",
+        "list_traces",
         "manage_catalog",
         "manage_error_catalog",
         "manage_script_capabilities",
         "manage_subagents",
         "manage_tools",
-        "set_active_instance"
+        "replay_request",
+        "set_active_instance",
+        "stop_fixture_capture",
+        "stop_fixture_replay",
+        "stop_trace"
       ],
       "tool_group_description": "Essential scene, script, asset & editor tools (always on by default)",
       "tools": [
@@ -241,6 +455,7 @@
         "execute_menu_item",
         "find_gameobjects",
         "find_in_file",
+        "get_command_stats",
         "get_diagnostics",
         "manage_addressables",
         "manage_asset",
@@ -267,14 +482,19 @@
         "validate_script",
         "manage_script",
         "get_sha",
+        "manage_selection",
         "manage_video_capture",
+        "manage_windows",
+        "ping",
         "read_console",
         "validate_compile_health",
         "get_runtime_status",
         "list_runtime_tools",
         "execute_runtime_command",
         "get_runtime_connection_info",
-        "script_apply_edits"
+        "script_apply_edits",
+        "list_event_subscriptions",
+        "poll_subscription_events"
       ],
       "when_to_use": [
         "Scene composition, hierarchy edits, and asset inspection.",
@@ -291,11 +511,164 @@
       "activation": {
         "params": {
           "action": "activate",
+          "group": "dev_tools"
+        },
+        "tool": "manage_tools"
+      },
+      "default_enabled": true,
+      "description": "Internal development and debugging tools",
+      "group": "dev_tools",
+      "handoff_targets": [],
+      "id": "unity-dev-tools-specialist",
+      "kind": "specialist",
+      "name": "Unity Dev_Tools Specialist",
+      "shared_meta_tools": [
+        "clear_traces",
+        "compare_benchmarks",
+        "configure_replay_scenario",
+        "debug_request_context",
+        "delete_fixture",
+        "execute_custom_tool",
+        "get_benchmark_results",
+        "get_benchmark_trends",
+        "get_captured_fixtures",
+        "get_trace_summary",
+        "import_fixtures",
+        "list_benchmarks",
+        "list_replay_sessions",
+        "list_traces",
+        "manage_catalog",
+        "manage_error_catalog",
+        "manage_script_capabilities",
+        "manage_subagents",
+        "manage_tools",
+        "replay_request",
+        "set_active_instance",
+        "stop_fixture_capture",
+        "stop_fixture_replay",
+        "stop_trace"
+      ],
+      "tool_group_description": "Internal development and debugging tools",
+      "tools": [
+        "run_benchmark",
+        "start_fixture_capture",
+        "start_trace",
+        "start_fixture_replay"
+      ],
+      "when_to_use": [],
+      "workflow": []
+    },
+    {
+      "activation": {
+        "params": {
+          "action": "activate",
+          "group": "diff_patch"
+        },
+        "tool": "manage_tools"
+      },
+      "default_enabled": true,
+      "description": "Scene and prefab diff/patch operations",
+      "group": "diff_patch",
+      "handoff_targets": [],
+      "id": "unity-diff-patch-specialist",
+      "kind": "specialist",
+      "name": "Unity Diff_Patch Specialist",
+      "shared_meta_tools": [
+        "clear_traces",
+        "compare_benchmarks",
+        "configure_replay_scenario",
+        "debug_request_context",
+        "delete_fixture",
+        "execute_custom_tool",
+        "get_benchmark_results",
+        "get_benchmark_trends",
+        "get_captured_fixtures",
+        "get_trace_summary",
+        "import_fixtures",
+        "list_benchmarks",
+        "list_replay_sessions",
+        "list_traces",
+        "manage_catalog",
+        "manage_error_catalog",
+        "manage_script_capabilities",
+        "manage_subagents",
+        "manage_tools",
+        "replay_request",
+        "set_active_instance",
+        "stop_fixture_capture",
+        "stop_fixture_replay",
+        "stop_trace"
+      ],
+      "tool_group_description": "Scene and prefab diff/patch operations",
+      "tools": [
+        "apply_prefab_patch",
+        "apply_scene_patch",
+        "diff_asset",
+        "diff_prefab",
+        "diff_scene"
+      ],
+      "when_to_use": [],
+      "workflow": []
+    },
+    {
+      "activation": {
+        "params": {
+          "action": "activate",
+          "group": "events"
+        },
+        "tool": "manage_tools"
+      },
+      "default_enabled": true,
+      "description": "Editor event subscription and condition waiting",
+      "group": "events",
+      "handoff_targets": [],
+      "id": "unity-events-specialist",
+      "kind": "specialist",
+      "name": "Unity Events Specialist",
+      "shared_meta_tools": [
+        "clear_traces",
+        "compare_benchmarks",
+        "configure_replay_scenario",
+        "debug_request_context",
+        "delete_fixture",
+        "execute_custom_tool",
+        "get_benchmark_results",
+        "get_benchmark_trends",
+        "get_captured_fixtures",
+        "get_trace_summary",
+        "import_fixtures",
+        "list_benchmarks",
+        "list_replay_sessions",
+        "list_traces",
+        "manage_catalog",
+        "manage_error_catalog",
+        "manage_script_capabilities",
+        "manage_subagents",
+        "manage_tools",
+        "replay_request",
+        "set_active_instance",
+        "stop_fixture_capture",
+        "stop_fixture_replay",
+        "stop_trace"
+      ],
+      "tool_group_description": "Editor event subscription and condition waiting",
+      "tools": [
+        "subscribe_editor_events",
+        "unsubscribe_editor_events",
+        "wait_for_editor_condition"
+      ],
+      "when_to_use": [],
+      "workflow": []
+    },
+    {
+      "activation": {
+        "params": {
+          "action": "activate",
           "group": "input"
         },
         "tool": "manage_tools"
       },
-      "default_enabled": false,
+      "default_enabled": true,
       "description": "Unity Input System - Action Maps, Actions, Bindings, and Runtime Simulation",
       "group": "input",
       "handoff_targets": [],
@@ -303,14 +676,30 @@
       "kind": "specialist",
       "name": "Unity Input Specialist",
       "shared_meta_tools": [
+        "clear_traces",
+        "compare_benchmarks",
+        "configure_replay_scenario",
         "debug_request_context",
+        "delete_fixture",
         "execute_custom_tool",
+        "get_benchmark_results",
+        "get_benchmark_trends",
+        "get_captured_fixtures",
+        "get_trace_summary",
+        "import_fixtures",
+        "list_benchmarks",
+        "list_replay_sessions",
+        "list_traces",
         "manage_catalog",
         "manage_error_catalog",
         "manage_script_capabilities",
         "manage_subagents",
         "manage_tools",
-        "set_active_instance"
+        "replay_request",
+        "set_active_instance",
+        "stop_fixture_capture",
+        "stop_fixture_replay",
+        "stop_trace"
       ],
       "tool_group_description": "Unity Input System - Action Maps, Actions, Bindings, and Runtime Simulation",
       "tools": [
@@ -323,11 +712,275 @@
       "activation": {
         "params": {
           "action": "activate",
+          "group": "navigation"
+        },
+        "tool": "manage_tools"
+      },
+      "default_enabled": true,
+      "description": "Editor navigation and focus tools",
+      "group": "navigation",
+      "handoff_targets": [],
+      "id": "unity-navigation-specialist",
+      "kind": "specialist",
+      "name": "Unity Navigation Specialist",
+      "shared_meta_tools": [
+        "clear_traces",
+        "compare_benchmarks",
+        "configure_replay_scenario",
+        "debug_request_context",
+        "delete_fixture",
+        "execute_custom_tool",
+        "get_benchmark_results",
+        "get_benchmark_trends",
+        "get_captured_fixtures",
+        "get_trace_summary",
+        "import_fixtures",
+        "list_benchmarks",
+        "list_replay_sessions",
+        "list_traces",
+        "manage_catalog",
+        "manage_error_catalog",
+        "manage_script_capabilities",
+        "manage_subagents",
+        "manage_tools",
+        "replay_request",
+        "set_active_instance",
+        "stop_fixture_capture",
+        "stop_fixture_replay",
+        "stop_trace"
+      ],
+      "tool_group_description": "Editor navigation and focus tools",
+      "tools": [
+        "focus_hierarchy",
+        "frame_scene_target",
+        "navigate_editor",
+        "open_inspector_target",
+        "reveal_asset"
+      ],
+      "when_to_use": [],
+      "workflow": []
+    },
+    {
+      "activation": {
+        "params": {
+          "action": "activate",
+          "group": "pipeline"
+        },
+        "tool": "manage_tools"
+      },
+      "default_enabled": true,
+      "description": "Pipeline recording, replay, and playbook automation tools",
+      "group": "pipeline",
+      "handoff_targets": [],
+      "id": "unity-pipeline-specialist",
+      "kind": "specialist",
+      "name": "Unity Pipeline Specialist",
+      "shared_meta_tools": [
+        "clear_traces",
+        "compare_benchmarks",
+        "configure_replay_scenario",
+        "debug_request_context",
+        "delete_fixture",
+        "execute_custom_tool",
+        "get_benchmark_results",
+        "get_benchmark_trends",
+        "get_captured_fixtures",
+        "get_trace_summary",
+        "import_fixtures",
+        "list_benchmarks",
+        "list_replay_sessions",
+        "list_traces",
+        "manage_catalog",
+        "manage_error_catalog",
+        "manage_script_capabilities",
+        "manage_subagents",
+        "manage_tools",
+        "replay_request",
+        "set_active_instance",
+        "stop_fixture_capture",
+        "stop_fixture_replay",
+        "stop_trace"
+      ],
+      "tool_group_description": "Pipeline recording, replay, and playbook automation tools",
+      "tools": [
+        "create_playbook",
+        "list_pipelines",
+        "list_playbooks",
+        "record_pipeline",
+        "replay_pipeline",
+        "run_playbook",
+        "save_pipeline",
+        "stop_pipeline_recording"
+      ],
+      "when_to_use": [],
+      "workflow": []
+    },
+    {
+      "activation": {
+        "params": {
+          "action": "activate",
+          "group": "pipeline_control"
+        },
+        "tool": "manage_tools"
+      },
+      "default_enabled": true,
+      "description": "Build settings, player settings, and import pipeline control",
+      "group": "pipeline_control",
+      "handoff_targets": [],
+      "id": "unity-pipeline-control-specialist",
+      "kind": "specialist",
+      "name": "Unity Pipeline_Control Specialist",
+      "shared_meta_tools": [
+        "clear_traces",
+        "compare_benchmarks",
+        "configure_replay_scenario",
+        "debug_request_context",
+        "delete_fixture",
+        "execute_custom_tool",
+        "get_benchmark_results",
+        "get_benchmark_trends",
+        "get_captured_fixtures",
+        "get_trace_summary",
+        "import_fixtures",
+        "list_benchmarks",
+        "list_replay_sessions",
+        "list_traces",
+        "manage_catalog",
+        "manage_error_catalog",
+        "manage_script_capabilities",
+        "manage_subagents",
+        "manage_tools",
+        "replay_request",
+        "set_active_instance",
+        "stop_fixture_capture",
+        "stop_fixture_replay",
+        "stop_trace"
+      ],
+      "tool_group_description": "Build settings, player settings, and import pipeline control",
+      "tools": [
+        "manage_build_settings",
+        "manage_define_symbols",
+        "manage_import_pipeline",
+        "manage_player_settings"
+      ],
+      "when_to_use": [],
+      "workflow": []
+    },
+    {
+      "activation": {
+        "params": {
+          "action": "activate",
+          "group": "profiling"
+        },
+        "tool": "manage_tools"
+      },
+      "default_enabled": true,
+      "description": "Unity Profiler capture, analysis, and performance diagnostics",
+      "group": "profiling",
+      "handoff_targets": [],
+      "id": "unity-profiling-specialist",
+      "kind": "specialist",
+      "name": "Unity Profiling Specialist",
+      "shared_meta_tools": [
+        "clear_traces",
+        "compare_benchmarks",
+        "configure_replay_scenario",
+        "debug_request_context",
+        "delete_fixture",
+        "execute_custom_tool",
+        "get_benchmark_results",
+        "get_benchmark_trends",
+        "get_captured_fixtures",
+        "get_trace_summary",
+        "import_fixtures",
+        "list_benchmarks",
+        "list_replay_sessions",
+        "list_traces",
+        "manage_catalog",
+        "manage_error_catalog",
+        "manage_script_capabilities",
+        "manage_subagents",
+        "manage_tools",
+        "replay_request",
+        "set_active_instance",
+        "stop_fixture_capture",
+        "stop_fixture_replay",
+        "stop_trace"
+      ],
+      "tool_group_description": "Unity Profiler capture, analysis, and performance diagnostics",
+      "tools": [
+        "manage_profiler",
+        "record_profiler_session"
+      ],
+      "when_to_use": [],
+      "workflow": []
+    },
+    {
+      "activation": {
+        "params": {
+          "action": "activate",
+          "group": "project_config"
+        },
+        "tool": "manage_tools"
+      },
+      "default_enabled": true,
+      "description": "Project and Asset Intelligence \u2013 settings, registries, dependencies, built-in assets",
+      "group": "project_config",
+      "handoff_targets": [],
+      "id": "unity-project-config-specialist",
+      "kind": "specialist",
+      "name": "Unity Project_Config Specialist",
+      "shared_meta_tools": [
+        "clear_traces",
+        "compare_benchmarks",
+        "configure_replay_scenario",
+        "debug_request_context",
+        "delete_fixture",
+        "execute_custom_tool",
+        "get_benchmark_results",
+        "get_benchmark_trends",
+        "get_captured_fixtures",
+        "get_trace_summary",
+        "import_fixtures",
+        "list_benchmarks",
+        "list_replay_sessions",
+        "list_traces",
+        "manage_catalog",
+        "manage_error_catalog",
+        "manage_script_capabilities",
+        "manage_subagents",
+        "manage_tools",
+        "replay_request",
+        "set_active_instance",
+        "stop_fixture_capture",
+        "stop_fixture_replay",
+        "stop_trace"
+      ],
+      "tool_group_description": "Project and Asset Intelligence \u2013 settings, registries, dependencies, built-in assets",
+      "tools": [
+        "analyze_asset_dependencies",
+        "find_builtin_assets",
+        "get_component_types",
+        "get_object_references",
+        "list_shaders",
+        "manage_asset_import_settings",
+        "manage_editor_settings",
+        "manage_project_memory",
+        "manage_project_settings",
+        "manage_registry_config"
+      ],
+      "when_to_use": [],
+      "workflow": []
+    },
+    {
+      "activation": {
+        "params": {
+          "action": "activate",
           "group": "scripting_ext"
         },
         "tool": "manage_tools"
       },
-      "default_enabled": false,
+      "default_enabled": true,
       "description": "Handles ScriptableObject and data-oriented authoring flows.",
       "group": "scripting_ext",
       "handoff_targets": [
@@ -338,14 +991,30 @@
       "kind": "specialist",
       "name": "Unity Data Specialist",
       "shared_meta_tools": [
+        "clear_traces",
+        "compare_benchmarks",
+        "configure_replay_scenario",
         "debug_request_context",
+        "delete_fixture",
         "execute_custom_tool",
+        "get_benchmark_results",
+        "get_benchmark_trends",
+        "get_captured_fixtures",
+        "get_trace_summary",
+        "import_fixtures",
+        "list_benchmarks",
+        "list_replay_sessions",
+        "list_traces",
         "manage_catalog",
         "manage_error_catalog",
         "manage_script_capabilities",
         "manage_subagents",
         "manage_tools",
-        "set_active_instance"
+        "replay_request",
+        "set_active_instance",
+        "stop_fixture_capture",
+        "stop_fixture_replay",
+        "stop_trace"
       ],
       "tool_group_description": "ScriptableObject management",
       "tools": [
@@ -366,11 +1035,60 @@
       "activation": {
         "params": {
           "action": "activate",
+          "group": "spatial"
+        },
+        "tool": "manage_tools"
+      },
+      "default_enabled": true,
+      "description": "Transform operations and spatial queries \u2013 advanced scene construction",
+      "group": "spatial",
+      "handoff_targets": [],
+      "id": "unity-spatial-specialist",
+      "kind": "specialist",
+      "name": "Unity Spatial Specialist",
+      "shared_meta_tools": [
+        "clear_traces",
+        "compare_benchmarks",
+        "configure_replay_scenario",
+        "debug_request_context",
+        "delete_fixture",
+        "execute_custom_tool",
+        "get_benchmark_results",
+        "get_benchmark_trends",
+        "get_captured_fixtures",
+        "get_trace_summary",
+        "import_fixtures",
+        "list_benchmarks",
+        "list_replay_sessions",
+        "list_traces",
+        "manage_catalog",
+        "manage_error_catalog",
+        "manage_script_capabilities",
+        "manage_subagents",
+        "manage_tools",
+        "replay_request",
+        "set_active_instance",
+        "stop_fixture_capture",
+        "stop_fixture_replay",
+        "stop_trace"
+      ],
+      "tool_group_description": "Transform operations and spatial queries \u2013 advanced scene construction",
+      "tools": [
+        "manage_transform",
+        "spatial_queries"
+      ],
+      "when_to_use": [],
+      "workflow": []
+    },
+    {
+      "activation": {
+        "params": {
+          "action": "activate",
           "group": "testing"
         },
         "tool": "manage_tools"
       },
-      "default_enabled": false,
+      "default_enabled": true,
       "description": "Runs validation loops, test jobs, and post-change verification.",
       "group": "testing",
       "handoff_targets": [
@@ -382,21 +1100,35 @@
       "kind": "specialist",
       "name": "Unity Testing Specialist",
       "shared_meta_tools": [
+        "clear_traces",
+        "compare_benchmarks",
+        "configure_replay_scenario",
         "debug_request_context",
+        "delete_fixture",
         "execute_custom_tool",
+        "get_benchmark_results",
+        "get_benchmark_trends",
+        "get_captured_fixtures",
+        "get_trace_summary",
+        "import_fixtures",
+        "list_benchmarks",
+        "list_replay_sessions",
+        "list_traces",
         "manage_catalog",
         "manage_error_catalog",
         "manage_script_capabilities",
         "manage_subagents",
         "manage_tools",
-        "set_active_instance"
+        "replay_request",
+        "set_active_instance",
+        "stop_fixture_capture",
+        "stop_fixture_replay",
+        "stop_trace"
       ],
       "tool_group_description": "Test runner & async test jobs",
       "tools": [
         "audit_prefab_integrity",
         "audit_scene_integrity",
-        "manage_profiler",
-        "record_profiler_session",
         "preflight_audit",
         "run_tests",
         "get_test_job"
@@ -416,11 +1148,61 @@
       "activation": {
         "params": {
           "action": "activate",
+          "group": "transactions"
+        },
+        "tool": "manage_tools"
+      },
+      "default_enabled": true,
+      "description": "Transaction management with rollback and preview capabilities",
+      "group": "transactions",
+      "handoff_targets": [],
+      "id": "unity-transactions-specialist",
+      "kind": "specialist",
+      "name": "Unity Transactions Specialist",
+      "shared_meta_tools": [
+        "clear_traces",
+        "compare_benchmarks",
+        "configure_replay_scenario",
+        "debug_request_context",
+        "delete_fixture",
+        "execute_custom_tool",
+        "get_benchmark_results",
+        "get_benchmark_trends",
+        "get_captured_fixtures",
+        "get_trace_summary",
+        "import_fixtures",
+        "list_benchmarks",
+        "list_replay_sessions",
+        "list_traces",
+        "manage_catalog",
+        "manage_error_catalog",
+        "manage_script_capabilities",
+        "manage_subagents",
+        "manage_tools",
+        "replay_request",
+        "set_active_instance",
+        "stop_fixture_capture",
+        "stop_fixture_replay",
+        "stop_trace"
+      ],
+      "tool_group_description": "Transaction management with rollback and preview capabilities",
+      "tools": [
+        "manage_transactions",
+        "preview_changes",
+        "rollback_changes"
+      ],
+      "when_to_use": [],
+      "workflow": []
+    },
+    {
+      "activation": {
+        "params": {
+          "action": "activate",
           "group": "ui"
         },
         "tool": "manage_tools"
       },
-      "default_enabled": false,
+      "default_enabled": true,
       "description": "Owns UI Toolkit and interface authoring tasks.",
       "group": "ui",
       "handoff_targets": [
@@ -431,14 +1213,30 @@
       "kind": "specialist",
       "name": "Unity UI Specialist",
       "shared_meta_tools": [
+        "clear_traces",
+        "compare_benchmarks",
+        "configure_replay_scenario",
         "debug_request_context",
+        "delete_fixture",
         "execute_custom_tool",
+        "get_benchmark_results",
+        "get_benchmark_trends",
+        "get_captured_fixtures",
+        "get_trace_summary",
+        "import_fixtures",
+        "list_benchmarks",
+        "list_replay_sessions",
+        "list_traces",
         "manage_catalog",
         "manage_error_catalog",
         "manage_script_capabilities",
         "manage_subagents",
         "manage_tools",
-        "set_active_instance"
+        "replay_request",
+        "set_active_instance",
+        "stop_fixture_capture",
+        "stop_fixture_replay",
+        "stop_trace"
       ],
       "tool_group_description": "UI Toolkit (UXML, USS, UIDocument)",
       "tools": [
@@ -464,7 +1262,7 @@
         },
         "tool": "manage_tools"
       },
-      "default_enabled": false,
+      "default_enabled": true,
       "description": "Handles shaders, materials, textures, and VFX authoring flows.",
       "group": "vfx",
       "handoff_targets": [
@@ -475,14 +1273,30 @@
       "kind": "specialist",
       "name": "Unity VFX Specialist",
       "shared_meta_tools": [
+        "clear_traces",
+        "compare_benchmarks",
+        "configure_replay_scenario",
         "debug_request_context",
+        "delete_fixture",
         "execute_custom_tool",
+        "get_benchmark_results",
+        "get_benchmark_trends",
+        "get_captured_fixtures",
+        "get_trace_summary",
+        "import_fixtures",
+        "list_benchmarks",
+        "list_replay_sessions",
+        "list_traces",
         "manage_catalog",
         "manage_error_catalog",
         "manage_script_capabilities",
         "manage_subagents",
         "manage_tools",
-        "set_active_instance"
+        "replay_request",
+        "set_active_instance",
+        "stop_fixture_capture",
+        "stop_fixture_replay",
+        "stop_trace"
       ],
       "tool_group_description": "Visual effects \u2013 VFX Graph, shaders, procedural textures",
       "tools": [
@@ -505,214 +1319,51 @@
       "activation": {
         "params": {
           "action": "activate",
-          "group": "spatial"
-        },
-        "tool": "manage_tools"
-      },
-      "default_enabled": false,
-      "description": "Owns transform operations and spatial awareness for reliable scene construction and object placement.",
-      "group": "spatial",
-      "handoff_targets": [
-        "unity-core-builder",
-        "unity-testing-specialist"
-      ],
-      "id": "unity-spatial-specialist",
-      "kind": "specialist",
-      "name": "Unity Spatial Specialist",
-      "shared_meta_tools": [
-        "debug_request_context",
-        "execute_custom_tool",
-        "manage_catalog",
-        "manage_error_catalog",
-        "manage_script_capabilities",
-        "manage_subagents",
-        "manage_tools",
-        "set_active_instance"
-      ],
-      "tool_group_description": "Transform operations and spatial queries",
-      "tools": [
-        "manage_transform",
-        "spatial_queries"
-      ],
-      "when_to_use": [
-        "Transform-aware inspection and manipulation",
-        "Spatial reasoning about object placement",
-        "Snap, align, and distribute operations",
-        "Bounds and overlap queries",
-        "Raycast and surface queries",
-        "Distance, direction, and relative offset calculations"
-      ],
-      "workflow": [
-        "Activate the spatial group for the current session.",
-        "Use spatial_queries to understand scene layout before making changes.",
-        "Apply transforms with manage_transform using spatial context.",
-        "Validate placement with spatial validation checks.",
-        "Hand off to core builder for prefab/scene saves after placement."
-      ]
-    },
-    {
-      "activation": {
-        "params": {
-          "action": "activate",
-          "group": "project_config"
-        },
-        "tool": "manage_tools"
-      },
-      "default_enabled": false,
-      "description": "Owns project configuration, asset intelligence, package registry management, and project memory/rules.",
-      "group": "project_config",
-      "handoff_targets": [
-        "unity-core-builder",
-        "unity-testing-specialist"
-      ],
-      "id": "unity-project-config-specialist",
-      "kind": "specialist",
-      "name": "Unity Project Config Specialist",
-      "shared_meta_tools": [
-        "debug_request_context",
-        "execute_custom_tool",
-        "manage_catalog",
-        "manage_error_catalog",
-        "manage_script_capabilities",
-        "manage_subagents",
-        "manage_tools",
-        "set_active_instance"
-      ],
-      "tool_group_description": "Project settings, asset intelligence, and configuration",
-      "tools": [
-        "manage_project_settings",
-        "manage_editor_settings",
-        "manage_registry_config",
-        "analyze_asset_dependencies",
-        "manage_asset_import_settings",
-        "list_shaders",
-        "find_builtin_assets",
-        "get_component_types",
-        "get_object_references",
-        "manage_project_memory"
-      ],
-      "when_to_use": [
-        "Project settings inspection or mutation",
-        "Editor preferences configuration",
-        "Package registry management",
-        "Asset dependency graph analysis",
-        "Import settings inspection and configuration",
-        "Shader and built-in asset discovery",
-        "Component type enumeration",
-        "Object reference graph inspection",
-        "Project rules and conventions management"
-      ],
-      "workflow": [
-        "Activate the project_config group for the current session.",
-        "Inspect current configuration before making targeted updates.",
-        "Make changes through the appropriate configuration tools.",
-        "Validate changes compile and work correctly.",
-        "Route asset operations to core builder, validation to testing specialist."
-      ]
-    },
-    {
-      "activation": {
-        "params": {
-          "action": "activate",
-          "group": "pipeline"
-        },
-        "tool": "manage_tools"
-      },
-      "default_enabled": false,
-      "description": "Owns workflow recording, pipeline management, and reusable playbook execution.",
-      "group": "pipeline",
-      "handoff_targets": [
-        "unity-orchestrator",
-        "unity-core-builder",
-        "unity-testing-specialist"
-      ],
-      "id": "unity-pipeline-specialist",
-      "kind": "specialist",
-      "name": "Unity Pipeline Specialist",
-      "shared_meta_tools": [
-        "debug_request_context",
-        "execute_custom_tool",
-        "manage_catalog",
-        "manage_error_catalog",
-        "manage_script_capabilities",
-        "manage_subagents",
-        "manage_tools",
-        "set_active_instance"
-      ],
-      "tool_group_description": "Workflow recording and pipeline automation",
-      "tools": [
-        "record_pipeline",
-        "stop_pipeline_recording",
-        "replay_pipeline",
-        "save_pipeline",
-        "list_pipelines",
-        "list_playbooks",
-        "run_playbook",
-        "create_playbook"
-      ],
-      "when_to_use": [
-        "Recording editor workflows for later replay",
-        "Replaying saved multi-step workflows",
-        "Running pre-built playbooks",
-        "Creating reusable automation from recorded actions",
-        "Managing pipeline storage and organization"
-      ],
-      "workflow": [
-        "Activate the pipeline group for the current session.",
-        "Start recording to capture a workflow.",
-        "Execute workflow via other specialists while recording.",
-        "Stop and save the pipeline with a descriptive name.",
-        "Replay pipelines directly or convert to playbooks for reusable workflows.",
-        "Audit trail is maintained for all pipeline operations."
-      ]
-    },
-    {
-      "activation": {
-        "params": {
-          "action": "activate",
           "group": "visual_qa"
         },
         "tool": "manage_tools"
       },
-      "default_enabled": false,
-      "description": "Owns visual verification, screenshot analysis, and post-mutation visual validation loops.",
+      "default_enabled": true,
+      "description": "Visual verification and screenshot analysis \u2013 AI-powered image validation",
       "group": "visual_qa",
-      "handoff_targets": [
-        "unity-testing-specialist",
-        "unity-core-builder"
-      ],
+      "handoff_targets": [],
       "id": "unity-visual-qa-specialist",
       "kind": "specialist",
-      "name": "Unity Visual QA Specialist",
+      "name": "Unity Visual_Qa Specialist",
       "shared_meta_tools": [
+        "clear_traces",
+        "compare_benchmarks",
+        "configure_replay_scenario",
         "debug_request_context",
+        "delete_fixture",
         "execute_custom_tool",
+        "get_benchmark_results",
+        "get_benchmark_trends",
+        "get_captured_fixtures",
+        "get_trace_summary",
+        "import_fixtures",
+        "list_benchmarks",
+        "list_replay_sessions",
+        "list_traces",
         "manage_catalog",
         "manage_error_catalog",
         "manage_script_capabilities",
         "manage_subagents",
         "manage_tools",
-        "set_active_instance"
+        "replay_request",
+        "set_active_instance",
+        "stop_fixture_capture",
+        "stop_fixture_replay",
+        "stop_trace"
       ],
-      "tool_group_description": "Visual verification and screenshot analysis",
+      "tool_group_description": "Visual verification and screenshot analysis \u2013 AI-powered image validation",
       "tools": [
-        "analyze_screenshot"
+        "analyze_screenshot",
+        "manage_screenshot"
       ],
-      "when_to_use": [
-        "Post-mutation visual verification",
-        "Screenshot analysis and interpretation",
-        "Visual regression detection",
-        "Scene/UI validation after changes",
-        "Self-correction flows requiring visual feedback"
-      ],
-      "workflow": [
-        "Activate the visual_qa group for the current session.",
-        "Capture screenshot via manage_video_capture.",
-        "Analyze captured visuals with analyze_screenshot.",
-        "Report structured findings (issues detected, visual state).",
-        "Route fixes to core builder, structural validation to testing specialist."
-      ]
+      "when_to_use": [],
+      "workflow": []
     }
   ],
-  "version": 2
+  "version": 1
 }

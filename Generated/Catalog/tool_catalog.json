@@ -41,9 +41,9 @@
     "transactions": 3,
     "ui": 2,
     "vfx": 3,
-    "visual_qa": 1
+    "visual_qa": 2
   },
-  "tool_count": 133,
+  "tool_count": 134,
   "tools": [
     {
       "action_capabilities": {
@@ -154,6 +154,15 @@
           "requires_no_tests": false,
           "supports_dry_run": false,
           "wait_for_no_compile": true
+        },
+        "compare_screenshots": {
+          "high_risk": false,
+          "mutating": false,
+          "read_only": true,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "supports_dry_run": false,
+          "wait_for_no_compile": true
         }
       },
       "capabilities": {
@@ -174,14 +183,15 @@
         "wait_for_no_compile": true
       },
       "default_enabled": true,
-      "description": "Analyze screenshots and images for visual verification. Works with manage_video_capture to provide a complete capture \u2192 analyze workflow. Actions: analyze (perform image analysis). \n\nAnalysis Types:\n- ui_validation: Verify UI elements are present and correctly positioned\n- scene_composition: Analyze overall scene layout and visual balance\n- object_presence: Check for expected objects in the scene\n- color_check: Validate color schemes and visual consistency\n- custom: Use natural language query for specific analysis\n\n\nWorkflow:\n1. Use manage_video_capture to capture a screenshot\n2. Pass the screenshot path or data to analyze_screenshot\n3. Specify analysis_type and optional expected_elements\n4. Review structured analysis results",
+      "description": "Analyze screenshots and images for visual verification. Works with manage_video_capture to provide a complete capture \u2192 analyze workflow. Actions: analyze (perform image analysis), compare_screenshots (deterministic pixel diff). \n\nAnalysis Types:\n- ui_validation: Verify UI elements are present and correctly positioned\n- scene_composition: Analyze overall scene layout and visual balance\n- object_presence: Check for expected objects in the scene\n- color_check: Validate color schemes and visual consistency\n- custom: Use natural language query for specific analysis\n\n\nWorkflow:\n1. Use manage_video_capture to capture a screenshot\n2. Pass the screenshot path or data to analyze_screenshot\n3. Specify analysis_type and optional expected_elements\n4. Review structured analysis results",
       "group": "visual_qa",
       "group_description": "Visual verification and screenshot analysis \u2013 AI-powered image validation",
       "name": "analyze_screenshot",
       "parameters": [
         {
           "enum": [
-            "analyze"
+            "analyze",
+            "compare_screenshots"
           ],
           "name": "action",
           "required": true,
@@ -210,6 +220,16 @@
           "type": "string"
         },
         {
+          "name": "screenshot_path_b",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "screenshot_data_b",
+          "required": false,
+          "type": "string"
+        },
+        {
           "name": "query",
           "required": false,
           "type": "string"
@@ -226,7 +246,8 @@
         }
       ],
       "supported_actions": [
-        "analyze"
+        "analyze",
+        "compare_screenshots"
       ],
       "tags": [
         "group:visual_qa"
@@ -260,7 +281,7 @@
       "parameters": [
         {
           "name": "prefab_path",
-          "required": true,
+          "required": false,
           "type": "string"
         },
         {
@@ -302,6 +323,21 @@
           "name": "apply_as_override",
           "required": false,
           "type": "boolean | string"
+        },
+        {
+          "name": "patch",
+          "required": false,
+          "type": "array | object | string"
+        },
+        {
+          "name": "prefab_guid",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "handle_variants",
+          "required": false,
+          "type": "boolean"
         }
       ],
       "supported_actions": [],
@@ -364,6 +400,16 @@
           "name": "skip_validation",
           "required": false,
           "type": "boolean | string"
+        },
+        {
+          "name": "patch",
+          "required": false,
+          "type": "array | object | string"
+        },
+        {
+          "name": "target_mode",
+          "required": false,
+          "type": "string"
         }
       ],
       "supported_actions": [],
@@ -456,6 +502,11 @@
       "parameters": [
         {
           "name": "detailed",
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "name": "include_statistics",
           "required": false,
           "type": "boolean"
         }
@@ -733,6 +784,16 @@
           "name": "force_rebuild",
           "required": false,
           "type": "boolean"
+        },
+        {
+          "name": "force",
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "name": "path_filter",
+          "required": false,
+          "type": "string"
         }
       ],
       "supported_actions": [
@@ -1253,7 +1314,7 @@
       "parameters": [
         {
           "name": "source_path",
-          "required": true,
+          "required": false,
           "type": "string"
         },
         {
@@ -1280,6 +1341,16 @@
           "name": "include_import_settings",
           "required": false,
           "type": "boolean | string"
+        },
+        {
+          "name": "asset_path",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "asset_guid",
+          "required": false,
+          "type": "string"
         }
       ],
       "supported_actions": [],
@@ -1316,6 +1387,8 @@
         {
           "enum": [
             "asset_vs_instance",
+            "checkpoint",
+            "current_vs_saved",
             "show_overrides",
             "two_prefabs"
           ],
@@ -1325,7 +1398,7 @@
         },
         {
           "name": "source_prefab",
-          "required": true,
+          "required": false,
           "type": "string"
         },
         {
@@ -1342,6 +1415,16 @@
           "name": "show_override_details",
           "required": false,
           "type": "boolean | string"
+        },
+        {
+          "name": "prefab_path",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "source_checkpoint_id",
+          "required": false,
+          "type": "string"
         }
       ],
       "supported_actions": [],
@@ -1631,7 +1714,7 @@
             "find_path"
           ],
           "name": "action",
-          "required": true,
+          "required": false,
           "type": "enum"
         },
         {
@@ -1657,7 +1740,9 @@
         {
           "enum": [
             "both",
+            "depends_on",
             "downstream",
+            "referenced_by",
             "upstream"
           ],
           "name": "direction",
@@ -1686,6 +1771,21 @@
         },
         {
           "name": "include_usage_context",
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "name": "include_usage_details",
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "name": "recursive",
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "name": "detect_circular",
           "required": false,
           "type": "boolean"
         }
@@ -2033,8 +2133,23 @@
       "parameters": [
         {
           "name": "target",
-          "required": true,
+          "required": false,
           "type": "integer | object | string"
+        },
+        {
+          "name": "target_name",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "instance_id",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "hierarchy_path",
+          "required": false,
+          "type": "string"
         },
         {
           "name": "expand",
@@ -2138,6 +2253,41 @@
           "name": "duration",
           "required": false,
           "type": "number"
+        },
+        {
+          "name": "target_name",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "instance_id",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "bounds_center",
+          "required": false,
+          "type": "array | object"
+        },
+        {
+          "name": "bounds_size",
+          "required": false,
+          "type": "array | object"
+        },
+        {
+          "name": "camera_distance",
+          "required": false,
+          "type": "number"
+        },
+        {
+          "name": "mode",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "frame_selected",
+          "required": false,
+          "type": "boolean"
         }
       ],
       "supported_actions": [],
@@ -4679,7 +4829,34 @@
           "supports_dry_run": false,
           "wait_for_no_compile": true
         },
+        "add_symbol": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "supports_dry_run": false,
+          "wait_for_no_compile": true
+        },
+        "clear_symbols": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "supports_dry_run": false,
+          "wait_for_no_compile": true
+        },
         "get_define_symbols": {
+          "high_risk": false,
+          "mutating": false,
+          "read_only": true,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "supports_dry_run": false,
+          "wait_for_no_compile": true
+        },
+        "get_symbols": {
           "high_risk": false,
           "mutating": false,
           "read_only": true,
@@ -4697,7 +4874,25 @@
           "supports_dry_run": false,
           "wait_for_no_compile": true
         },
+        "remove_symbol": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "supports_dry_run": false,
+          "wait_for_no_compile": true
+        },
         "set_define_symbols": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "supports_dry_run": false,
+          "wait_for_no_compile": true
+        },
+        "set_symbols": {
           "high_risk": true,
           "mutating": true,
           "read_only": false,
@@ -4711,7 +4906,8 @@
         "action_model": "mixed",
         "high_risk": true,
         "known_read_only_actions": [
-          "get_define_symbols"
+          "get_define_symbols",
+          "get_symbols"
         ],
         "local_only": false,
         "mutating": true,
@@ -4735,9 +4931,14 @@
         {
           "enum": [
             "add_define_symbol",
+            "add_symbol",
+            "clear_symbols",
             "get_define_symbols",
+            "get_symbols",
             "remove_define_symbol",
-            "set_define_symbols"
+            "remove_symbol",
+            "set_define_symbols",
+            "set_symbols"
           ],
           "name": "action",
           "required": true,
@@ -4757,13 +4958,23 @@
           "name": "symbols",
           "required": false,
           "type": "array"
+        },
+        {
+          "name": "build_target",
+          "required": false,
+          "type": "string"
         }
       ],
       "supported_actions": [
         "add_define_symbol",
+        "add_symbol",
+        "clear_symbols",
         "get_define_symbols",
+        "get_symbols",
         "remove_define_symbol",
-        "set_define_symbols"
+        "remove_symbol",
+        "set_define_symbols",
+        "set_symbols"
       ],
       "tags": [
         "group:pipeline_control"
@@ -5407,6 +5618,15 @@
           "supports_dry_run": false,
           "wait_for_no_compile": true
         },
+        "force_reimport_by_type": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "supports_dry_run": false,
+          "wait_for_no_compile": true
+        },
         "force_reserialize": {
           "high_risk": true,
           "mutating": true,
@@ -5425,7 +5645,34 @@
           "supports_dry_run": false,
           "wait_for_no_compile": true
         },
+        "get_importer_settings": {
+          "high_risk": false,
+          "mutating": false,
+          "read_only": true,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "supports_dry_run": false,
+          "wait_for_no_compile": true
+        },
+        "get_queue": {
+          "high_risk": false,
+          "mutating": false,
+          "read_only": true,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "supports_dry_run": false,
+          "wait_for_no_compile": true
+        },
         "pause_import": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "supports_dry_run": false,
+          "wait_for_no_compile": true
+        },
+        "refresh": {
           "high_risk": true,
           "mutating": true,
           "read_only": false,
@@ -5442,13 +5689,33 @@
           "requires_no_tests": false,
           "supports_dry_run": false,
           "wait_for_no_compile": true
+        },
+        "set_importer_settings": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "supports_dry_run": false,
+          "wait_for_no_compile": true
+        },
+        "stop_refresh": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "supports_dry_run": false,
+          "wait_for_no_compile": true
         }
       },
       "capabilities": {
         "action_model": "mixed",
         "high_risk": true,
         "known_read_only_actions": [
-          "get_import_queue_status"
+          "get_import_queue_status",
+          "get_importer_settings",
+          "get_queue"
         ],
         "local_only": false,
         "mutating": true,
@@ -5472,10 +5739,16 @@
         {
           "enum": [
             "force_reimport",
+            "force_reimport_by_type",
             "force_reserialize",
             "get_import_queue_status",
+            "get_importer_settings",
+            "get_queue",
             "pause_import",
-            "resume_import"
+            "refresh",
+            "resume_import",
+            "set_importer_settings",
+            "stop_refresh"
           ],
           "name": "action",
           "required": true,
@@ -5490,14 +5763,35 @@
           "name": "options",
           "required": false,
           "type": "object"
+        },
+        {
+          "name": "asset_type",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "asset_path",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "settings",
+          "required": false,
+          "type": "object"
         }
       ],
       "supported_actions": [
         "force_reimport",
+        "force_reimport_by_type",
         "force_reserialize",
         "get_import_queue_status",
+        "get_importer_settings",
+        "get_queue",
         "pause_import",
-        "resume_import"
+        "refresh",
+        "resume_import",
+        "set_importer_settings",
+        "stop_refresh"
       ],
       "tags": [
         "group:pipeline_control"
@@ -5930,6 +6224,15 @@
     },
     {
       "action_capabilities": {
+        "get_icon_settings": {
+          "high_risk": false,
+          "mutating": false,
+          "read_only": true,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "supports_dry_run": false,
+          "wait_for_no_compile": true
+        },
         "get_player_settings": {
           "high_risk": false,
           "mutating": false,
@@ -5957,6 +6260,24 @@
           "supports_dry_run": false,
           "wait_for_no_compile": true
         },
+        "get_settings": {
+          "high_risk": false,
+          "mutating": false,
+          "read_only": true,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "supports_dry_run": false,
+          "wait_for_no_compile": true
+        },
+        "get_splash_settings": {
+          "high_risk": false,
+          "mutating": false,
+          "read_only": true,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "supports_dry_run": false,
+          "wait_for_no_compile": true
+        },
         "set_player_settings": {
           "high_risk": true,
           "mutating": true,
@@ -5974,15 +6295,27 @@
           "requires_no_tests": false,
           "supports_dry_run": false,
           "wait_for_no_compile": true
+        },
+        "set_settings": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "supports_dry_run": false,
+          "wait_for_no_compile": true
         }
       },
       "capabilities": {
         "action_model": "mixed",
         "high_risk": true,
         "known_read_only_actions": [
+          "get_icon_settings",
           "get_player_settings",
           "get_publishing_settings",
-          "get_resolution_settings"
+          "get_resolution_settings",
+          "get_settings",
+          "get_splash_settings"
         ],
         "local_only": false,
         "mutating": true,
@@ -6005,11 +6338,15 @@
       "parameters": [
         {
           "enum": [
+            "get_icon_settings",
             "get_player_settings",
             "get_publishing_settings",
             "get_resolution_settings",
+            "get_settings",
+            "get_splash_settings",
             "set_player_settings",
-            "set_resolution_settings"
+            "set_resolution_settings",
+            "set_settings"
           ],
           "name": "action",
           "required": true,
@@ -6024,14 +6361,23 @@
           "name": "platform",
           "required": false,
           "type": "string"
+        },
+        {
+          "name": "resolution",
+          "required": false,
+          "type": "object"
         }
       ],
       "supported_actions": [
+        "get_icon_settings",
         "get_player_settings",
         "get_publishing_settings",
         "get_resolution_settings",
+        "get_settings",
+        "get_splash_settings",
         "set_player_settings",
-        "set_resolution_settings"
+        "set_resolution_settings",
+        "set_settings"
       ],
       "tags": [
         "group:pipeline_control"
@@ -7579,6 +7925,141 @@
         "group:core"
       ],
       "unity_target": "manage_scene"
+    },
+    {
+      "action_capabilities": {
+        "capture_editor_window": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "supports_dry_run": false,
+          "wait_for_no_compile": true
+        },
+        "capture_game_view": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "supports_dry_run": false,
+          "wait_for_no_compile": true
+        },
+        "capture_object_preview": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "supports_dry_run": false,
+          "wait_for_no_compile": true
+        },
+        "capture_scene_view": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "supports_dry_run": false,
+          "wait_for_no_compile": true
+        },
+        "get_last_screenshot": {
+          "high_risk": true,
+          "mutating": true,
+          "read_only": false,
+          "refresh_if_dirty": true,
+          "requires_no_tests": false,
+          "supports_dry_run": false,
+          "wait_for_no_compile": true
+        }
+      },
+      "capabilities": {
+        "action_model": "unknown",
+        "high_risk": true,
+        "known_read_only_actions": [],
+        "local_only": false,
+        "mutating": true,
+        "read_only": false,
+        "refresh_if_dirty": true,
+        "requires_explicit_opt_in": false,
+        "requires_no_tests": false,
+        "requires_unity": true,
+        "runtime_only": false,
+        "server_only": false,
+        "supports_dry_run": false,
+        "supports_verification": false,
+        "wait_for_no_compile": true
+      },
+      "default_enabled": true,
+      "description": "Capture screenshots of the Unity Game view, Scene view, object previews, or the full editor window. Actions: capture_game_view, capture_scene_view, capture_object_preview, capture_editor_window, get_last_screenshot. Returns base64 or path output suitable for visual QA workflows.",
+      "group": "visual_qa",
+      "group_description": "Visual verification and screenshot analysis \u2013 AI-powered image validation",
+      "name": "manage_screenshot",
+      "parameters": [
+        {
+          "enum": [
+            "capture_editor_window",
+            "capture_game_view",
+            "capture_object_preview",
+            "capture_scene_view",
+            "get_last_screenshot"
+          ],
+          "name": "action",
+          "required": true,
+          "type": "enum"
+        },
+        {
+          "name": "width",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "height",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "enum": [
+            "base64",
+            "path"
+          ],
+          "name": "format",
+          "required": false,
+          "type": "enum"
+        },
+        {
+          "name": "target_object",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "camera_position",
+          "required": false,
+          "type": "array"
+        },
+        {
+          "name": "camera_rotation",
+          "required": false,
+          "type": "array"
+        },
+        {
+          "name": "background_color",
+          "required": false,
+          "type": "array | string"
+        }
+      ],
+      "supported_actions": [
+        "capture_editor_window",
+        "capture_game_view",
+        "capture_object_preview",
+        "capture_scene_view",
+        "get_last_screenshot"
+      ],
+      "tags": [
+        "group:visual_qa"
+      ],
+      "unity_target": "manage_screenshot"
     },
     {
       "action_capabilities": {
@@ -9811,6 +10292,36 @@
           "name": "mode",
           "required": false,
           "type": "enum"
+        },
+        {
+          "name": "target_name",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "target_names",
+          "required": false,
+          "type": "array"
+        },
+        {
+          "name": "instance_id",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "asset_guid",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "asset_path",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "focus_component",
+          "required": false,
+          "type": "string"
         }
       ],
       "supported_actions": [
@@ -10471,6 +10982,11 @@
         },
         {
           "name": "guid",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "asset_guid",
           "required": false,
           "type": "string"
         },
@@ -11850,6 +12366,11 @@
           "name": "max_related_assets",
           "required": false,
           "type": "integer"
+        },
+        {
+          "name": "include_size_details",
+          "required": false,
+          "type": "boolean"
         }
       ],
       "supported_actions": [],
@@ -11885,11 +12406,16 @@
       "parameters": [
         {
           "name": "subscription_id",
-          "required": true,
+          "required": false,
           "type": "string"
         },
         {
           "name": "flush_pending_events",
+          "required": false,
+          "type": "boolean | string"
+        },
+        {
+          "name": "unsubscribe_all",
           "required": false,
           "type": "boolean | string"
         }

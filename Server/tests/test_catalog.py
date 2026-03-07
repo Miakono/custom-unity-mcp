@@ -120,3 +120,13 @@ def test_build_tool_catalog_bootstraps_registry_when_empty(monkeypatch):
 
     assert called is True
     assert any(item["name"] == "_bootstrapped_tool" for item in catalog["tools"])
+
+
+def test_build_tool_catalog_includes_manage_screenshot_from_runtime_registry():
+    catalog = build_tool_catalog()
+
+    manage_screenshot = next(item for item in catalog["tools"] if item["name"] == "manage_screenshot")
+
+    assert manage_screenshot["group"] == "visual_qa"
+    assert "capture_editor_window" in manage_screenshot["supported_actions"]
+    assert "get_last_screenshot" in manage_screenshot["supported_actions"]

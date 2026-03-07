@@ -2,7 +2,7 @@
 
 Generated machine-readable catalog derived from the live server tool registry.
 
-Tool count: 133
+Tool count: 134
 Default enabled groups: animation, asset_intelligence, core, dev_tools, diff_patch, events, input, navigation, pipeline, pipeline_control, profiling, project_config, scripting_ext, spatial, testing, transactions, ui, vfx, visual_qa
 
 ## analyze_asset_dependencies
@@ -33,7 +33,7 @@ Analyze asset dependencies and relationships. Read-only actions: get_dependencie
 
 ## analyze_screenshot
 
-Analyze screenshots and images for visual verification. Works with manage_video_capture to provide a complete capture → analyze workflow. Actions: analyze (perform image analysis). 
+Analyze screenshots and images for visual verification. Works with manage_video_capture to provide a complete capture → analyze workflow. Actions: analyze (perform image analysis), compare_screenshots (deterministic pixel diff). 
 
 Analysis Types:
 - ui_validation: Verify UI elements are present and correctly positioned
@@ -58,17 +58,20 @@ Workflow:
 - Local only: `false`
 - Runtime only: `false`
 - Requires explicit opt-in: `false`
-- Supported actions: `analyze`
+- Supported actions: `analyze`, `compare_screenshots`
 - Parameters:
-  - `action`: type=`enum`, required=`true`, enum=`analyze`
+  - `action`: type=`enum`, required=`true`, enum=`analyze`, `compare_screenshots`
   - `analysis_type`: type=`enum`, required=`true`, enum=`color_check`, `custom`, `object_presence`, `scene_composition`, `ui_validation`
   - `screenshot_path`: type=`string`, required=`false`
   - `screenshot_data`: type=`string`, required=`false`
+  - `screenshot_path_b`: type=`string`, required=`false`
+  - `screenshot_data_b`: type=`string`, required=`false`
   - `query`: type=`string`, required=`false`
   - `expected_elements`: type=`array`, required=`false`
   - `regions_of_interest`: type=`array`, required=`false`
 - Action contracts:
   - `analyze`: read_only=`true`, mutating=`false`, high_risk=`false`, supports_dry_run=`false`
+  - `compare_screenshots`: read_only=`true`, mutating=`false`, high_risk=`false`, supports_dry_run=`false`
 
 ## apply_prefab_patch
 
@@ -84,7 +87,7 @@ Apply structured patches to Unity prefabs. Supports applying patches derived fro
 - Runtime only: `false`
 - Requires explicit opt-in: `false`
 - Parameters:
-  - `prefab_path`: type=`string`, required=`true`
+  - `prefab_path`: type=`string`, required=`false`
   - `operations`: type=`array | string`, required=`false`
   - `based_on_diff`: type=`string`, required=`false`
   - `target_mode`: type=`enum`, required=`false`, enum=`asset`, `instance`, `variant`
@@ -92,6 +95,9 @@ Apply structured patches to Unity prefabs. Supports applying patches derived fro
   - `dry_run`: type=`boolean | string`, required=`false`
   - `create_checkpoint`: type=`boolean | string`, required=`false`
   - `apply_as_override`: type=`boolean | string`, required=`false`
+  - `patch`: type=`array | object | string`, required=`false`
+  - `prefab_guid`: type=`string`, required=`false`
+  - `handle_variants`: type=`boolean`, required=`false`
 
 ## apply_scene_patch
 
@@ -113,6 +119,8 @@ Apply structured patches to Unity scenes. Supports applying patches derived from
   - `dry_run`: type=`boolean | string`, required=`false`
   - `create_checkpoint`: type=`boolean | string`, required=`false`
   - `skip_validation`: type=`boolean | string`, required=`false`
+  - `patch`: type=`array | object | string`, required=`false`
+  - `target_mode`: type=`string`, required=`false`
 
 ## apply_text_edits
 
@@ -160,6 +168,7 @@ Check the status of the asset index without modifying it. Reports index freshnes
 - Requires explicit opt-in: `false`
 - Parameters:
   - `detailed`: type=`boolean`, required=`false`
+  - `include_statistics`: type=`boolean`, required=`false`
 
 ## audit_prefab_integrity
 
@@ -241,6 +250,8 @@ Build and maintain a searchable index of Unity project assets. Supports full reb
   - `include_import_settings`: type=`boolean`, required=`false`
   - `max_depth`: type=`integer`, required=`false`
   - `force_rebuild`: type=`boolean`, required=`false`
+  - `force`: type=`boolean`, required=`false`
+  - `path_filter`: type=`string`, required=`false`
 - Action contracts:
   - `build`: read_only=`false`, mutating=`true`, high_risk=`true`, supports_dry_run=`false`
   - `clear`: read_only=`false`, mutating=`true`, high_risk=`true`, supports_dry_run=`false`
@@ -449,11 +460,13 @@ Compare Unity assets and generate structured diffs. Supports comparing any Unity
 - Runtime only: `false`
 - Requires explicit opt-in: `false`
 - Parameters:
-  - `source_path`: type=`string`, required=`true`
+  - `source_path`: type=`string`, required=`false`
   - `target_path`: type=`string`, required=`false`
   - `compare_mode`: type=`enum`, required=`false`, enum=`check_import_settings`, `current_vs_saved`, `two_assets`
   - `include_binary`: type=`boolean | string`, required=`false`
   - `include_import_settings`: type=`boolean | string`, required=`false`
+  - `asset_path`: type=`string`, required=`false`
+  - `asset_guid`: type=`string`, required=`false`
 
 ## diff_prefab
 
@@ -469,11 +482,13 @@ Compare Unity prefabs and generate structured diffs. Supports comparing prefab a
 - Runtime only: `false`
 - Requires explicit opt-in: `false`
 - Parameters:
-  - `compare_mode`: type=`enum`, required=`true`, enum=`asset_vs_instance`, `show_overrides`, `two_prefabs`
-  - `source_prefab`: type=`string`, required=`true`
+  - `compare_mode`: type=`enum`, required=`true`, enum=`asset_vs_instance`, `checkpoint`, `current_vs_saved`, `show_overrides`, `two_prefabs`
+  - `source_prefab`: type=`string`, required=`false`
   - `target_prefab`: type=`string`, required=`false`
   - `include_unchanged`: type=`boolean | string`, required=`false`
   - `show_override_details`: type=`boolean | string`, required=`false`
+  - `prefab_path`: type=`string`, required=`false`
+  - `source_checkpoint_id`: type=`string`, required=`false`
 
 ## diff_scene
 
@@ -564,17 +579,20 @@ Find asset references bidirectionally. Discover what assets reference a target a
 - Requires explicit opt-in: `false`
 - Supported actions: `analyze_impact`, `find_circular`, `find_dependencies`, `find_dependents`, `find_path`
 - Parameters:
-  - `action`: type=`enum`, required=`true`, enum=`analyze_impact`, `find_circular`, `find_dependencies`, `find_dependents`, `find_path`
+  - `action`: type=`enum`, required=`false`, enum=`analyze_impact`, `find_circular`, `find_dependencies`, `find_dependents`, `find_path`
   - `asset_path`: type=`string`, required=`false`
   - `asset_guid`: type=`string`, required=`false`
   - `target_asset_path`: type=`string`, required=`false`
   - `target_asset_guid`: type=`string`, required=`false`
-  - `direction`: type=`enum`, required=`false`, enum=`both`, `downstream`, `upstream`
+  - `direction`: type=`enum`, required=`false`, enum=`both`, `depends_on`, `downstream`, `referenced_by`, `upstream`
   - `max_depth`: type=`integer`, required=`false`
   - `include_indirect`: type=`boolean`, required=`false`
   - `filter_types`: type=`array`, required=`false`
   - `search_scope`: type=`string`, required=`false`
   - `include_usage_context`: type=`boolean`, required=`false`
+  - `include_usage_details`: type=`boolean`, required=`false`
+  - `recursive`: type=`boolean`, required=`false`
+  - `detect_circular`: type=`boolean`, required=`false`
 - Action contracts:
   - `analyze_impact`: read_only=`true`, mutating=`false`, high_risk=`false`, supports_dry_run=`false`
   - `find_circular`: read_only=`true`, mutating=`false`, high_risk=`false`, supports_dry_run=`false`
@@ -707,7 +725,10 @@ Focuses and expands a GameObject in the Unity Hierarchy window. Scrolls to make 
 - Runtime only: `false`
 - Requires explicit opt-in: `false`
 - Parameters:
-  - `target`: type=`integer | object | string`, required=`true`
+  - `target`: type=`integer | object | string`, required=`false`
+  - `target_name`: type=`string`, required=`false`
+  - `instance_id`: type=`integer`, required=`false`
+  - `hierarchy_path`: type=`string`, required=`false`
   - `expand`: type=`boolean`, required=`false`
   - `expand_depth`: type=`integer`, required=`false`
   - `select`: type=`boolean`, required=`false`
@@ -734,6 +755,13 @@ Frames a target in the Unity Scene view camera. Can frame selected objects, a sp
   - `distance`: type=`number`, required=`false`
   - `orthographic`: type=`boolean`, required=`false`
   - `duration`: type=`number`, required=`false`
+  - `target_name`: type=`string`, required=`false`
+  - `instance_id`: type=`integer`, required=`false`
+  - `bounds_center`: type=`array | object`, required=`false`
+  - `bounds_size`: type=`array | object`, required=`false`
+  - `camera_distance`: type=`number`, required=`false`
+  - `mode`: type=`string`, required=`false`
+  - `frame_selected`: type=`boolean`, required=`false`
 
 ## get_benchmark_results
 
@@ -1475,18 +1503,24 @@ Manage Unity Scripting Define Symbols for conditional compilation. Read-only act
 - Local only: `false`
 - Runtime only: `false`
 - Requires explicit opt-in: `false`
-- Supported actions: `add_define_symbol`, `get_define_symbols`, `remove_define_symbol`, `set_define_symbols`
-- Known read-only actions: `get_define_symbols`
+- Supported actions: `add_define_symbol`, `add_symbol`, `clear_symbols`, `get_define_symbols`, `get_symbols`, `remove_define_symbol`, `remove_symbol`, `set_define_symbols`, `set_symbols`
+- Known read-only actions: `get_define_symbols`, `get_symbols`
 - Parameters:
-  - `action`: type=`enum`, required=`true`, enum=`add_define_symbol`, `get_define_symbols`, `remove_define_symbol`, `set_define_symbols`
+  - `action`: type=`enum`, required=`true`, enum=`add_define_symbol`, `add_symbol`, `clear_symbols`, `get_define_symbols`, `get_symbols`, `remove_define_symbol`, `remove_symbol`, `set_define_symbols`, `set_symbols`
   - `platform`: type=`string`, required=`false`
   - `symbol`: type=`string`, required=`false`
   - `symbols`: type=`array`, required=`false`
+  - `build_target`: type=`string`, required=`false`
 - Action contracts:
   - `add_define_symbol`: read_only=`false`, mutating=`true`, high_risk=`true`, supports_dry_run=`false`
+  - `add_symbol`: read_only=`false`, mutating=`true`, high_risk=`true`, supports_dry_run=`false`
+  - `clear_symbols`: read_only=`false`, mutating=`true`, high_risk=`true`, supports_dry_run=`false`
   - `get_define_symbols`: read_only=`true`, mutating=`false`, high_risk=`false`, supports_dry_run=`false`
+  - `get_symbols`: read_only=`true`, mutating=`false`, high_risk=`false`, supports_dry_run=`false`
   - `remove_define_symbol`: read_only=`false`, mutating=`true`, high_risk=`true`, supports_dry_run=`false`
+  - `remove_symbol`: read_only=`false`, mutating=`true`, high_risk=`true`, supports_dry_run=`false`
   - `set_define_symbols`: read_only=`false`, mutating=`true`, high_risk=`true`, supports_dry_run=`false`
+  - `set_symbols`: read_only=`false`, mutating=`true`, high_risk=`true`, supports_dry_run=`false`
 
 ## manage_editor
 
@@ -1634,18 +1668,27 @@ Manage Unity Asset Import Pipeline including reimport, reserialize, and import c
 - Local only: `false`
 - Runtime only: `false`
 - Requires explicit opt-in: `false`
-- Supported actions: `force_reimport`, `force_reserialize`, `get_import_queue_status`, `pause_import`, `resume_import`
-- Known read-only actions: `get_import_queue_status`
+- Supported actions: `force_reimport`, `force_reimport_by_type`, `force_reserialize`, `get_import_queue_status`, `get_importer_settings`, `get_queue`, `pause_import`, `refresh`, `resume_import`, `set_importer_settings`, `stop_refresh`
+- Known read-only actions: `get_import_queue_status`, `get_importer_settings`, `get_queue`
 - Parameters:
-  - `action`: type=`enum`, required=`true`, enum=`force_reimport`, `force_reserialize`, `get_import_queue_status`, `pause_import`, `resume_import`
+  - `action`: type=`enum`, required=`true`, enum=`force_reimport`, `force_reimport_by_type`, `force_reserialize`, `get_import_queue_status`, `get_importer_settings`, `get_queue`, `pause_import`, `refresh`, `resume_import`, `set_importer_settings`, `stop_refresh`
   - `asset_paths`: type=`array`, required=`false`
   - `options`: type=`object`, required=`false`
+  - `asset_type`: type=`string`, required=`false`
+  - `asset_path`: type=`string`, required=`false`
+  - `settings`: type=`object`, required=`false`
 - Action contracts:
   - `force_reimport`: read_only=`false`, mutating=`true`, high_risk=`true`, supports_dry_run=`false`
+  - `force_reimport_by_type`: read_only=`false`, mutating=`true`, high_risk=`true`, supports_dry_run=`false`
   - `force_reserialize`: read_only=`false`, mutating=`true`, high_risk=`true`, supports_dry_run=`false`
   - `get_import_queue_status`: read_only=`true`, mutating=`false`, high_risk=`false`, supports_dry_run=`false`
+  - `get_importer_settings`: read_only=`true`, mutating=`false`, high_risk=`false`, supports_dry_run=`false`
+  - `get_queue`: read_only=`true`, mutating=`false`, high_risk=`false`, supports_dry_run=`false`
   - `pause_import`: read_only=`false`, mutating=`true`, high_risk=`true`, supports_dry_run=`false`
+  - `refresh`: read_only=`false`, mutating=`true`, high_risk=`true`, supports_dry_run=`false`
   - `resume_import`: read_only=`false`, mutating=`true`, high_risk=`true`, supports_dry_run=`false`
+  - `set_importer_settings`: read_only=`false`, mutating=`true`, high_risk=`true`, supports_dry_run=`false`
+  - `stop_refresh`: read_only=`false`, mutating=`true`, high_risk=`true`, supports_dry_run=`false`
 
 ## manage_input_system
 
@@ -1757,18 +1800,23 @@ Manage Unity Player Settings including company info, product info, version, reso
 - Local only: `false`
 - Runtime only: `false`
 - Requires explicit opt-in: `false`
-- Supported actions: `get_player_settings`, `get_publishing_settings`, `get_resolution_settings`, `set_player_settings`, `set_resolution_settings`
-- Known read-only actions: `get_player_settings`, `get_publishing_settings`, `get_resolution_settings`
+- Supported actions: `get_icon_settings`, `get_player_settings`, `get_publishing_settings`, `get_resolution_settings`, `get_settings`, `get_splash_settings`, `set_player_settings`, `set_resolution_settings`, `set_settings`
+- Known read-only actions: `get_icon_settings`, `get_player_settings`, `get_publishing_settings`, `get_resolution_settings`, `get_settings`, `get_splash_settings`
 - Parameters:
-  - `action`: type=`enum`, required=`true`, enum=`get_player_settings`, `get_publishing_settings`, `get_resolution_settings`, `set_player_settings`, `set_resolution_settings`
+  - `action`: type=`enum`, required=`true`, enum=`get_icon_settings`, `get_player_settings`, `get_publishing_settings`, `get_resolution_settings`, `get_settings`, `get_splash_settings`, `set_player_settings`, `set_resolution_settings`, `set_settings`
   - `settings`: type=`object`, required=`false`
   - `platform`: type=`string`, required=`false`
+  - `resolution`: type=`object`, required=`false`
 - Action contracts:
+  - `get_icon_settings`: read_only=`true`, mutating=`false`, high_risk=`false`, supports_dry_run=`false`
   - `get_player_settings`: read_only=`true`, mutating=`false`, high_risk=`false`, supports_dry_run=`false`
   - `get_publishing_settings`: read_only=`true`, mutating=`false`, high_risk=`false`, supports_dry_run=`false`
   - `get_resolution_settings`: read_only=`true`, mutating=`false`, high_risk=`false`, supports_dry_run=`false`
+  - `get_settings`: read_only=`true`, mutating=`false`, high_risk=`false`, supports_dry_run=`false`
+  - `get_splash_settings`: read_only=`true`, mutating=`false`, high_risk=`false`, supports_dry_run=`false`
   - `set_player_settings`: read_only=`false`, mutating=`true`, high_risk=`true`, supports_dry_run=`false`
   - `set_resolution_settings`: read_only=`false`, mutating=`true`, high_risk=`true`, supports_dry_run=`false`
+  - `set_settings`: read_only=`false`, mutating=`true`, high_risk=`true`, supports_dry_run=`false`
 
 ## manage_prefabs
 
@@ -2094,6 +2142,36 @@ Performs CRUD operations on Unity scenes. Read-only actions: get_hierarchy, get_
   - `screenshot`: read_only=`true`, mutating=`false`, high_risk=`false`, supports_dry_run=`false`
   - `set_active`: read_only=`false`, mutating=`true`, high_risk=`true`, supports_dry_run=`true`
   - `unload`: read_only=`false`, mutating=`true`, high_risk=`true`, supports_dry_run=`true`
+
+## manage_screenshot
+
+Capture screenshots of the Unity Game view, Scene view, object previews, or the full editor window. Actions: capture_game_view, capture_scene_view, capture_object_preview, capture_editor_window, get_last_screenshot. Returns base64 or path output suitable for visual QA workflows.
+
+- Group: `visual_qa`
+- Unity target: `manage_screenshot`
+- Action model: `unknown`
+- Mutating: `true`
+- High risk: `true`
+- Supports dry-run: `false`
+- Local only: `false`
+- Runtime only: `false`
+- Requires explicit opt-in: `false`
+- Supported actions: `capture_editor_window`, `capture_game_view`, `capture_object_preview`, `capture_scene_view`, `get_last_screenshot`
+- Parameters:
+  - `action`: type=`enum`, required=`true`, enum=`capture_editor_window`, `capture_game_view`, `capture_object_preview`, `capture_scene_view`, `get_last_screenshot`
+  - `width`: type=`integer`, required=`false`
+  - `height`: type=`integer`, required=`false`
+  - `format`: type=`enum`, required=`false`, enum=`base64`, `path`
+  - `target_object`: type=`string`, required=`false`
+  - `camera_position`: type=`array`, required=`false`
+  - `camera_rotation`: type=`array`, required=`false`
+  - `background_color`: type=`array | string`, required=`false`
+- Action contracts:
+  - `capture_editor_window`: read_only=`false`, mutating=`true`, high_risk=`true`, supports_dry_run=`false`
+  - `capture_game_view`: read_only=`false`, mutating=`true`, high_risk=`true`, supports_dry_run=`false`
+  - `capture_object_preview`: read_only=`false`, mutating=`true`, high_risk=`true`, supports_dry_run=`false`
+  - `capture_scene_view`: read_only=`false`, mutating=`true`, high_risk=`true`, supports_dry_run=`false`
+  - `get_last_screenshot`: read_only=`false`, mutating=`true`, high_risk=`true`, supports_dry_run=`false`
 
 ## manage_script
 
@@ -2612,6 +2690,12 @@ Opens a target in the Unity Inspector window. Supports opening GameObjects, asse
   - `expand_component`: type=`boolean`, required=`false`
   - `lock`: type=`boolean`, required=`false`
   - `mode`: type=`enum`, required=`false`, enum=`debug`, `debug_internal`, `normal`
+  - `target_name`: type=`string`, required=`false`
+  - `target_names`: type=`array`, required=`false`
+  - `instance_id`: type=`integer`, required=`false`
+  - `asset_guid`: type=`string`, required=`false`
+  - `asset_path`: type=`string`, required=`false`
+  - `focus_component`: type=`string`, required=`false`
 - Action contracts:
   - `clear`: read_only=`false`, mutating=`true`, high_risk=`true`, supports_dry_run=`false`
   - `get_target`: read_only=`false`, mutating=`true`, high_risk=`true`, supports_dry_run=`false`
@@ -2839,6 +2923,7 @@ Reveals/ping an asset in the Unity Project window. Highlights the asset and scro
 - Parameters:
   - `asset_path`: type=`string`, required=`false`
   - `guid`: type=`string`, required=`false`
+  - `asset_guid`: type=`string`, required=`false`
   - `instance_id`: type=`integer`, required=`false`
   - `select`: type=`boolean`, required=`false`
   - `highlight`: type=`boolean`, required=`false`
@@ -3312,6 +3397,7 @@ Generate intelligent summaries of Unity assets. Provides high-level understandin
   - `include_usage_stats`: type=`boolean`, required=`false`
   - `include_properties`: type=`boolean`, required=`false`
   - `max_related_assets`: type=`integer`, required=`false`
+  - `include_size_details`: type=`boolean`, required=`false`
 
 ## unsubscribe_editor_events
 
@@ -3327,8 +3413,9 @@ Unsubscribes from Unity editor events and cleans up the subscription. Returns st
 - Runtime only: `false`
 - Requires explicit opt-in: `false`
 - Parameters:
-  - `subscription_id`: type=`string`, required=`true`
+  - `subscription_id`: type=`string`, required=`false`
   - `flush_pending_events`: type=`boolean | string`, required=`false`
+  - `unsubscribe_all`: type=`boolean | string`, required=`false`
 
 ## validate_compile_health
 

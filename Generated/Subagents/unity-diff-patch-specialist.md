@@ -1,12 +1,12 @@
-# Unity Input Specialist
+# Unity Diff_Patch Specialist
 
-ID: `unity-input-specialist`
+ID: `unity-diff-patch-specialist`
 Kind: `specialist`
 
-Unity Input System - Action Maps, Actions, Bindings, and Runtime Simulation
+Scene and prefab diff/patch operations
 
-Tool group: `input`
-Activate with: `manage_tools(action="activate", group="input")`
+Tool group: `diff_patch`
+Activate with: `manage_tools(action="activate", group="diff_patch")`
 
 Shared meta-tools:
 - `clear_traces`
@@ -35,4 +35,8 @@ Shared meta-tools:
 - `stop_trace`
 
 Primary tools:
-- `manage_input_system`
+- `apply_prefab_patch`
+- `apply_scene_patch`
+- `diff_asset`
+- `diff_prefab`
+- `diff_scene`

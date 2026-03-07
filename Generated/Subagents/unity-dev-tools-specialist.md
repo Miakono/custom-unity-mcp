@@ -1,12 +1,12 @@
-# Unity Input Specialist
+# Unity Dev_Tools Specialist
 
-ID: `unity-input-specialist`
+ID: `unity-dev-tools-specialist`
 Kind: `specialist`
 
-Unity Input System - Action Maps, Actions, Bindings, and Runtime Simulation
+Internal development and debugging tools
 
-Tool group: `input`
-Activate with: `manage_tools(action="activate", group="input")`
+Tool group: `dev_tools`
+Activate with: `manage_tools(action="activate", group="dev_tools")`
 
 Shared meta-tools:
 - `clear_traces`
@@ -35,4 +35,7 @@ Shared meta-tools:
 - `stop_trace`
 
 Primary tools:
-- `manage_input_system`
+- `run_benchmark`
+- `start_fixture_capture`
+- `start_trace`
+- `start_fixture_replay`

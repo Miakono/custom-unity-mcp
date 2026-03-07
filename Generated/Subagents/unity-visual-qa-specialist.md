@@ -1,41 +1,39 @@
-# Unity Visual QA Specialist
+# Unity Visual_Qa Specialist
 
 ID: `unity-visual-qa-specialist`
 Kind: `specialist`
 
-Owns visual verification, screenshot analysis, and post-mutation visual validation loops.
+Visual verification and screenshot analysis – AI-powered image validation
 
 Tool group: `visual_qa`
 Activate with: `manage_tools(action="activate", group="visual_qa")`
 
 Shared meta-tools:
+- `clear_traces`
+- `compare_benchmarks`
+- `configure_replay_scenario`
 - `debug_request_context`
+- `delete_fixture`
 - `execute_custom_tool`
+- `get_benchmark_results`
+- `get_benchmark_trends`
+- `get_captured_fixtures`
+- `get_trace_summary`
+- `import_fixtures`
+- `list_benchmarks`
+- `list_replay_sessions`
+- `list_traces`
 - `manage_catalog`
 - `manage_error_catalog`
 - `manage_script_capabilities`
 - `manage_subagents`
 - `manage_tools`
+- `replay_request`
 - `set_active_instance`
+- `stop_fixture_capture`
+- `stop_fixture_replay`
+- `stop_trace`
 
 Primary tools:
 - `analyze_screenshot`
-- `manage_video_capture` (for capture operations)
-
-Use when:
-- Post-mutation visual verification
-- Screenshot analysis and interpretation
-- Visual regression detection
-- Scene/UI validation after changes
-- Self-correction flows requiring visual feedback
-
-Workflow:
-- Activate the visual_qa group for the current session.
-- Capture screenshot via manage_video_capture.
-- Analyze captured visuals with analyze_screenshot.
-- Report structured findings (issues detected, visual state).
-- Route fixes to core builder, structural validation to testing specialist.
-
-Handoff targets:
-- `unity-testing-specialist` (for structural validation)
-- `unity-core-builder` (for fixes)
+- `manage_screenshot`

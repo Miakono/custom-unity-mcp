@@ -123,3 +123,11 @@ def test_build_subagent_catalog_bootstraps_registry_when_empty(monkeypatch):
     assert called is True
     core = next(item for item in catalog["subagents"] if item["id"] == "unity-core-specialist")
     assert "_manage_scene" in core["tools"]
+
+
+def test_build_subagent_catalog_includes_visual_qa_specialist_tools_from_runtime_registry():
+    catalog = build_subagent_catalog()
+
+    visual_qa = next(item for item in catalog["subagents"] if item.get("group") == "visual_qa")
+
+    assert "manage_screenshot" in visual_qa["tools"]

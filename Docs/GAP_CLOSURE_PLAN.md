@@ -1,7 +1,7 @@
 # Unity MCP Gap Closure Plan (Repo-Grounded)
 
 **Goal**: Close real feature and reliability gaps without damaging Unity asset integrity or existing release workflows.  
-**Repo Snapshot Date**: 2026-03-06.
+**Repo Snapshot Date**: 2026-03-07.
 
 This is the current remediation plan for repo cleanup and workflow hardening.
 It is grounded in the checked-in source, generated artifacts, and recent validation work, but it is not a claim that every acceptance criterion below is already passing.
@@ -10,7 +10,12 @@ Document role:
 
 - Use this file for current gap-remediation priorities.
 - Use `Docs/HANDOFF_2026-03-06.md` for the latest validated implementation and smoke-status snapshot.
-- Treat `Docs/PREMIUM_FEATURE_PLAN*.md` as historical planning records unless explicitly reactivated.
+- Treat premium/legacy planning docs indexed under `Docs/Archive/README.md` as historical records unless explicitly reactivated.
+
+Archive guardrail:
+
+- Active planning and execution sources are the current docs in `Docs/`.
+- Archived planning docs under `Docs/Archive/` are non-authoritative for current scope unless a current doc explicitly reactivates them.
 
 ---
 
@@ -18,7 +23,7 @@ Document role:
 
 This plan replaces stale assumptions from the prior draft.
 
-- Screenshot capability already exists in source (`manage_screenshot`, Unity `ManageScreenshot`), but the repo still shows source-vs-export contract drift that should be cleaned up before calling the surface stable.
+- Screenshot capability is now implemented end-to-end for the current supported path: `manage_screenshot` exposes `capture_editor_window` and `get_last_screenshot`, `analyze_screenshot` supports `compare_screenshots`, and local Windows HTTP editor capture is handled server-side when available.
 - UI Toolkit support already exists (`manage_ui`, `manage_runtime_ui`, `UIToolkitAutomation`).
 - Tracked virtualenv files under `Server/.venv/` are already `0`.
 - `Generated/` contains publishable artifacts (catalog, error catalog, subagents), not disposable build junk.
@@ -46,26 +51,27 @@ Recent validated state that should not be reopened casually:
 
 Decision for this run:
 
-1. Remove `get_last_screenshot` from the Python-exposed `manage_screenshot` action list in Phase 0.
-2. Re-introduce it only after a Unity-side implementation exists and is tested end-to-end.
+1. Keep `get_last_screenshot` in the Python-exposed `manage_screenshot` action list.
+2. Treat it as part of the supported visual QA workflow because Unity-side storage and retrieval now exist and route tests cover the surface.
 
 Rationale:
 
-1. Avoid shipping an advertised action that currently returns unsupported behavior.
+1. The action is implemented and should no longer be documented as aspirational or removed.
 
-### 0.1 Fix `manage_screenshot` contract mismatch
+### 0.1 Screenshot contract status
 
-Current repo-grounded mismatch:
+Current repo-grounded state:
 
-- The server source currently advertises `get_last_screenshot` and still uses `group="visual"`.
-- The Unity-side implementation path currently supports only `capture_game_view`, `capture_scene_view`, and `capture_object_preview`.
-- The generated catalog currently emphasizes `visual_qa` tooling, so the published story is not as explicit or coherent as the source suggests.
+- The server source exposes screenshot actions under `group="visual_qa"`.
+- The Unity-side implementation now supports `capture_game_view`, `capture_scene_view`, `capture_object_preview`, `capture_editor_window`, and `get_last_screenshot`.
+- Local Windows HTTP `capture_editor_window` requests are intercepted server-side and returned with backend marker `server_hwnd_client_bbox` when the Unity editor window can be resolved.
+- Screenshot comparison is available through `analyze_screenshot(action="compare_screenshots", ...)`.
 
 Actions:
 
-1. Execute the binding decision from Phase 0.0.
-2. Align tool group naming: use `visual_qa` consistently, or formally document and export `visual` as an intentional public group.
-3. Normalize parameter aliasing and response keys (`image_base64`, `data_uri`, file path mode).
+1. Keep `visual_qa` as the documented screenshot group.
+2. Preserve the current response contract (`image_base64`, `data_uri`, optional `file_path`) and backend marker fields.
+3. Document the supported operating boundary clearly: whole-editor capture is currently a local Windows HTTP capability and remains OS/window-state constrained.
 
 ### 0.2 Baseline snapshot and publish
 
@@ -77,8 +83,8 @@ Capture and commit a baseline report in docs:
 
 **Acceptance Criteria**:
 
-- [ ] `manage_screenshot` source-facing and generated-artifact-facing actions exactly match executable Unity actions.
-- [ ] No unknown group registration errors for screenshot tooling.
+- [x] `manage_screenshot` source-facing and generated-artifact-facing actions exactly match executable Unity actions.
+- [x] No unknown group registration errors for screenshot tooling.
 - [ ] Baseline report recorded and referenced by subsequent phases.
 
 ### Phase 0 Gate (must pass before Phase 1)
@@ -135,13 +141,13 @@ Action:
 
 **Goal**: Turn existing screenshot capability into a stable visual QA workflow.
 
-### 2.1 Complete screenshot workflow
+### 2.1 Screenshot workflow status
 
 Action:
 
-1. Add `compare_screenshots` (or equivalent diff path) by integrating with diff/analysis tools.
-2. Add bounded in-memory recent capture buffer only if needed (`get_last_screenshot` implementation path).
-3. Enforce predictable size/format limits and timeouts.
+1. `compare_screenshots` is now implemented in `analyze_screenshot`.
+2. `get_last_screenshot` is now implemented through the Unity screenshot tool state.
+3. Remaining work is operational hardening, not surface creation: document limits, keep smoke coverage on, and add more diagnostics if window selection drifts.
 
 ### 2.2 Wire visual tooling coherently
 
@@ -152,8 +158,8 @@ Action:
 
 **Acceptance Criteria**:
 
-- [ ] A full capture -> analyze -> compare flow works in automated tests.
-- [ ] Returned image payloads are accepted by target MCP clients.
+- [x] A full capture -> analyze -> compare flow works in automated tests.
+- [x] Returned image payloads are accepted by target MCP clients.
 - [ ] 1080p screenshot capture meets latency/error SLOs: p50 <= 750 ms, p95 <= 1200 ms, failure rate <= 1% over 100 runs.
 
 ### Phase 2 Gate (must pass before Phase 3)

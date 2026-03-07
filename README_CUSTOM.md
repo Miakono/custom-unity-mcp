@@ -86,3 +86,12 @@ Latest live bridge updates (2026-03-06):
   `Scripts/Run-LiveUnitySmoke.ps1`,
   and `Scripts/Run-ValidationSuite.ps1`.
 - See `Docs/LIVE_TEST_MATRIX.md` for the current live verification list and `Docs/HANDOFF_2026-03-06.md` for the implementation summary.
+
+Latest visual QA updates (2026-03-07):
+
+- `manage_screenshot` now exposes and routes `capture_editor_window` and `get_last_screenshot` alongside the existing game/scene/object capture actions.
+- `analyze_screenshot` now supports deterministic `compare_screenshots` pixel-diff checks for capture regression testing.
+- Local HTTP `/api/command` on Windows now intercepts `capture_editor_window` and captures the Unity editor client area server-side via `Server/src/utils/windows_unity_editor_capture.py`.
+- The server-side editor capture path returns the backend marker `server_hwnd_client_bbox` so live validation can prove which implementation handled a capture.
+- Screenshot smoke coverage was added to `Server/tests/integration/test_live_unity_smoke_runner.py` as an opt-in extension of the live Unity matrix.
+- Operational limitation: whole-editor capture is currently intended for local Windows HTTP sessions and depends on a visible/restorable Unity window; minimized-window capture remains OS-constrained.

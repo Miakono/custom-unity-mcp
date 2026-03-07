@@ -9,6 +9,7 @@ This is the current supporting validation workflow reference for the V2/V3 live-
 Use this file for validation entry points and scope.
 Use `Docs/HANDOFF_2026-03-06.md` for the latest validated implementation snapshot.
 Use `Docs/GAP_CLOSURE_PLAN.md` for current remediation priorities outside the narrow validation workflow.
+Treat old planning docs indexed in `Docs/Archive/README.md` as historical-only unless explicitly reactivated.
 
 ## Purpose
 
@@ -20,6 +21,7 @@ This document tracks the validation workflow that is actually in use after the l
 - The Unity bridge now accepts the payload shapes used by the server for the validated matrix.
 - The previously missing live handlers for `preview_changes` and `diff_scene` were added to the Unity bridge.
 - A reusable live smoke test now exists in `Server/tests/integration/test_live_unity_smoke_runner.py`.
+- The live smoke runner now also supports an opt-in screenshot extension for scene capture, editor capture, and `get_last_screenshot`.
 - One-command validation wrappers now exist in:
   - `Scripts/Run-LiveUnitySmoke.ps1`
   - `Scripts/Run-ValidationSuite.ps1`
@@ -63,6 +65,7 @@ Verified result from this pass:
 
 - `1 passed, 1 deselected in 0.72s`
 - The live test executed a 29-command representative matrix successfully.
+- With screenshot smoke enabled, the same runner executes a 32-command representative matrix.
 
 ### 3. Combined Validation
 
@@ -104,7 +107,7 @@ These are the main remaining gaps after the current pass:
 
 - `diff_scene` is callable and smoke-tested live, but the current live bridge implementation is still limited in depth and scope.
 - The live smoke matrix is representative, not exhaustive across every tool in the catalog.
-- Documentation outside the directly updated handoff and validation files may still lag behind runtime reality.
+- Whole-editor screenshot validation lives beside this runner but is operationally narrower: the most reliable editor-window capture path is currently local Windows HTTP only.
 - Generated specialist/subagent artifacts still need a tighter audit against the runtime-exposed tool story.
 
 ## Definition Of Done For This Validation Layer

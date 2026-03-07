@@ -9,6 +9,7 @@ Works in conjunction with manage_video_capture to provide a complete visual QA w
 This is a server-only tool that performs analysis locally without requiring Unity connection.
 """
 import base64
+import hashlib
 import io
 import os
 from typing import Annotated, Any, Literal
@@ -26,7 +27,7 @@ from services.registry import mcp_for_unity_tool
     description=(
         "Analyze screenshots and images for visual verification. "
         "Works with manage_video_capture to provide a complete capture → analyze workflow. "
-        "Actions: analyze (perform image analysis). "
+        "Actions: analyze (perform image analysis), compare_screenshots (deterministic pixel diff). "
         "\n\nAnalysis Types:\n"
         "- ui_validation: Verify UI elements are present and correctly positioned\n"
         "- scene_composition: Analyze overall scene layout and visual balance\n"
@@ -48,8 +49,8 @@ from services.registry import mcp_for_unity_tool
 async def analyze_screenshot(
     ctx: Context,
     action: Annotated[
-        Literal["analyze"],
-        "Action to perform. Currently only 'analyze' is supported."
+        Literal["analyze", "compare_screenshots"],
+        "Action to perform: analyze or compare_screenshots."
     ],
     analysis_type: Annotated[
         Literal["ui_validation", "scene_composition", "object_presence", "color_check", "custom"],
@@ -62,6 +63,14 @@ async def analyze_screenshot(
     screenshot_data: Annotated[
         str | None,
         "Base64-encoded image data. Either screenshot_path or screenshot_data must be provided."
+    ] = None,
+    screenshot_path_b: Annotated[
+        str | None,
+        "For compare_screenshots: path to the second screenshot file."
+    ] = None,
+    screenshot_data_b: Annotated[
+        str | None,
+        "For compare_screenshots: base64-encoded data for the second screenshot."
     ] = None,
     query: Annotated[
         str | None,
@@ -89,24 +98,48 @@ async def analyze_screenshot(
     """
     action_lower = action.lower()
     
-    if action_lower != "analyze":
+    if action_lower not in ("analyze", "compare_screenshots"):
         return {
             "success": False,
-            "error": f"Unknown action '{action}'. Supported actions: analyze"
+            "error": f"Unknown action '{action}'. Supported actions: analyze, compare_screenshots"
         }
     
-    # Validate input - must have either path or data
-    if not screenshot_path and not screenshot_data:
-        return {
-            "success": False,
-            "error": "Either screenshot_path or screenshot_data must be provided."
-        }
-    
-    if screenshot_path and screenshot_data:
-        return {
-            "success": False,
-            "error": "Provide either screenshot_path or screenshot_data, not both."
-        }
+    if action_lower == "analyze":
+        # Validate input - must have either path or data
+        if not screenshot_path and not screenshot_data:
+            return {
+                "success": False,
+                "error": "Either screenshot_path or screenshot_data must be provided."
+            }
+
+        if screenshot_path and screenshot_data:
+            return {
+                "success": False,
+                "error": "Provide either screenshot_path or screenshot_data, not both."
+            }
+
+    if action_lower == "compare_screenshots":
+        if not (screenshot_path or screenshot_data):
+            return {
+                "success": False,
+                "error": "compare_screenshots requires screenshot A via screenshot_path or screenshot_data."
+            }
+        if screenshot_path and screenshot_data:
+            return {
+                "success": False,
+                "error": "For screenshot A provide either screenshot_path or screenshot_data, not both."
+            }
+
+        if not (screenshot_path_b or screenshot_data_b):
+            return {
+                "success": False,
+                "error": "compare_screenshots requires screenshot B via screenshot_path_b or screenshot_data_b."
+            }
+        if screenshot_path_b and screenshot_data_b:
+            return {
+                "success": False,
+                "error": "For screenshot B provide either screenshot_path_b or screenshot_data_b, not both."
+            }
     
     # Validate custom query is provided when analysis_type is custom
     if analysis_type == "custom" and not query:
@@ -116,9 +149,32 @@ async def analyze_screenshot(
         }
     
     try:
-        # Load the image
+        if action_lower == "compare_screenshots":
+            image_a, source_a = await _load_image(screenshot_path, screenshot_data)
+            if image_a is None:
+                return {
+                    "success": False,
+                    "error": f"Failed to load screenshot A: {source_a}"
+                }
+
+            image_b, source_b = await _load_image(screenshot_path_b, screenshot_data_b)
+            if image_b is None:
+                return {
+                    "success": False,
+                    "error": f"Failed to load screenshot B: {source_b}"
+                }
+
+            comparison = _compare_images(image_a, image_b)
+            return {
+                "success": True,
+                "action": action_lower,
+                "source_a": source_a,
+                "source_b": source_b,
+                "comparison": comparison,
+            }
+
+        # Load the image for analyze
         image, source_info = await _load_image(screenshot_path, screenshot_data)
-        
         if image is None:
             return {
                 "success": False,
@@ -368,4 +424,54 @@ def _placeholder_detect_elements(
         "confidence_threshold": None,
         "elements": [],
         "expected_elements": expected_elements if expected_elements else [],
+    }
+
+
+def _compare_images(image_a: Image.Image, image_b: Image.Image) -> dict[str, Any]:
+    """Compare two screenshots and return deterministic diff metrics."""
+    a = image_a.convert("RGB")
+    b = image_b.convert("RGB")
+
+    if a.size != b.size:
+        b = b.resize(a.size, Image.Resampling.LANCZOS)
+
+    data_a = a.tobytes()
+    data_b = b.tobytes()
+
+    total_channels = len(data_a)
+    abs_diff_sum = 0
+    changed_channels = 0
+    for av, bv in zip(data_a, data_b):
+        delta = abs(av - bv)
+        abs_diff_sum += delta
+        if delta > 0:
+            changed_channels += 1
+
+    total_pixels = a.size[0] * a.size[1]
+    mean_abs_diff = abs_diff_sum / max(1, total_channels)
+
+    changed_pixels = 0
+    threshold = 8
+    for idx in range(0, total_channels, 3):
+        if (
+            abs(data_a[idx] - data_b[idx]) > threshold
+            or abs(data_a[idx + 1] - data_b[idx + 1]) > threshold
+            or abs(data_a[idx + 2] - data_b[idx + 2]) > threshold
+        ):
+            changed_pixels += 1
+
+    hash_a = hashlib.sha256(data_a).hexdigest()
+    hash_b = hashlib.sha256(data_b).hexdigest()
+
+    return {
+        "width": a.size[0],
+        "height": a.size[1],
+        "mean_abs_diff": round(mean_abs_diff, 4),
+        "changed_pixels": changed_pixels,
+        "changed_pixels_pct": round((changed_pixels * 100.0) / max(1, total_pixels), 4),
+        "changed_channels_pct": round((changed_channels * 100.0) / max(1, total_channels), 4),
+        "hash_a": hash_a,
+        "hash_b": hash_b,
+        "exact_match": hash_a == hash_b,
+        "note": "If dimensions differ, screenshot B is resized to screenshot A before comparison.",
     }

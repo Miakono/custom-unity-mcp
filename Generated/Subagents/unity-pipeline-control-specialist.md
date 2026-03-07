@@ -1,12 +1,12 @@
-# Unity Input Specialist
+# Unity Pipeline_Control Specialist
 
-ID: `unity-input-specialist`
+ID: `unity-pipeline-control-specialist`
 Kind: `specialist`
 
-Unity Input System - Action Maps, Actions, Bindings, and Runtime Simulation
+Build settings, player settings, and import pipeline control
 
-Tool group: `input`
-Activate with: `manage_tools(action="activate", group="input")`
+Tool group: `pipeline_control`
+Activate with: `manage_tools(action="activate", group="pipeline_control")`
 
 Shared meta-tools:
 - `clear_traces`
@@ -35,4 +35,7 @@ Shared meta-tools:
 - `stop_trace`
 
 Primary tools:
-- `manage_input_system`
+- `manage_build_settings`
+- `manage_define_symbols`
+- `manage_import_pipeline`
+- `manage_player_settings`

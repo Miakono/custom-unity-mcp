@@ -15,11 +15,13 @@ from services.custom_tool_service import (
     CustomToolService,
     resolve_project_id_for_unity_instance,
 )
+from utils.windows_unity_editor_capture import capture_unity_editor_window
 from core.config import config
 from starlette.routing import WebSocketRoute
 from starlette.responses import JSONResponse
 import argparse
 import asyncio
+import inspect
 
 # Fix to IPV4 Connection Issue #853
 # Will disable features in ProactorEventLoop including subprocess pipes and named pipes
@@ -34,6 +36,7 @@ import threading
 import time
 from typing import AsyncIterator, Any
 from urllib.parse import urlparse
+from uuid import uuid4
 
 # Workaround for environments where tool signature evaluation runs with a globals
 # dict that does not include common `typing` names (e.g. when annotations are strings
@@ -64,6 +67,8 @@ except Exception:
 
 from fastmcp import FastMCP
 from logging.handlers import RotatingFileHandler
+from services.registry import ensure_tool_registry_populated
+from services.registry.tool_registry import get_tool_by_name
 
 
 class WindowsSafeRotatingFileHandler(RotatingFileHandler):
@@ -360,6 +365,77 @@ def _normalize_instance_token(instance_token: str | None) -> tuple[str | None, s
     return None, instance_token
 
 
+class _HttpToolRequestContext:
+    def __init__(self, meta: dict[str, Any] | None = None) -> None:
+        self.meta = meta or {}
+
+
+class _HttpToolContext:
+    def __init__(self, unity_instance: str | None) -> None:
+        self.session_id = str(uuid4())
+        self._state: dict[str, Any] = {"unity_instance": unity_instance}
+        self.request_context = _HttpToolRequestContext(meta={"unity_instance": unity_instance})
+
+    async def get_state(self, key: str, default: Any = None) -> Any:
+        return self._state.get(key, default)
+
+    async def set_state(self, key: str, value: Any) -> None:
+        self._state[key] = value
+
+    async def info(self, _message: str) -> None:
+        return None
+
+    async def warning(self, _message: str) -> None:
+        return None
+
+    async def warn(self, message: str) -> None:
+        await self.warning(message)
+
+    async def error(self, _message: str) -> None:
+        return None
+
+
+async def _execute_registered_http_tool(
+    tool_name: str,
+    tool_params: dict[str, Any],
+    unity_instance: str | None,
+) -> dict[str, Any]:
+    ensure_tool_registry_populated()
+    tool_info = get_tool_by_name(tool_name)
+    if tool_info is None:
+        return {"success": False, "message": f"Unknown MCP tool '{tool_name}'."}
+
+    try:
+        func = tool_info["func"]
+        ctx = _HttpToolContext(unity_instance)
+        func_signature = inspect.signature(func)
+        invocation = func(ctx=ctx, **tool_params) if "ctx" in func_signature.parameters else func(**tool_params)
+        result = await invocation if inspect.isawaitable(invocation) else invocation
+    except TypeError as exc:
+        logger.warning("HTTP MCP tool invocation failed for %s: %s", tool_name, exc)
+        return {
+            "success": False,
+            "message": f"Invalid parameters for MCP tool '{tool_name}': {exc}",
+        }
+    except Exception as exc:
+        logger.exception("HTTP MCP tool execution failed for %s", tool_name)
+        return {
+            "success": False,
+            "message": f"Failed to execute MCP tool '{tool_name}': {exc}",
+        }
+
+    if hasattr(result, "model_dump"):
+        return result.model_dump()
+
+    if isinstance(result, dict):
+        return result
+
+    return {
+        "success": False,
+        "message": f"Tool '{tool_name}' returned unsupported result type {type(result).__name__}.",
+    }
+
+
 def create_mcp_server(project_scoped_tools: bool) -> FastMCP:
     mcp = FastMCP(
         name="mcp-for-unity-server",
@@ -411,9 +487,10 @@ def create_mcp_server(project_scoped_tools: bool) -> FastMCP:
                 if not command_type:
                     return JSONResponse({"success": False, "error": "Missing 'type' field"}, status_code=400)
 
-                # Get available sessions
+                # Get available sessions when present. Some built-in MCP tools are server-only,
+                # so they can still execute even if no Unity editor is currently connected.
                 sessions = await PluginHub.get_sessions()
-                if not sessions.sessions:
+                if not sessions.sessions and command_type not in ("execute_mcp_tool",):
                     return JSONResponse({
                         "success": False,
                         "error": "No Unity instances connected. Make sure Unity is running with MCP plugin."
@@ -434,7 +511,7 @@ def create_mcp_server(project_scoped_tools: bool) -> FastMCP:
 
                 # If a specific unity_instance was requested but not found, return an error
                 # (Check done here so execute_custom_tool can also validate the instance)
-                if unity_instance and not session_id:
+                if unity_instance and not session_id and command_type not in ("execute_mcp_tool",):
                     return JSONResponse(
                         {
                             "success": False,
@@ -445,7 +522,7 @@ def create_mcp_server(project_scoped_tools: bool) -> FastMCP:
 
                 # If no specific unity_instance requested, use first available session
                 # (Must be done before execute_custom_tool check so all command types benefit)
-                if not session_id:
+                if not session_id and sessions.sessions:
                     try:
                         session_id = next(iter(sessions.sessions.keys()))
                         session_details = sessions.sessions.get(session_id)
@@ -509,6 +586,76 @@ def create_mcp_server(project_scoped_tools: bool) -> FastMCP:
                         project_id, tool_name, unity_instance_hint, tool_params
                     )
                     return JSONResponse(result.model_dump())
+
+                if command_type == "execute_mcp_tool":
+                    tool_name = None
+                    tool_params: dict[str, Any] = {}
+                    if isinstance(params, dict):
+                        tool_name = params.get("tool_name") or params.get("name")
+                        tool_params = params.get("parameters") or params.get("params") or {}
+
+                    if not tool_name:
+                        return JSONResponse(
+                            {"success": False, "error": "Missing 'tool_name' for execute_mcp_tool"},
+                            status_code=400,
+                        )
+                    if tool_params is None:
+                        tool_params = {}
+                    if not isinstance(tool_params, dict):
+                        return JSONResponse(
+                            {"success": False, "error": "Tool parameters must be an object/dict"},
+                            status_code=400,
+                        )
+
+                    unity_instance_hint = unity_instance
+                    if session_details and session_details.hash:
+                        unity_instance_hint = session_details.hash
+
+                    if (
+                        tool_name == "manage_screenshot"
+                        and tool_params.get("action") == "capture_editor_window"
+                        and session_details is not None
+                    ):
+                        server_capture = capture_unity_editor_window(session_details.project)
+                        if server_capture is not None:
+                            if tool_params.get("format") == "path":
+                                import base64
+                                import tempfile
+
+                                image_bytes = base64.b64decode(server_capture["image_base64"])
+                                with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as temp_file:
+                                    temp_file.write(image_bytes)
+                                    server_capture["file_path"] = temp_file.name
+                                server_capture.pop("image_base64", None)
+                            else:
+                                server_capture["data_uri"] = f"data:image/png;base64,{server_capture['image_base64']}"
+
+                            return JSONResponse({"result": server_capture})
+
+                    result = await _execute_registered_http_tool(tool_name, tool_params, unity_instance_hint)
+                    return JSONResponse({"result": result})
+
+                if (
+                    command_type == "manage_screenshot"
+                    and isinstance(params, dict)
+                    and params.get("action") == "capture_editor_window"
+                    and session_details is not None
+                ):
+                    server_capture = capture_unity_editor_window(session_details.project)
+                    if server_capture is not None:
+                        if params.get("format") == "path":
+                            import base64
+                            import tempfile
+
+                            image_bytes = base64.b64decode(server_capture["image_base64"])
+                            with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as temp_file:
+                                temp_file.write(image_bytes)
+                                server_capture["file_path"] = temp_file.name
+                            server_capture.pop("image_base64", None)
+                        else:
+                            server_capture["data_uri"] = f"data:image/png;base64,{server_capture['image_base64']}"
+
+                        return JSONResponse({"result": server_capture})
 
                 # Send command to Unity
                 result = await PluginHub.send_command(session_id, command_type, params)
