@@ -17,7 +17,8 @@
     ],
     "autoReferenced": true,
     "defineConstraints": [
-        "MCP_ADDRESSABLES_PACKAGE_PRESENT"
+        "MCP_ADDRESSABLES_PACKAGE_PRESENT",
+        "MCP_ENABLE_ADDRESSABLES_TOOLS"
     ],
     "versionDefines": [
         {
