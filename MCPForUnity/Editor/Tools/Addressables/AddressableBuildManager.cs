@@ -1,4 +1,4 @@
-#if UNITY_ADDRESSABLES
+#if MCP_ADDRESSABLES_PACKAGE_PRESENT
 using System;
 using System.Collections.Generic;
 using System.IO;

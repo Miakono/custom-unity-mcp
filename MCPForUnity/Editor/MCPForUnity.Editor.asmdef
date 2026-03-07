@@ -25,11 +25,6 @@
             "define": "ENABLE_INPUT_SYSTEM"
         },
         {
-            "name": "com.unity.addressables",
-            "expression": "1.0.0",
-            "define": "UNITY_ADDRESSABLES"
-        },
-        {
             "name": "com.unity.visualeffectgraph",
             "expression": "1.0.0",
             "define": "UNITY_VFX_GRAPH"
