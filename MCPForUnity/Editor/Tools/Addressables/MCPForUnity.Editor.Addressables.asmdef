@@ -3,7 +3,9 @@
     "rootNamespace": "MCPForUnity.Editor.Tools.Addressables",
     "references": [
         "MCPForUnity.Editor",
-        "Newtonsoft.Json"
+        "Newtonsoft.Json",
+        "Unity.Addressables.Editor",
+        "Unity.ScriptableBuildPipeline.Editor"
     ],
     "includePlatforms": [
         "Editor"
