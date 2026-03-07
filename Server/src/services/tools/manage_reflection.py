@@ -169,7 +169,7 @@ async def manage_reflection(
     unity_instance = await get_unity_instance_from_context(ctx)
     
     # Check preflight gate
-    gate = await maybe_run_tool_preflight(ctx, "manage_reflection")
+    gate = await maybe_run_tool_preflight(ctx, "manage_reflection", action=action)
     if gate is not None:
         return gate.model_dump()
     

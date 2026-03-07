@@ -39,6 +39,7 @@ namespace MCPForUnity.Editor.Tools
                     UnityEngine.Object.DestroyImmediate(kvp.Value);
             }
             s_panelRTs.Clear();
+            CleanupPendingEditorCapture(deleteScreenshotAsset: false);
         }
 
         public static object HandleCommand(JObject @params)
@@ -753,6 +754,22 @@ namespace MCPForUnity.Editor.Tools
         // renders into them automatically every frame.
         private static readonly Dictionary<int, RenderTexture> s_panelRTs = new();
 
+        private static bool s_hasPendingEditorCapture;
+        private static string s_pendingEditorCaptureRequestKey;
+        private static string s_pendingEditorCaptureTarget;
+        private static string s_pendingEditorCaptureSourceAsset;
+        private static string s_pendingEditorCaptureAssetsRelativePath;
+        private static string s_pendingEditorCaptureFullPath;
+        private static bool s_pendingEditorCaptureIncludeImage;
+        private static int s_pendingEditorCaptureMaxResolution;
+        private static int s_pendingEditorCaptureRequestedWidth;
+        private static int s_pendingEditorCaptureRequestedHeight;
+        private static double s_pendingEditorCaptureRequestedAt;
+        private static int s_pendingEditorCapturePanelSettingsInstanceId;
+        private static int s_pendingEditorCaptureUidocumentInstanceId;
+        private static GameObject s_pendingEditorCaptureTempGameObject;
+        private static PanelSettings s_pendingEditorCaptureTempPanelSettings;
+
         // Play-mode coroutine capture state.  Only one capture is in-flight at a
         // time; concurrent render_ui calls while a capture is pending are rejected
         // with an explicit error.
@@ -927,25 +944,89 @@ namespace MCPForUnity.Editor.Tools
             }
             // ── End play-mode branch ────────────────────────────────────────────────
 
-            // Resolve UIDocument
-            UIDocument uiDoc = null;
-            GameObject tempGo = null;
-            PanelSettings tempPs = null;
+            return RenderUIInEditorViaGameViewCapture(target, uxmlPath, width, height, includeImage, maxResolution, fileName);
+        }
 
-            try
+        private static object RenderUIInEditorViaGameViewCapture(
+            string target,
+            string uxmlPath,
+            int width,
+            int height,
+            bool includeImage,
+            int maxResolution,
+            string fileName)
+        {
+            string requestKey = BuildEditorCaptureRequestKey(target, uxmlPath);
+            if (s_hasPendingEditorCapture)
             {
-                if (!string.IsNullOrEmpty(target))
+                if (!string.Equals(s_pendingEditorCaptureRequestKey, requestKey, StringComparison.Ordinal) &&
+                    PendingEditorCaptureTimedOut())
                 {
-                    var goInstruction = new JObject { ["find"] = target };
-                    GameObject go = ObjectResolver.Resolve(goInstruction, typeof(GameObject)) as GameObject;
-                    if (go == null)
-                        return new ErrorResponse($"Could not find target GameObject: {target}");
-
-                    uiDoc = go.GetComponent<UIDocument>();
-                    if (uiDoc == null)
-                        return new ErrorResponse($"GameObject '{go.name}' has no UIDocument component.");
+                    CleanupPendingEditorCapture(deleteScreenshotAsset: true);
                 }
                 else
+                {
+                    return ContinueEditorScreenCapture(requestKey);
+                }
+            }
+
+            return BeginEditorScreenCapture(target, uxmlPath, width, height, includeImage, maxResolution, fileName, requestKey);
+        }
+
+        private static object ContinueEditorScreenCapture(string requestKey)
+        {
+            if (!string.Equals(s_pendingEditorCaptureRequestKey, requestKey, StringComparison.Ordinal))
+            {
+                string pendingLabel = !string.IsNullOrEmpty(s_pendingEditorCaptureTarget)
+                    ? s_pendingEditorCaptureTarget
+                    : s_pendingEditorCaptureSourceAsset;
+                return new ErrorResponse(
+                    $"An editor-mode UI capture is already pending for '{pendingLabel}'. Call render_ui again for that target first."
+                );
+            }
+
+            object completed;
+            if (TryCompletePendingEditorCapture(out completed))
+                return completed;
+
+            if (PendingEditorCaptureTimedOut())
+            {
+                string timedOutLabel = !string.IsNullOrEmpty(s_pendingEditorCaptureTarget)
+                    ? s_pendingEditorCaptureTarget
+                    : s_pendingEditorCaptureSourceAsset;
+                CleanupPendingEditorCapture(deleteScreenshotAsset: true);
+                return new ErrorResponse(
+                    $"Timed out waiting for editor-mode UI capture for '{timedOutLabel}'."
+                );
+            }
+
+            return new SuccessResponse(
+                "Editor-mode UI screenshot capture is still pending. Call render_ui again to retrieve the rendered image.",
+                new Dictionary<string, object>
+                {
+                    { "pending", true },
+                    { "gameObject", !string.IsNullOrEmpty(s_pendingEditorCaptureTarget) ? (object)s_pendingEditorCaptureTarget : s_pendingEditorCaptureSourceAsset },
+                    { "path", s_pendingEditorCaptureAssetsRelativePath },
+                }
+            );
+        }
+
+        private static object BeginEditorScreenCapture(
+            string target,
+            string uxmlPath,
+            int width,
+            int height,
+            bool includeImage,
+            int maxResolution,
+            string fileName,
+            string requestKey)
+        {
+            GameObject tempGo = null;
+            PanelSettings tempPs = null;
+            try
+            {
+                UIDocument uiDoc;
+                if (string.IsNullOrEmpty(target))
                 {
                     uxmlPath = AssetPathUtility.SanitizeAssetPath(uxmlPath);
                     if (uxmlPath == null)
@@ -957,6 +1038,7 @@ namespace MCPForUnity.Editor.Tools
 
                     tempGo = new GameObject("__MCP_UI_Render_Temp__");
                     tempGo.hideFlags = HideFlags.HideAndDontSave;
+
                     uiDoc = tempGo.AddComponent<UIDocument>();
 
                     string[] guids = AssetDatabase.FindAssets("t:PanelSettings");
@@ -972,113 +1054,33 @@ namespace MCPForUnity.Editor.Tools
                     uiDoc.panelSettings = ps;
                     uiDoc.visualTreeAsset = vta;
                 }
+                else
+                {
+                    var goInstruction = new JObject { ["find"] = target };
+                    GameObject go = ObjectResolver.Resolve(goInstruction, typeof(GameObject)) as GameObject;
+                    if (go == null)
+                        return new ErrorResponse($"Could not find target GameObject: {target}");
+
+                    uiDoc = go.GetComponent<UIDocument>();
+                    if (uiDoc == null)
+                        return new ErrorResponse($"GameObject '{go.name}' has no UIDocument component.");
+                }
 
                 if (uiDoc.panelSettings == null)
                     return new ErrorResponse("UIDocument has no PanelSettings assigned.");
 
-                var panelSettings = uiDoc.panelSettings;
-                int psId = panelSettings.GetInstanceID();
+                PanelSettings panelSettings = uiDoc.panelSettings;
+                int panelSettingsId = panelSettings.GetInstanceID();
+                RenderTexture rt = GetOrCreatePanelRenderTexture(panelSettings, width, height);
+                panelSettings.targetTexture = rt;
 
-                // Check if we already have a persistent RT assigned to this PanelSettings.
-                // If the RT exists and its size matches, the panel has been rendering into it.
-                // If not, create one and assign it — content will be available on the next call.
-                // Look up from our cache rather than panelSettings.targetTexture,
-                // because we set targetTexture = null after each successful read
-                // to restore on-screen rendering.  The RT itself stays alive in s_panelRTs.
-                bool rtJustAssigned = false;
-                RenderTexture rt = null;
-
-                if (s_panelRTs.TryGetValue(psId, out var cachedRt) && cachedRt != null)
-                {
-                    if (cachedRt.width == width && cachedRt.height == height)
-                    {
-                        rt = cachedRt;
-                        // Re-attach if it was detached after the previous read
-                        if (panelSettings.targetTexture != rt)
-                        {
-                            panelSettings.targetTexture = rt;
-                            rtJustAssigned = true;
-
-                            uiDoc.rootVisualElement?.MarkDirtyRepaint();
-                            EditorUtility.SetDirty(panelSettings);
-                            UnityEditorInternal.InternalEditorUtility.RepaintAllViews();
-                            Canvas.ForceUpdateCanvases();
-                        }
-                    }
-                    else
-                    {
-                        // Size changed — release the old RT
-                        panelSettings.targetTexture = null;
-                        string oldPath = AssetDatabase.GetAssetPath(cachedRt);
-                        cachedRt.Release();
-                        if (!string.IsNullOrEmpty(oldPath))
-                            AssetDatabase.DeleteAsset(oldPath);
-                        else
-                            UnityEngine.Object.DestroyImmediate(cachedRt);
-                        s_panelRTs.Remove(psId);
-                    }
-                }
-
-                if (rt == null)
-                {
-                    // Create RT as an asset so PanelSettings can serialize the reference properly
-                    rt = new RenderTexture(width, height, 32, RenderTextureFormat.ARGB32);
-                    rt.name = $"MCP_UI_Render_{psId}";
-                    rt.Create();
-
-                    string rtFolder = "Assets/UI";
-                    if (!AssetDatabase.IsValidFolder(rtFolder))
-                        AssetDatabase.CreateFolder("Assets", "UI");
-                    string rtAssetPath = $"{rtFolder}/RT_MCP_UI_Render_{psId}.renderTexture";
-                    AssetDatabase.CreateAsset(rt, rtAssetPath);
-                    AssetDatabase.SaveAssets();
-
-                    panelSettings.targetTexture = rt;
-                    s_panelRTs[psId] = rt;
-                    rtJustAssigned = true;
-
-                }
-                else
-                {
-                    // Reattach the cached RT on subsequent calls. The previous call clears
-                    // targetTexture after capture so the UI returns to the normal display.
-                    panelSettings.targetTexture = rt;
-                }
-
-                // Mark dirty and force editor repaint so the panel renders into the RT.
+                EnsureGameView();
                 uiDoc.rootVisualElement?.MarkDirtyRepaint();
                 EditorUtility.SetDirty(panelSettings);
-                UnityEditorInternal.InternalEditorUtility.RepaintAllViews();
-
-                // Force a synchronous layout + repaint pass before reading pixels.
                 Canvas.ForceUpdateCanvases();
+                UnityEditorInternal.InternalEditorUtility.RepaintAllViews();
+                EditorApplication.QueuePlayerLoopUpdate();
 
-                // Read pixels from the RT
-                RenderTexture prevActive = RenderTexture.active;
-                RenderTexture.active = rt;
-                var tex = new Texture2D(width, height, TextureFormat.RGBA32, false);
-                tex.ReadPixels(new Rect(0, 0, width, height), 0, 0);
-                tex.Apply();
-                RenderTexture.active = prevActive;
-
-                // Restore targetTexture to null so the UI renders back to the
-                // actual display / camera.  The RT stays cached in s_panelRTs
-                // and will be re-attached on the next render_ui call.
-                if (!rtJustAssigned)
-                {
-                    panelSettings.targetTexture = null;
-                    EditorUtility.SetDirty(panelSettings);
-                }
-
-                // Check if any content was rendered
-                bool hasContent = false;
-                var pixels = tex.GetPixels32();
-                for (int i = 0; i < pixels.Length; i += Mathf.Max(1, pixels.Length / 100))
-                {
-                    if (pixels[i].a > 0) { hasContent = true; break; }
-                }
-
-                // Save to Screenshots folder
                 string resolvedName = string.IsNullOrWhiteSpace(fileName)
                     ? $"ui-render-{DateTime.Now:yyyyMMdd-HHmmss}.png"
                     : fileName.Trim();
@@ -1087,67 +1089,38 @@ namespace MCPForUnity.Editor.Tools
 
                 string folder = Path.Combine(Application.dataPath, "Screenshots");
                 Directory.CreateDirectory(folder);
-                string fullPath = Path.Combine(folder, resolvedName).Replace('\\', '/');
-                fullPath = EnsureUniqueFilePath(fullPath);
-
-                byte[] png = tex.EncodeToPNG();
-                File.WriteAllBytes(fullPath, png);
-
+                string fullPath = EnsureUniqueFilePath(Path.Combine(folder, resolvedName).Replace('\\', '/'));
                 string assetsRelPath = "Assets/Screenshots/" + Path.GetFileName(fullPath);
-                AssetDatabase.ImportAsset(assetsRelPath, ImportAssetOptions.ForceSynchronousImport);
 
-                var data = new Dictionary<string, object>
-                {
-                    { "path", assetsRelPath },
-                    { "fullPath", fullPath },
-                    { "width", width },
-                    { "height", height },
-                    { "hasContent", hasContent },
-                };
+                s_hasPendingEditorCapture = true;
+                s_pendingEditorCaptureRequestKey = requestKey;
+                s_pendingEditorCaptureTarget = target;
+                s_pendingEditorCaptureSourceAsset = uxmlPath;
+                s_pendingEditorCaptureAssetsRelativePath = assetsRelPath;
+                s_pendingEditorCaptureFullPath = fullPath;
+                s_pendingEditorCaptureIncludeImage = includeImage;
+                s_pendingEditorCaptureMaxResolution = maxResolution;
+                s_pendingEditorCaptureRequestedWidth = width;
+                s_pendingEditorCaptureRequestedHeight = height;
+                s_pendingEditorCaptureRequestedAt = EditorApplication.timeSinceStartup;
+                s_pendingEditorCapturePanelSettingsInstanceId = panelSettingsId;
+                s_pendingEditorCaptureUidocumentInstanceId = uiDoc.GetInstanceID();
+                s_pendingEditorCaptureTempGameObject = tempGo;
+                s_pendingEditorCaptureTempPanelSettings = tempPs;
 
-                if (rtJustAssigned)
-                    data["note"] = "RenderTexture was just assigned to PanelSettings. Call render_ui again to capture the rendered UI.";
+                tempGo = null;
+                tempPs = null;
 
-                if (!string.IsNullOrEmpty(target))
-                    data["gameObject"] = target;
-                if (!string.IsNullOrEmpty(uxmlPath))
-                    data["sourceAsset"] = uxmlPath;
-
-                if (includeImage)
-                {
-                    int targetMax = maxResolution > 0 ? maxResolution : 640;
-                    Texture2D downscaled = null;
-                    try
+                return new SuccessResponse(
+                    "Editor-mode UI screenshot capture queued. Call render_ui again to retrieve the rendered image.",
+                    new Dictionary<string, object>
                     {
-                        if (width > targetMax || height > targetMax)
-                        {
-                            downscaled = ScreenshotUtility.DownscaleTexture(tex, targetMax);
-                            data["imageBase64"] = Convert.ToBase64String(downscaled.EncodeToPNG());
-                            data["imageWidth"] = downscaled.width;
-                            data["imageHeight"] = downscaled.height;
-                        }
-                        else
-                        {
-                            data["imageBase64"] = Convert.ToBase64String(png);
-                            data["imageWidth"] = width;
-                            data["imageHeight"] = height;
-                        }
+                        { "pending", true },
+                        { "gameObject", !string.IsNullOrEmpty(target) ? (object)target : uxmlPath },
+                        { "path", assetsRelPath },
+                        { "note", "The UI panel is rendering into a capture texture. Call render_ui again to retrieve the image once pixels are available." }
                     }
-                    finally
-                    {
-                        if (downscaled != null) UnityEngine.Object.DestroyImmediate(downscaled);
-                    }
-                }
-
-                UnityEngine.Object.DestroyImmediate(tex);
-
-                string msg = hasContent
-                    ? $"UI rendered to '{assetsRelPath}'."
-                    : rtJustAssigned
-                        ? $"RenderTexture assigned to PanelSettings. Call render_ui again to capture the rendered content."
-                        : $"UI render saved to '{assetsRelPath}' (no visible content detected).";
-
-                return new SuccessResponse(msg, data);
+                );
             }
             finally
             {
@@ -1161,6 +1134,249 @@ namespace MCPForUnity.Editor.Tools
                         UnityEngine.Object.DestroyImmediate(tempPs, true);
                 }
             }
+        }
+
+        private static bool TryCompletePendingEditorCapture(out object response)
+        {
+            response = null;
+            if (!s_hasPendingEditorCapture)
+                return false;
+
+            Texture2D captured = null;
+            Texture2D downscaled = null;
+            try
+            {
+                EnsureGameView();
+                if (s_pendingEditorCapturePanelSettingsInstanceId == 0)
+                {
+                    response = new ErrorResponse("Editor-mode UI capture lost its PanelSettings reference.");
+                    CleanupPendingEditorCapture(deleteScreenshotAsset: true);
+                    return true;
+                }
+
+                if (!s_panelRTs.TryGetValue(s_pendingEditorCapturePanelSettingsInstanceId, out var rt) || rt == null)
+                {
+                    response = new ErrorResponse("Editor-mode UI capture lost its RenderTexture.");
+                    CleanupPendingEditorCapture(deleteScreenshotAsset: true);
+                    return true;
+                }
+
+                var panelSettings = UnityEditorObjectLookup.FindObjectByInstanceId<PanelSettings>(s_pendingEditorCapturePanelSettingsInstanceId);
+                if (panelSettings != null && panelSettings.targetTexture != rt)
+                {
+                    panelSettings.targetTexture = rt;
+                    EditorUtility.SetDirty(panelSettings);
+                }
+
+                var uiDocument = UnityEditorObjectLookup.FindObjectByInstanceId<UIDocument>(s_pendingEditorCaptureUidocumentInstanceId);
+                if (uiDocument != null)
+                {
+                    if (uiDocument.rootVisualElement?.panel == null)
+                        return false;
+
+                    uiDocument.rootVisualElement.MarkDirtyRepaint();
+                }
+
+                Canvas.ForceUpdateCanvases();
+                UnityEditorInternal.InternalEditorUtility.RepaintAllViews();
+                EditorApplication.QueuePlayerLoopUpdate();
+
+                RenderTexture previous = RenderTexture.active;
+                RenderTexture.active = rt;
+                captured = new Texture2D(rt.width, rt.height, TextureFormat.RGBA32, false);
+                captured.ReadPixels(new Rect(0, 0, rt.width, rt.height), 0, 0);
+                captured.Apply();
+                RenderTexture.active = previous;
+
+                bool hasContent = TextureHasMeaningfulContent(captured);
+                if (!hasContent)
+                    return false;
+
+                Texture2D finalTexture = captured;
+                byte[] finalPng = finalTexture.EncodeToPNG();
+                File.WriteAllBytes(s_pendingEditorCaptureFullPath, finalPng);
+                AssetDatabase.ImportAsset(s_pendingEditorCaptureAssetsRelativePath, ImportAssetOptions.ForceSynchronousImport);
+
+                var data = new Dictionary<string, object>
+                {
+                    { "path", s_pendingEditorCaptureAssetsRelativePath },
+                    { "fullPath", s_pendingEditorCaptureFullPath },
+                    { "width", finalTexture.width },
+                    { "height", finalTexture.height },
+                    { "hasContent", true },
+                };
+
+                if (!string.IsNullOrEmpty(s_pendingEditorCaptureTarget))
+                    data["gameObject"] = s_pendingEditorCaptureTarget;
+                if (!string.IsNullOrEmpty(s_pendingEditorCaptureSourceAsset))
+                    data["sourceAsset"] = s_pendingEditorCaptureSourceAsset;
+
+                if (s_pendingEditorCaptureIncludeImage)
+                {
+                    int targetMax = s_pendingEditorCaptureMaxResolution > 0 ? s_pendingEditorCaptureMaxResolution : 640;
+                    if (finalTexture.width > targetMax || finalTexture.height > targetMax)
+                    {
+                        downscaled = ScreenshotUtility.DownscaleTexture(finalTexture, targetMax);
+                        data["imageBase64"] = Convert.ToBase64String(downscaled.EncodeToPNG());
+                        data["imageWidth"] = downscaled.width;
+                        data["imageHeight"] = downscaled.height;
+                    }
+                    else
+                    {
+                        data["imageBase64"] = Convert.ToBase64String(finalPng);
+                        data["imageWidth"] = finalTexture.width;
+                        data["imageHeight"] = finalTexture.height;
+                    }
+                }
+
+                response = new SuccessResponse($"UI render saved to '{s_pendingEditorCaptureAssetsRelativePath}'.", data);
+                CleanupPendingEditorCapture(deleteScreenshotAsset: false);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                response = new ErrorResponse($"Editor-mode screen capture failed: {ex.Message}");
+                CleanupPendingEditorCapture(deleteScreenshotAsset: true);
+                return true;
+            }
+            finally
+            {
+                if (captured != null) UnityEngine.Object.DestroyImmediate(captured);
+                if (downscaled != null) UnityEngine.Object.DestroyImmediate(downscaled);
+            }
+        }
+
+        private static void CleanupPendingEditorCapture(bool deleteScreenshotAsset)
+        {
+            if (!s_hasPendingEditorCapture)
+                return;
+
+            if (s_pendingEditorCaptureTempGameObject != null)
+                UnityEngine.Object.DestroyImmediate(s_pendingEditorCaptureTempGameObject);
+
+            if (s_pendingEditorCaptureTempPanelSettings != null)
+            {
+                string tempPsPath = AssetDatabase.GetAssetPath(s_pendingEditorCaptureTempPanelSettings);
+                if (!string.IsNullOrEmpty(tempPsPath))
+                    AssetDatabase.DeleteAsset(tempPsPath);
+                else
+                    UnityEngine.Object.DestroyImmediate(s_pendingEditorCaptureTempPanelSettings, true);
+            }
+
+            if (deleteScreenshotAsset)
+            {
+                try
+                {
+                    if (!string.IsNullOrEmpty(s_pendingEditorCaptureAssetsRelativePath) && AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(s_pendingEditorCaptureAssetsRelativePath) != null)
+                        AssetDatabase.DeleteAsset(s_pendingEditorCaptureAssetsRelativePath);
+                    else if (!string.IsNullOrEmpty(s_pendingEditorCaptureFullPath) && File.Exists(s_pendingEditorCaptureFullPath))
+                        File.Delete(s_pendingEditorCaptureFullPath);
+                }
+                catch { }
+            }
+
+            if (s_pendingEditorCapturePanelSettingsInstanceId != 0)
+            {
+                var panelSettings = UnityEditorObjectLookup.FindObjectByInstanceId<PanelSettings>(s_pendingEditorCapturePanelSettingsInstanceId);
+                if (panelSettings != null)
+                {
+                    panelSettings.targetTexture = null;
+                    EditorUtility.SetDirty(panelSettings);
+                }
+            }
+
+            s_hasPendingEditorCapture = false;
+            s_pendingEditorCaptureRequestKey = null;
+            s_pendingEditorCaptureTarget = null;
+            s_pendingEditorCaptureSourceAsset = null;
+            s_pendingEditorCaptureAssetsRelativePath = null;
+            s_pendingEditorCaptureFullPath = null;
+            s_pendingEditorCaptureIncludeImage = false;
+            s_pendingEditorCaptureMaxResolution = 0;
+            s_pendingEditorCaptureRequestedWidth = 0;
+            s_pendingEditorCaptureRequestedHeight = 0;
+            s_pendingEditorCaptureRequestedAt = 0;
+            s_pendingEditorCapturePanelSettingsInstanceId = 0;
+            s_pendingEditorCaptureUidocumentInstanceId = 0;
+            s_pendingEditorCaptureTempGameObject = null;
+            s_pendingEditorCaptureTempPanelSettings = null;
+        }
+
+        private static bool PendingEditorCaptureTimedOut()
+        {
+            return EditorApplication.timeSinceStartup - s_pendingEditorCaptureRequestedAt > 30.0;
+        }
+
+        private static RenderTexture GetOrCreatePanelRenderTexture(PanelSettings panelSettings, int width, int height)
+        {
+            int psId = panelSettings.GetInstanceID();
+            if (s_panelRTs.TryGetValue(psId, out var cachedRt) && cachedRt != null)
+            {
+                if (cachedRt.width == width && cachedRt.height == height)
+                    return cachedRt;
+
+                string oldPath = AssetDatabase.GetAssetPath(cachedRt);
+                panelSettings.targetTexture = null;
+                cachedRt.Release();
+                if (!string.IsNullOrEmpty(oldPath))
+                    AssetDatabase.DeleteAsset(oldPath);
+                else
+                    UnityEngine.Object.DestroyImmediate(cachedRt);
+                s_panelRTs.Remove(psId);
+            }
+
+            string rtFolder = "Assets/UI";
+            if (!AssetDatabase.IsValidFolder(rtFolder))
+                AssetDatabase.CreateFolder("Assets", "UI");
+
+            var rt = new RenderTexture(width, height, 32, RenderTextureFormat.ARGB32)
+            {
+                name = $"MCP_UI_Render_{psId}"
+            };
+            rt.Create();
+
+            string rtAssetPath = AssetDatabase.GenerateUniqueAssetPath($"{rtFolder}/RT_MCP_UI_Render_{psId}.renderTexture");
+            AssetDatabase.CreateAsset(rt, rtAssetPath);
+            AssetDatabase.SaveAssets();
+            s_panelRTs[psId] = rt;
+            return rt;
+        }
+
+        private static string BuildEditorCaptureRequestKey(string target, string uxmlPath)
+        {
+            return !string.IsNullOrEmpty(target)
+                ? $"target:{target}"
+                : $"path:{uxmlPath}";
+        }
+
+        private static void EnsureGameView()
+        {
+            try
+            {
+                try
+                {
+                    if (!EditorApplication.ExecuteMenuItem("Window/General/Game"))
+                    {
+                        EditorApplication.ExecuteMenuItem("Window/General/Game %2");
+                    }
+                }
+                catch { }
+
+                try
+                {
+                    var gameViewType = Type.GetType("UnityEditor.GameView,UnityEditor");
+                    if (gameViewType != null)
+                    {
+                        var window = EditorWindow.GetWindow(gameViewType);
+                        window?.Repaint();
+                    }
+                }
+                catch { }
+
+                try { SceneView.RepaintAll(); } catch { }
+                try { EditorApplication.QueuePlayerLoopUpdate(); } catch { }
+            }
+            catch { }
         }
 
         // ---- Link Stylesheet ----
@@ -1760,6 +1976,51 @@ namespace MCPForUnity.Editor.Tools
                 counter++;
             } while (File.Exists(candidate));
             return candidate;
+        }
+
+        private static Texture2D ResizeTexture(Texture2D source, int width, int height)
+        {
+            RenderTexture prevActive = RenderTexture.active;
+            var rt = RenderTexture.GetTemporary(width, height, 0, RenderTextureFormat.ARGB32);
+            try
+            {
+                Graphics.Blit(source, rt);
+                RenderTexture.active = rt;
+                var resized = new Texture2D(width, height, TextureFormat.RGBA32, false);
+                resized.ReadPixels(new Rect(0, 0, width, height), 0, 0);
+                resized.Apply();
+                return resized;
+            }
+            finally
+            {
+                RenderTexture.active = prevActive;
+                RenderTexture.ReleaseTemporary(rt);
+            }
+        }
+
+        private static bool TextureHasMeaningfulContent(Texture2D texture)
+        {
+            if (texture == null || texture.width == 0 || texture.height == 0)
+                return false;
+
+            Color32[] pixels = texture.GetPixels32();
+            if (pixels == null || pixels.Length == 0)
+                return false;
+
+            Color32 reference = pixels[0];
+            for (int i = 1; i < pixels.Length; i++)
+            {
+                Color32 sample = pixels[i];
+                int diff =
+                    Mathf.Abs(sample.r - reference.r) +
+                    Mathf.Abs(sample.g - reference.g) +
+                    Mathf.Abs(sample.b - reference.b) +
+                    Mathf.Abs(sample.a - reference.a);
+                if (diff >= 12)
+                    return true;
+            }
+
+            return false;
         }
 
         private static string ColorToHex(Color c)

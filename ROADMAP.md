@@ -2,14 +2,27 @@
 
 Date: 2026-03-05
 
+## Current Document Map
+- Current remediation and gap-priority plan: [Docs/GAP_CLOSURE_PLAN.md](Docs/GAP_CLOSURE_PLAN.md)
+- Current validated implementation snapshot: [Docs/HANDOFF_2026-03-06.md](Docs/HANDOFF_2026-03-06.md)
+- Current validation workflow reference: [Docs/V2_V3_VALIDATION_PLAN.md](Docs/V2_V3_VALIDATION_PLAN.md)
+- Current subagent/catalog usage reference: [Docs/SUBAGENTS.md](Docs/SUBAGENTS.md)
+- Supporting live smoke and task-specific operational references: [Docs/LIVE_TEST_MATRIX.md](Docs/LIVE_TEST_MATRIX.md), [Docs/MAGE_FIREBALL_VFX.md](Docs/MAGE_FIREBALL_VFX.md)
+- Historical archive index: [Docs/Archive/README.md](Docs/Archive/README.md)
+- Historical premium planning records: [Docs/Archive/PREMIUM_FEATURE_PLAN.md](Docs/Archive/PREMIUM_FEATURE_PLAN.md), [Docs/Archive/PREMIUM_FEATURE_PLAN_V2.md](Docs/Archive/PREMIUM_FEATURE_PLAN_V2.md), [Docs/Archive/PREMIUM_FEATURE_PLAN_V3.md](Docs/Archive/PREMIUM_FEATURE_PLAN_V3.md)
+- Historical implementation/planning records: [Docs/Archive/V2_IMPLEMENTATION_SUMMARY.md](Docs/Archive/V2_IMPLEMENTATION_SUMMARY.md), [Docs/Archive/SUBAGENT_V2_IMPLEMENTATION_PLAN.md](Docs/Archive/SUBAGENT_V2_IMPLEMENTATION_PLAN.md), [Docs/Archive/V2_V3_IMPLEMENTATION_REPORT.md](Docs/Archive/V2_V3_IMPLEMENTATION_REPORT.md), [Docs/Archive/HANDOFF_2026-03-05.md](Docs/Archive/HANDOFF_2026-03-05.md)
+
+Use this roadmap as the top-level index. Do not treat all plan documents as equally current.
+
 ## Goals
 - Keep the fork game-agnostic and safe by default.
 - Improve reliability before adding higher-level automation.
 - Add observable acceptance checks for each phase.
-- See [Docs/PREMIUM_FEATURE_PLAN.md](Docs/PREMIUM_FEATURE_PLAN.md) for the post-foundation premium capability roadmap.
+- See [Docs/GAP_CLOSURE_PLAN.md](Docs/GAP_CLOSURE_PLAN.md) for the current repo-grounded remediation plan.
+- See [Docs/Archive/PREMIUM_FEATURE_PLAN.md](Docs/Archive/PREMIUM_FEATURE_PLAN.md), [Docs/Archive/PREMIUM_FEATURE_PLAN_V2.md](Docs/Archive/PREMIUM_FEATURE_PLAN_V2.md), and [Docs/Archive/PREMIUM_FEATURE_PLAN_V3.md](Docs/Archive/PREMIUM_FEATURE_PLAN_V3.md) for the historical premium roadmap sequence.
 
 ## v0.1 Safety and Reliability (Current)
-Status: In Progress
+Status: Complete
 
 ### Delivered
 - Added a centralized server-side action policy registry to classify read-only vs mutating tool actions.
@@ -33,8 +46,8 @@ Status: In Progress
 - Added an audit test that prevents direct tool-module `preflight(...)` usage outside the centralized policy layer.
 
 ### Remaining
-- Fold the current audit coverage into a repeatable CI check.
-- Close remaining documentation gaps around policy metadata and error contracts.
+- Keep CI checks pinned to the latest generated artifacts and policy tests.
+- Continue tightening documentation drift between implementation and roadmap state.
 
 ### Acceptance
 - All mutating tool entrypoints perform preflight before sending Unity mutations.
@@ -42,7 +55,7 @@ Status: In Progress
 - All patched Python modules pass `python -m py_compile`.
 
 ## v0.2 UX and Action Model
-Status: Planned
+Status: In Progress
 
 ### Scope
 - Add an explicit action capability schema for each tool (read-only vs mutating metadata).
@@ -50,6 +63,22 @@ Status: Planned
 - Improve error payloads for action mismatch and invalid parameter shapes.
 - Add a consistent "what to do next" hint in common failure responses.
 - Generate tool catalog / skill artifacts from the live registry.
+
+### Delivered (Current)
+- Action capability metadata now covers core and premium tool families, including:
+  - mutating vs read-only action classification for mixed tools
+  - high-risk flags
+  - local-only and runtime-only flags
+  - dry-run support metadata where implemented
+- Generated artifacts are now synced from the live registry and policy layer:
+  - `Generated/Catalog/tool_catalog.json`
+  - `Generated/Subagents/subagents.json`
+  - `Generated/ErrorCatalog/error_catalog.json`
+- Error catalogs and docs are generated and versioned for stable code references.
+
+### Remaining
+- Expand action-level coverage for newly added runtime bridge and future domains as they land.
+- Continue broadening direct tests for premium tool surfaces and edge-case payloads.
 
 ### Acceptance
 - Tool metadata can be programmatically queried for mutability.
@@ -78,7 +107,7 @@ Status: Planned
 - Prefer additive changes and explicit feature flags for behavioral shifts.
 
 ## Suggested Next Tasks
-1. Add machine-readable capability metadata for tool/action mutability, risk, runtime scope, and opt-in requirements.
-2. Add generated tool catalog / skill output from the registry.
-3. Add `docs/ERROR_CODES.md` to lock response contracts.
-4. Start Phase 2 from [Docs/PREMIUM_FEATURE_PLAN.md](Docs/PREMIUM_FEATURE_PLAN.md): local code intelligence tools.
+1. Complete Phase 2 acceptance by adding deeper end-to-end tests for premium/runtime tool paths.
+2. Start checkpoint/restore primitives and deterministic dry-run validation output from v0.3.
+3. Add a release checklist step that regenerates and verifies all `Generated/*` artifacts in CI.
+4. Keep roadmap/plan status updates in lockstep with implementation merges.

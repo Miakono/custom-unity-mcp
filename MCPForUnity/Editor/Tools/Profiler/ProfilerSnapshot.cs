@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using MCPForUnity.Editor.Helpers;
+using MCPForUnity.Runtime.Helpers;
 using Unity.Profiling;
 using Unity.Profiling.Editor;
 using UnityEngine;
@@ -154,7 +156,7 @@ namespace MCPForUnity.Editor.Tools.Profiler
             // UI time
             try
             {
-                using (var recorder = ProfilerRecorder.StartNew(ProfilerCategory.UI, "UI"))
+                using (var recorder = ProfilerRecorder.StartNew(ProfilerCategory.Gui, "UI"))
                 {
                     if (recorder.Valid && recorder.Count > 0)
                         data.uiTimeMs = recorder.LastValue / 1000000.0;
@@ -415,7 +417,7 @@ namespace MCPForUnity.Editor.Tools.Profiler
                 // Count audio sources in the scene
                 if (UnityEngine.Application.isPlaying)
                 {
-                    var audioSources = UnityEngine.Object.FindObjectsOfType<UnityEngine.AudioSource>();
+                    var audioSources = UnityObjectCompatibility.FindObjectsByType<UnityEngine.AudioSource>();
                     data.totalAudioSources = audioSources.Length;
                     data.playingAudioSources = 0;
                     foreach (var source in audioSources)
@@ -425,8 +427,8 @@ namespace MCPForUnity.Editor.Tools.Profiler
                     }
                 }
 
-                // Try to get DSP load
-                data.audioLevel = UnityEngine.AudioSettings.dspLoad;
+                // dspLoad is not available in all Unity versions.
+                data.audioLevel = 0f;
             }
             catch (Exception ex)
             {

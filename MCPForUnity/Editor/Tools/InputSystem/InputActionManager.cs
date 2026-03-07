@@ -10,6 +10,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 namespace MCPForUnity.Editor.Tools.InputSystem
 {
@@ -41,7 +42,7 @@ namespace MCPForUnity.Editor.Tools.InputSystem
                 {
                     name = m.name,
                     id = m.id.ToString(),
-                    actionCount = m.actions.Length
+                    actionCount = m.actions.Count
                 }).ToList();
 
                 return new SuccessResponse($"Found {maps.Count} action maps", new { actionMaps = maps });
@@ -200,7 +201,7 @@ namespace MCPForUnity.Editor.Tools.InputSystem
                     type = a.type.ToString(),
                     id = a.id.ToString(),
                     expectedControlType = a.expectedControlType,
-                    bindingCount = a.bindings.Length
+                    bindingCount = a.bindings.Count
                 }).ToList();
 
                 return new SuccessResponse($"Found {actions.Count} actions", new { actions });
@@ -516,7 +517,7 @@ namespace MCPForUnity.Editor.Tools.InputSystem
                     return new ErrorResponse($"Binding index {bindingIndex} out of range (count: {targetAction.bindings.Count})");
                 }
 
-                targetAction.RemoveBinding(bindingIndex);
+                targetAction.ChangeBinding(bindingIndex).Erase();
                 
                 EditorUtility.SetDirty(actionReference);
                 AssetDatabase.SaveAssets();
@@ -791,8 +792,8 @@ namespace MCPForUnity.Editor.Tools.InputSystem
                     path = assetPath,
                     actionMaps = asset.actionMaps.Select(m => m.name).ToList(),
                     controlSchemes = asset.controlSchemes.Select(s => s.name).ToList(),
-                    totalActions = asset.actionMaps.Sum(m => m.actions.Length),
-                    totalBindings = asset.actionMaps.Sum(m => m.bindings.Length)
+                    totalActions = asset.actionMaps.Sum(m => m.actions.Count),
+                    totalBindings = asset.actionMaps.Sum(m => m.bindings.Count)
                 });
             }
             catch (Exception ex)
@@ -807,12 +808,26 @@ namespace MCPForUnity.Editor.Tools.InputSystem
 
         private static UnityEngine.InputSystem.InputActionAsset LoadInputActionAsset(string path)
         {
-            if (!Path.IsPathRooted(path))
+            if (string.IsNullOrEmpty(path))
+            {
+                return null;
+            }
+
+            string relativePath;
+            if (path.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase))
+            {
+                relativePath = path.Replace("\\", "/");
+            }
+            else if (!Path.IsPathRooted(path))
             {
                 path = Path.Combine(Application.dataPath, "..", path);
+                relativePath = path.Replace(Application.dataPath, "Assets").Replace("\\", "/");
             }
-            
-            string relativePath = path.Replace(Application.dataPath, "Assets").Replace("\\", "/");
+            else
+            {
+                relativePath = path.Replace(Application.dataPath, "Assets").Replace("\\", "/");
+            }
+
             return AssetDatabase.LoadAssetAtPath<UnityEngine.InputSystem.InputActionAsset>(relativePath);
         }
 

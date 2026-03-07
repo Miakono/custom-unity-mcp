@@ -18,6 +18,7 @@ namespace MCPForUnity.Editor.Services
         public bool RequiresPolling { get; set; } = false;
         public string PollAction { get; set; } = "status";
         public bool IsBuiltIn { get; set; }
+        public bool DefaultEnabled { get; set; } = true;
         public string Group { get; set; } = "core";
     }
 

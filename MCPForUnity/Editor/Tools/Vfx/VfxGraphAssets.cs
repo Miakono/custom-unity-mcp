@@ -39,7 +39,7 @@ namespace MCPForUnity.Editor.Tools.Vfx
             return new { success = false, message = "VFX Graph package (com.unity.visualeffectgraph) not installed" };
         }
 #else
-        private static readonly string[] SupportedVfxGraphVersions = { "12.1" };
+        private static readonly Version MinimumSupportedVfxGraphVersion = new(12, 1);
 
         /// <summary>
         /// Creates a new VFX Graph asset file from a template.
@@ -497,8 +497,7 @@ namespace MCPForUnity.Editor.Tools.Vfx
                 return null;
             }
 
-            string supported = string.Join(", ", SupportedVfxGraphVersions.Select(version => $"{version}.x"));
-            return $"Unsupported VFX Graph version {info.version}. Supported versions: {supported}.";
+            return $"Unsupported VFX Graph version {info.version}. Minimum supported version is {MinimumSupportedVfxGraphVersion.Major}.{MinimumSupportedVfxGraphVersion.Minor}.x.";
         }
 
         private static bool IsVersionSupported(string installedVersion)
@@ -520,20 +519,7 @@ namespace MCPForUnity.Editor.Tools.Vfx
                 return false;
             }
 
-            foreach (string supported in SupportedVfxGraphVersions)
-            {
-                if (!Version.TryParse(supported, out Version target))
-                {
-                    continue;
-                }
-
-                if (installed.Major == target.Major && installed.Minor == target.Minor)
-                {
-                    return true;
-                }
-            }
-
-            return false;
+            return installed >= MinimumSupportedVfxGraphVersion;
         }
 
         private static string TryGetAssetPathFromFileSystem(string templatePath)

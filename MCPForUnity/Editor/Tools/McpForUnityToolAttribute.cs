@@ -32,9 +32,12 @@ namespace MCPForUnity.Editor.Tools
 
         /// <summary>
         /// Tool group for dynamic visibility on the Python server.
-        /// Core tools are enabled by default; other groups start hidden and
-        /// can be activated per-session via the manage_tools meta-tool.
-        /// Valid groups: core, vfx, animation, ui, scripting_ext, testing, menu.
+        /// Groups are enabled by default and can be toggled per-session via
+        /// the manage_tools meta-tool.
+        /// Valid groups: core, spatial, profiling, vfx, animation, ui,
+        /// scripting_ext, testing, input, project_config, visual_qa,
+        /// pipeline, transactions, events, diff_patch, asset_intelligence,
+        /// navigation, pipeline_control, dev_tools.
         /// Set to null for server meta-tools that should always be visible.
         /// </summary>
         public string Group { get; set; } = "core";

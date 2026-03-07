@@ -262,9 +262,12 @@ namespace MCPForUnity.Editor.Tools.InputSystem
             
             if (properties != null)
             {
-                foreach (var prop in properties.Properties())
+                var normalizedProperties = NormalizeToken(properties) as JObject ?? new JObject();
+                normalized["properties"] = normalizedProperties;
+
+                foreach (var prop in normalizedProperties.Properties())
                 {
-                    normalized[NormalizeKey(prop.Name, true)] = NormalizeToken(prop.Value);
+                    normalized[NormalizeKey(prop.Name, true)] = prop.Value?.DeepClone();
                 }
             }
 

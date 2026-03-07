@@ -3,8 +3,8 @@
     "core"
   ],
   "generated_from": "live_tool_registry",
-  "group_count": 6,
-  "subagent_count": 7,
+  "group_count": 11,
+  "subagent_count": 12,
   "subagents": [
     {
       "description": "Routes work to the right Unity specialist, keeps tool groups lean, and coordinates verification after mutations.",
@@ -29,7 +29,18 @@
             "tool": "manage_tools"
           },
           "specialist_id": "unity-core-specialist",
-          "tool_count": 21
+          "tool_count": 47
+        },
+        "input": {
+          "activate": {
+            "params": {
+              "action": "activate",
+              "group": "input"
+            },
+            "tool": "manage_tools"
+          },
+          "specialist_id": "unity-input-specialist",
+          "tool_count": 1
         },
         "scripting_ext": {
           "activate": {
@@ -51,7 +62,7 @@
             "tool": "manage_tools"
           },
           "specialist_id": "unity-testing-specialist",
-          "tool_count": 5
+          "tool_count": 7
         },
         "ui": {
           "activate": {
@@ -62,7 +73,7 @@
             "tool": "manage_tools"
           },
           "specialist_id": "unity-ui-specialist",
-          "tool_count": 1
+          "tool_count": 2
         },
         "vfx": {
           "activate": {
@@ -74,6 +85,50 @@
           },
           "specialist_id": "unity-vfx-specialist",
           "tool_count": 3
+        },
+        "spatial": {
+          "activate": {
+            "params": {
+              "action": "activate",
+              "group": "spatial"
+            },
+            "tool": "manage_tools"
+          },
+          "specialist_id": "unity-spatial-specialist",
+          "tool_count": 2
+        },
+        "project_config": {
+          "activate": {
+            "params": {
+              "action": "activate",
+              "group": "project_config"
+            },
+            "tool": "manage_tools"
+          },
+          "specialist_id": "unity-project-config-specialist",
+          "tool_count": 10
+        },
+        "pipeline": {
+          "activate": {
+            "params": {
+              "action": "activate",
+              "group": "pipeline"
+            },
+            "tool": "manage_tools"
+          },
+          "specialist_id": "unity-pipeline-specialist",
+          "tool_count": 8
+        },
+        "visual_qa": {
+          "activate": {
+            "params": {
+              "action": "activate",
+              "group": "visual_qa"
+            },
+            "tool": "manage_tools"
+          },
+          "specialist_id": "unity-visual-qa-specialist",
+          "tool_count": 1
         }
       },
       "id": "unity-orchestrator",
@@ -87,10 +142,15 @@
       "manages_groups": [
         "animation",
         "core",
+        "input",
         "scripting_ext",
         "testing",
         "ui",
-        "vfx"
+        "vfx",
+        "spatial",
+        "project_config",
+        "pipeline",
+        "visual_qa"
       ],
       "name": "Unity Orchestrator",
       "shared_meta_tools": [
@@ -181,22 +241,39 @@
         "execute_menu_item",
         "find_gameobjects",
         "find_in_file",
+        "get_diagnostics",
+        "manage_addressables",
         "manage_asset",
+        "manage_checkpoints",
+        "manage_code_intelligence",
+        "search_code",
+        "find_symbol",
+        "find_references",
+        "get_symbols",
+        "build_code_index",
+        "code_index_status",
         "manage_components",
         "manage_editor",
         "manage_gameobject",
         "manage_material",
+        "manage_package_manager",
         "manage_prefabs",
-        "manage_scene",
+        "manage_reflection",
         "refresh_unity",
+        "manage_scene",
         "apply_text_edits",
         "create_script",
         "delete_script",
         "validate_script",
         "manage_script",
         "get_sha",
+        "manage_video_capture",
         "read_console",
         "validate_compile_health",
+        "get_runtime_status",
+        "list_runtime_tools",
+        "execute_runtime_command",
+        "get_runtime_connection_info",
         "script_apply_edits"
       ],
       "when_to_use": [
@@ -209,6 +286,38 @@
         "Inspect current state first, then batch related changes when possible.",
         "Hand off to testing after meaningful mutations or compile-sensitive edits."
       ]
+    },
+    {
+      "activation": {
+        "params": {
+          "action": "activate",
+          "group": "input"
+        },
+        "tool": "manage_tools"
+      },
+      "default_enabled": false,
+      "description": "Unity Input System - Action Maps, Actions, Bindings, and Runtime Simulation",
+      "group": "input",
+      "handoff_targets": [],
+      "id": "unity-input-specialist",
+      "kind": "specialist",
+      "name": "Unity Input Specialist",
+      "shared_meta_tools": [
+        "debug_request_context",
+        "execute_custom_tool",
+        "manage_catalog",
+        "manage_error_catalog",
+        "manage_script_capabilities",
+        "manage_subagents",
+        "manage_tools",
+        "set_active_instance"
+      ],
+      "tool_group_description": "Unity Input System - Action Maps, Actions, Bindings, and Runtime Simulation",
+      "tools": [
+        "manage_input_system"
+      ],
+      "when_to_use": [],
+      "workflow": []
     },
     {
       "activation": {
@@ -286,6 +395,8 @@
       "tools": [
         "audit_prefab_integrity",
         "audit_scene_integrity",
+        "manage_profiler",
+        "record_profiler_session",
         "preflight_audit",
         "run_tests",
         "get_test_job"
@@ -331,6 +442,7 @@
       ],
       "tool_group_description": "UI Toolkit (UXML, USS, UIDocument)",
       "tools": [
+        "manage_runtime_ui",
         "manage_ui"
       ],
       "when_to_use": [
@@ -388,7 +500,219 @@
         "Capture or inspect current asset state before broad mutations.",
         "Escalate back to core or testing when changes affect shared assets or scene behavior."
       ]
+    },
+    {
+      "activation": {
+        "params": {
+          "action": "activate",
+          "group": "spatial"
+        },
+        "tool": "manage_tools"
+      },
+      "default_enabled": false,
+      "description": "Owns transform operations and spatial awareness for reliable scene construction and object placement.",
+      "group": "spatial",
+      "handoff_targets": [
+        "unity-core-builder",
+        "unity-testing-specialist"
+      ],
+      "id": "unity-spatial-specialist",
+      "kind": "specialist",
+      "name": "Unity Spatial Specialist",
+      "shared_meta_tools": [
+        "debug_request_context",
+        "execute_custom_tool",
+        "manage_catalog",
+        "manage_error_catalog",
+        "manage_script_capabilities",
+        "manage_subagents",
+        "manage_tools",
+        "set_active_instance"
+      ],
+      "tool_group_description": "Transform operations and spatial queries",
+      "tools": [
+        "manage_transform",
+        "spatial_queries"
+      ],
+      "when_to_use": [
+        "Transform-aware inspection and manipulation",
+        "Spatial reasoning about object placement",
+        "Snap, align, and distribute operations",
+        "Bounds and overlap queries",
+        "Raycast and surface queries",
+        "Distance, direction, and relative offset calculations"
+      ],
+      "workflow": [
+        "Activate the spatial group for the current session.",
+        "Use spatial_queries to understand scene layout before making changes.",
+        "Apply transforms with manage_transform using spatial context.",
+        "Validate placement with spatial validation checks.",
+        "Hand off to core builder for prefab/scene saves after placement."
+      ]
+    },
+    {
+      "activation": {
+        "params": {
+          "action": "activate",
+          "group": "project_config"
+        },
+        "tool": "manage_tools"
+      },
+      "default_enabled": false,
+      "description": "Owns project configuration, asset intelligence, package registry management, and project memory/rules.",
+      "group": "project_config",
+      "handoff_targets": [
+        "unity-core-builder",
+        "unity-testing-specialist"
+      ],
+      "id": "unity-project-config-specialist",
+      "kind": "specialist",
+      "name": "Unity Project Config Specialist",
+      "shared_meta_tools": [
+        "debug_request_context",
+        "execute_custom_tool",
+        "manage_catalog",
+        "manage_error_catalog",
+        "manage_script_capabilities",
+        "manage_subagents",
+        "manage_tools",
+        "set_active_instance"
+      ],
+      "tool_group_description": "Project settings, asset intelligence, and configuration",
+      "tools": [
+        "manage_project_settings",
+        "manage_editor_settings",
+        "manage_registry_config",
+        "analyze_asset_dependencies",
+        "manage_asset_import_settings",
+        "list_shaders",
+        "find_builtin_assets",
+        "get_component_types",
+        "get_object_references",
+        "manage_project_memory"
+      ],
+      "when_to_use": [
+        "Project settings inspection or mutation",
+        "Editor preferences configuration",
+        "Package registry management",
+        "Asset dependency graph analysis",
+        "Import settings inspection and configuration",
+        "Shader and built-in asset discovery",
+        "Component type enumeration",
+        "Object reference graph inspection",
+        "Project rules and conventions management"
+      ],
+      "workflow": [
+        "Activate the project_config group for the current session.",
+        "Inspect current configuration before making targeted updates.",
+        "Make changes through the appropriate configuration tools.",
+        "Validate changes compile and work correctly.",
+        "Route asset operations to core builder, validation to testing specialist."
+      ]
+    },
+    {
+      "activation": {
+        "params": {
+          "action": "activate",
+          "group": "pipeline"
+        },
+        "tool": "manage_tools"
+      },
+      "default_enabled": false,
+      "description": "Owns workflow recording, pipeline management, and reusable playbook execution.",
+      "group": "pipeline",
+      "handoff_targets": [
+        "unity-orchestrator",
+        "unity-core-builder",
+        "unity-testing-specialist"
+      ],
+      "id": "unity-pipeline-specialist",
+      "kind": "specialist",
+      "name": "Unity Pipeline Specialist",
+      "shared_meta_tools": [
+        "debug_request_context",
+        "execute_custom_tool",
+        "manage_catalog",
+        "manage_error_catalog",
+        "manage_script_capabilities",
+        "manage_subagents",
+        "manage_tools",
+        "set_active_instance"
+      ],
+      "tool_group_description": "Workflow recording and pipeline automation",
+      "tools": [
+        "record_pipeline",
+        "stop_pipeline_recording",
+        "replay_pipeline",
+        "save_pipeline",
+        "list_pipelines",
+        "list_playbooks",
+        "run_playbook",
+        "create_playbook"
+      ],
+      "when_to_use": [
+        "Recording editor workflows for later replay",
+        "Replaying saved multi-step workflows",
+        "Running pre-built playbooks",
+        "Creating reusable automation from recorded actions",
+        "Managing pipeline storage and organization"
+      ],
+      "workflow": [
+        "Activate the pipeline group for the current session.",
+        "Start recording to capture a workflow.",
+        "Execute workflow via other specialists while recording.",
+        "Stop and save the pipeline with a descriptive name.",
+        "Replay pipelines directly or convert to playbooks for reusable workflows.",
+        "Audit trail is maintained for all pipeline operations."
+      ]
+    },
+    {
+      "activation": {
+        "params": {
+          "action": "activate",
+          "group": "visual_qa"
+        },
+        "tool": "manage_tools"
+      },
+      "default_enabled": false,
+      "description": "Owns visual verification, screenshot analysis, and post-mutation visual validation loops.",
+      "group": "visual_qa",
+      "handoff_targets": [
+        "unity-testing-specialist",
+        "unity-core-builder"
+      ],
+      "id": "unity-visual-qa-specialist",
+      "kind": "specialist",
+      "name": "Unity Visual QA Specialist",
+      "shared_meta_tools": [
+        "debug_request_context",
+        "execute_custom_tool",
+        "manage_catalog",
+        "manage_error_catalog",
+        "manage_script_capabilities",
+        "manage_subagents",
+        "manage_tools",
+        "set_active_instance"
+      ],
+      "tool_group_description": "Visual verification and screenshot analysis",
+      "tools": [
+        "analyze_screenshot"
+      ],
+      "when_to_use": [
+        "Post-mutation visual verification",
+        "Screenshot analysis and interpretation",
+        "Visual regression detection",
+        "Scene/UI validation after changes",
+        "Self-correction flows requiring visual feedback"
+      ],
+      "workflow": [
+        "Activate the visual_qa group for the current session.",
+        "Capture screenshot via manage_video_capture.",
+        "Analyze captured visuals with analyze_screenshot.",
+        "Report structured findings (issues detected, visual state).",
+        "Route fixes to core builder, structural validation to testing specialist."
+      ]
     }
   ],
-  "version": 1
+  "version": 2
 }

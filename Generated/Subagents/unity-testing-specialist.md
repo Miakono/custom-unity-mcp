@@ -21,6 +21,8 @@ Shared meta-tools:
 Primary tools:
 - `audit_prefab_integrity`
 - `audit_scene_integrity`
+- `manage_profiler`
+- `record_profiler_session`
 - `preflight_audit`
 - `run_tests`
 - `get_test_job`

@@ -67,12 +67,13 @@ def _extract_images(response: dict[str, Any], action: str) -> ToolResult | None:
 @mcp_for_unity_tool(
     description=(
         "Performs CRUD operations on Unity scenes. "
-        "Read-only actions: get_hierarchy, get_active, get_build_settings, screenshot, scene_view_frame. "
-        "Modifying actions: create, load, save. "
+        "Read-only actions: get_hierarchy, get_active, get_build_settings, screenshot, scene_view_frame, list_opened. "
+        "Modifying actions: create, load, save, set_active, unload. "
         "screenshot supports include_image=true to return an inline base64 PNG for AI vision. "
         "screenshot with batch='surround' captures 6 angles around the scene (no file saved) for comprehensive scene understanding. "
         "screenshot with batch='orbit' captures configurable azimuth x elevation grid for visual QA (use orbit_angles, orbit_elevations, orbit_distance, orbit_fov). "
-        "screenshot with look_at/view_position creates a temp camera at that viewpoint and returns an inline image."
+        "screenshot with look_at/view_position creates a temp camera at that viewpoint and returns an inline image. "
+        "Use list_opened to see all loaded scenes in additive mode, set_active to switch active scene, unload to remove additive scenes."
     ),
     annotations=ToolAnnotations(
         title="Manage Scene",
@@ -90,6 +91,9 @@ async def manage_scene(
         "get_build_settings",
         "screenshot",
         "scene_view_frame",
+        "list_opened",
+        "set_active",
+        "unload",
     ], "Perform CRUD operations on Unity scenes, capture screenshots, and control the Scene View camera."],
     name: Annotated[str, "Scene name."] | None = None,
     path: Annotated[str, "Scene path."] | None = None,

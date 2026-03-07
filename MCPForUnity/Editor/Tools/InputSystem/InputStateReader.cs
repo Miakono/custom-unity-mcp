@@ -4,9 +4,12 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using MCPForUnity.Editor.Helpers;
+using MCPForUnity.Runtime.Helpers;
 using Newtonsoft.Json.Linq;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.Controls;
+using UnityInputSystem = UnityEngine.InputSystem.InputSystem;
 
 namespace MCPForUnity.Editor.Tools.InputSystem
 {
@@ -230,7 +233,7 @@ namespace MCPForUnity.Editor.Tools.InputSystem
                 if (controlPath.StartsWith("<"))
                 {
                     // Full path like <Keyboard>/space
-                    control = InputSystem.FindControl(controlPath);
+                    control = UnityInputSystem.FindControl(controlPath);
                 }
                 else
                 {
@@ -241,7 +244,7 @@ namespace MCPForUnity.Editor.Tools.InputSystem
                 if (control == null)
                 {
                     // Return available devices for debugging
-                    var availableDevices = InputSystem.devices.Select(d => $"{d.name} ({d.layout})").ToList();
+                    var availableDevices = UnityInputSystem.devices.Select(d => $"{d.name} ({d.layout})").ToList();
                     
                     return new ErrorResponse(
                         $"Control '{controlPath}' not found. " +
@@ -294,7 +297,7 @@ namespace MCPForUnity.Editor.Tools.InputSystem
             }
 
             // Also search in PlayerInput components
-            var playerInputs = UnityEngine.Object.FindObjectsOfType<PlayerInput>();
+            var playerInputs = UnityObjectCompatibility.FindObjectsByType<PlayerInput>();
             foreach (var playerInput in playerInputs)
             {
                 var action = playerInput.actions?.FindAction(actionName);
@@ -328,7 +331,7 @@ namespace MCPForUnity.Editor.Tools.InputSystem
             }
 
             // Get from PlayerInput components
-            var playerInputs = UnityEngine.Object.FindObjectsOfType<PlayerInput>();
+            var playerInputs = UnityObjectCompatibility.FindObjectsByType<PlayerInput>();
             foreach (var playerInput in playerInputs)
             {
                 if (playerInput.actions != null)
@@ -345,7 +348,7 @@ namespace MCPForUnity.Editor.Tools.InputSystem
 
         private static InputControl FindControlByName(string name, string deviceType)
         {
-            foreach (var device in InputSystem.devices)
+            foreach (var device in UnityInputSystem.devices)
             {
                 if (deviceType != "any" && !device.layout.Contains(deviceType, StringComparison.OrdinalIgnoreCase))
                 {

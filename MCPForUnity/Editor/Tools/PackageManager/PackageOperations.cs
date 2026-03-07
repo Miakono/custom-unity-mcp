@@ -30,6 +30,7 @@ namespace MCPForUnity.Editor.Tools.PackageManager
             
             try
             {
+                PackageRequestUtility.InvalidateInstalledPackagesCache();
                 string packageIdentifier;
                 
                 // Determine the package identifier format
@@ -69,20 +70,26 @@ namespace MCPForUnity.Editor.Tools.PackageManager
                 McpLog.Info($"[PackageOperations] Adding package: {packageIdentifier}");
                 
                 // Start the add request
-                var request = Client.Add(packageIdentifier);
-                
-                // Wait for completion
-                while (!request.IsCompleted)
-                {
-                    await Task.Delay(50);
-                }
-                
-                if (request.Status == StatusCode.Failure)
-                {
-                    return new ErrorResponse($"Failed to add package '{packageIdentifier}': {request.Error?.message}");
-                }
-                
-                var addedPackage = request.Result;
+                var addedPackage = await PackageRequestUtility.RunExclusiveAsync(
+                    "add_package",
+                    async () =>
+                    {
+                        var request = Client.Add(packageIdentifier);
+                        var wait = await PackageRequestUtility.WaitForCompletionAsync(
+                            request,
+                            "add_package",
+                            PackageRequestUtility.MutationTimeoutMs
+                        );
+
+                        if (!wait.Success)
+                        {
+                            throw new InvalidOperationException(wait.ErrorMessage);
+                        }
+
+                        return request.Result;
+                    }
+                );
+                PackageRequestUtility.InvalidateInstalledPackagesCache();
                 
                 return new SuccessResponse(
                     $"Package '{addedPackage.displayName ?? addedPackage.name}' ({addedPackage.name}@{addedPackage.version}) added successfully.",
@@ -95,6 +102,10 @@ namespace MCPForUnity.Editor.Tools.PackageManager
                         resolvedPath = addedPackage.resolvedPath
                     }
                 );
+            }
+            catch (InvalidOperationException e)
+            {
+                return new ErrorResponse(e.Message);
             }
             catch (Exception e)
             {
@@ -115,48 +126,59 @@ namespace MCPForUnity.Editor.Tools.PackageManager
             
             try
             {
-                // First check if the package exists
-                var listRequest = Client.List(false, false);
-                while (!listRequest.IsCompleted)
-                {
-                    await Task.Delay(10);
-                }
-                
-                if (listRequest.Status == StatusCode.Failure)
-                {
-                    return new ErrorResponse($"Failed to list packages: {listRequest.Error?.message}");
-                }
-                
-                var pkg = listRequest.Result.FirstOrDefault(p => p.name == packageName);
-                if (pkg == null)
-                {
-                    return new ErrorResponse($"Package '{packageName}' not found.");
-                }
-                
-                if (!pkg.isDirectDependency)
-                {
-                    return new ErrorResponse(
-                        $"Cannot remove '{packageName}' - it is a transitive dependency, not a direct dependency."
-                    );
-                }
-                
-                // Start the remove request
-                var request = Client.Remove(packageName);
-                
-                // Wait for completion
-                while (!request.IsCompleted)
-                {
-                    await Task.Delay(50);
-                }
-                
-                if (request.Status == StatusCode.Failure)
-                {
-                    return new ErrorResponse($"Failed to remove package '{packageName}': {request.Error?.message}");
-                }
-                
+                PackageRequestUtility.InvalidateInstalledPackagesCache();
+                await PackageRequestUtility.RunExclusiveAsync(
+                    "remove_package",
+                    async () =>
+                    {
+                        var listRequest = Client.List(false, true);
+                        var listWait = await PackageRequestUtility.WaitForCompletionAsync(
+                            listRequest,
+                            "remove_package:list_installed",
+                            PackageRequestUtility.ReadTimeoutMs
+                        );
+
+                        if (!listWait.Success)
+                        {
+                            throw new InvalidOperationException(listWait.ErrorMessage);
+                        }
+
+                        var pkg = listRequest.Result.FirstOrDefault(p => p.name == packageName);
+                        if (pkg == null)
+                        {
+                            throw new InvalidOperationException($"Package '{packageName}' not found.");
+                        }
+
+                        if (!pkg.isDirectDependency)
+                        {
+                            throw new InvalidOperationException(
+                                $"Cannot remove '{packageName}' - it is a transitive dependency, not a direct dependency."
+                            );
+                        }
+
+                        var request = Client.Remove(packageName);
+                        var wait = await PackageRequestUtility.WaitForCompletionAsync(
+                            request,
+                            "remove_package",
+                            PackageRequestUtility.MutationTimeoutMs
+                        );
+
+                        if (!wait.Success)
+                        {
+                            throw new InvalidOperationException(wait.ErrorMessage);
+                        }
+
+                        return true;
+                    }
+                );
+                PackageRequestUtility.InvalidateInstalledPackagesCache();
                 return new SuccessResponse(
                     $"Package '{packageName}' removed successfully."
                 );
+            }
+            catch (InvalidOperationException e)
+            {
+                return new ErrorResponse(e.Message);
             }
             catch (Exception e)
             {
@@ -174,33 +196,31 @@ namespace MCPForUnity.Editor.Tools.PackageManager
             try
             {
                 McpLog.Info("[PackageOperations] Resolving dependencies...");
-                
-                // Resolve forces a re-resolution of packages
-                var request = Client.Resolve();
-                
-                // Wait for completion
-                while (!request.IsCompleted)
-                {
-                    await Task.Delay(50);
-                }
-                
-                if (request.Status == StatusCode.Failure)
-                {
-                    return new ErrorResponse($"Failed to resolve dependencies: {request.Error?.message}");
-                }
-                
-                // Get the list of resolved packages
-                var listRequest = Client.List(false, false);
-                while (!listRequest.IsCompleted)
-                {
-                    await Task.Delay(10);
-                }
-                
-                int packageCount = 0;
-                if (listRequest.Status == StatusCode.Success)
-                {
-                    packageCount = listRequest.Result.Count();
-                }
+
+                PackageRequestUtility.InvalidateInstalledPackagesCache();
+                var packageCount = await PackageRequestUtility.RunExclusiveAsync(
+                    "resolve_dependencies",
+                    async () =>
+                    {
+                        Client.Resolve();
+                        await Task.Delay(300);
+
+                        var listRequest = Client.List(false, true);
+                        var listWait = await PackageRequestUtility.WaitForCompletionAsync(
+                            listRequest,
+                            "resolve_dependencies:list_installed",
+                            PackageRequestUtility.ReadTimeoutMs
+                        );
+
+                        if (!listWait.Success)
+                        {
+                            throw new InvalidOperationException(listWait.ErrorMessage);
+                        }
+
+                        return listRequest.Result.Count();
+                    }
+                );
+                PackageRequestUtility.InvalidateInstalledPackagesCache();
                 
                 return new SuccessResponse(
                     $"Dependencies resolved successfully. {packageCount} packages in project.",
@@ -210,6 +230,10 @@ namespace MCPForUnity.Editor.Tools.PackageManager
                         resolved = true
                     }
                 );
+            }
+            catch (InvalidOperationException e)
+            {
+                return new ErrorResponse(e.Message);
             }
             catch (Exception e)
             {

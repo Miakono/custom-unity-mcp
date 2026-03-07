@@ -19,6 +19,7 @@ def _is_success(payload: dict[str, Any]) -> bool:
 
 
 @mcp_for_unity_tool(
+    unity_target=None,
     description=(
         "Run a combined read-only preflight audit: compile health, scene integrity, and prefab integrity. "
         "Use this before broad mutations or test runs."

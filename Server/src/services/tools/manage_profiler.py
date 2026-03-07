@@ -217,6 +217,7 @@ async def manage_profiler(
 
 @mcp_for_unity_tool(
     group="profiling",
+    unity_target="manage_profiler",
     description=(
         "Continuously records profiler data for a specified duration. "
         "This is a long-running job that collects snapshots at regular intervals "

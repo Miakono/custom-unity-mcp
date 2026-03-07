@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using MCPForUnity.Runtime.Helpers;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -32,7 +33,7 @@ namespace MCPForUnity.Runtime.UI
         #endregion
 
         #region Properties
-        private List<UIDocument> ActiveDocuments => FindObjectsOfType<UIDocument>().ToList();
+        private List<UIDocument> ActiveDocuments => UnityObjectCompatibility.FindObjectsByType<UIDocument>().ToList();
         #endregion
 
         #region Find Elements

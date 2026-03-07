@@ -4,21 +4,21 @@
     flex-direction: column;
     flex-grow: 1;
     overflow: hidden;
+    background-color: rgba(37, 37, 38, 1);
 }
 
-/* Header Bar */
+/* Header */
 .header-bar {
     flex-direction: row;
     align-items: center;
     justify-content: space-between;
-    padding: 14px 18px 12px 18px;
-    margin: 12px 12px 5px 12px;
-    min-height: 56px;
+    padding: 18px 18px 14px 18px;
+    margin: 0px 0px 2px 0px;
+    min-height: 58px;
     flex-shrink: 0;
-    background-color: rgba(58, 43, 18, 0.12);
-    border-radius: 4px;
-    border-width: 1px;
-    border-color: rgba(145, 104, 39, 0.35);
+    background-color: rgba(43, 43, 46, 1);
+    border-bottom-width: 1px;
+    border-bottom-color: rgba(255, 255, 255, 0.08);
 }
 
 .header-copy {
@@ -27,36 +27,33 @@
 }
 
 .header-title {
-    font-size: 16px;
+    font-size: 18px;
     -unity-font-style: bold;
-    letter-spacing: 0.5px;
+    color: rgba(236, 236, 238, 1);
 }
 
 .header-subtitle {
-    margin-top: 2px;
+    margin-top: 3px;
     font-size: 11px;
-    color: rgba(210, 202, 190, 0.92);
+    color: rgba(178, 178, 184, 0.92);
 }
 
 .header-version {
+    flex-shrink: 0;
     font-size: 11px;
-    color: rgba(255, 229, 187, 1);
-    padding: 3px 10px;
-    background-color: rgba(145, 104, 39, 0.18);
-    border-radius: 10px;
-    border-width: 1px;
-    border-color: rgba(199, 145, 61, 0.4);
+    color: rgba(164, 164, 170, 0.9);
+    padding: 0px;
 }
 
 /* Update Notification */
 .update-notification {
     display: none;
-    padding: 8px 16px;
-    margin: 0px 12px;
-    background-color: rgba(100, 200, 100, 0.15);
-    border-radius: 4px;
+    padding: 10px 14px;
+    margin: 0px 14px 8px 14px;
+    background-color: rgba(46, 92, 54, 0.28);
+    border-radius: 8px;
     border-width: 1px;
-    border-color: rgba(100, 200, 100, 0.3);
+    border-color: rgba(84, 168, 101, 0.32);
 }
 
 .update-notification.visible {
@@ -65,49 +62,57 @@
 
 .update-notification-text {
     font-size: 11px;
-    color: rgba(100, 200, 100, 1);
+    color: rgba(175, 255, 190, 1);
     white-space: normal;
 }
 
 /* Tabs */
 .tab-toolbar {
-    margin: 8px 12px 0px 12px;
-    padding: 0px;
+    margin: 0px 18px;
+    padding: 6px 0px 0px 0px;
+    min-height: 34px;
     background-color: transparent;
     border-width: 0px;
     border-bottom-width: 1px;
-    border-bottom-color: rgba(0, 0, 0, 0.15);
+    border-bottom-color: rgba(255, 255, 255, 0.08);
+    justify-content: flex-start;
+    align-items: flex-end;
 }
 
 .tab-toolbar .unity-toolbar-button {
-    flex-grow: 1;
-    min-height: 32px;
-    font-size: 12px;
+    flex-grow: 0;
+    min-height: 28px;
+    font-size: 11px;
     border-width: 0px;
     background-color: transparent;
-    margin: 0px 2px 0px 0px;
-    padding: 0px 12px;
-    border-radius: 4px 4px 0px 0px;
-    margin-bottom: -1px;
+    margin: 0px 14px 0px 0px;
+    padding: 2px 0px 7px 0px;
+    border-radius: 0px;
+    color: rgba(176, 176, 182, 0.94);
+    -unity-text-align: middle-center;
 }
 
 .tab-toolbar .unity-toolbar-button:hover {
-    background-color: rgba(255, 255, 255, 0.05);
+    background-color: transparent;
+    color: rgba(226, 226, 230, 1);
 }
 
 .tab-toolbar .unity-toolbar-button:checked {
-    background-color: rgba(0, 0, 0, 0.04);
-    border-width: 1px;
-    border-color: rgba(0, 0, 0, 0.15);
-    border-bottom-width: 1px;
-    border-bottom-color: rgba(56, 56, 56, 1);
+    background-color: transparent;
+    border-bottom-width: 2px;
+    border-bottom-color: rgba(87, 150, 226, 0.96);
+    color: rgba(244, 244, 246, 1);
+}
+
+.tab-toolbar .unity-toolbar-toggle {
+    min-height: 28px;
 }
 
 /* Panels */
 .panel-scroll {
     flex-grow: 1;
     margin: 0px;
-    padding: 0px 8px 0px 8px;
+    padding: 16px 18px 18px 18px;
 }
 
 .hidden {
@@ -116,33 +121,56 @@
 
 .section-stack {
     flex-direction: column;
+    width: 100%;
+    max-width: 940px;
+    align-self: center;
 }
 
 /* Light Theme */
+.unity-theme-light #root-container {
+    background-color: rgba(236, 236, 238, 1);
+}
+
 .unity-theme-light .header-bar {
-    background-color: rgba(192, 149, 78, 0.12);
-    border-color: rgba(126, 88, 26, 0.2);
+    background-color: rgba(245, 245, 247, 1);
+    border-bottom-color: rgba(0, 0, 0, 0.1);
+}
+
+.unity-theme-light .header-title {
+    color: rgba(34, 34, 38, 1);
 }
 
 .unity-theme-light .header-subtitle {
-    color: rgba(74, 56, 27, 0.82);
+    color: rgba(88, 88, 94, 0.9);
 }
 
 .unity-theme-light .header-version {
-    background-color: rgba(176, 134, 60, 0.14);
+    color: rgba(108, 108, 114, 0.92);
+}
+
+.unity-theme-light .tab-toolbar {
+    border-bottom-color: rgba(0, 0, 0, 0.1);
+}
+
+.unity-theme-light .tab-toolbar .unity-toolbar-button {
+    color: rgba(86, 86, 92, 0.94);
+}
+
+.unity-theme-light .tab-toolbar .unity-toolbar-button:hover {
+    background-color: transparent;
+    color: rgba(38, 38, 42, 1);
 }
 
 .unity-theme-light .tab-toolbar .unity-toolbar-button:checked {
-    background-color: rgba(255, 255, 255, 0.5);
-    border-color: rgba(0, 0, 0, 0.15);
-    border-bottom-color: rgba(194, 194, 194, 1);
+    border-bottom-color: rgba(56, 119, 198, 0.96);
+    color: rgba(26, 26, 30, 1);
 }
 
 .unity-theme-light .update-notification {
-    background-color: rgba(100, 200, 100, 0.1);
-    border-color: rgba(100, 200, 100, 0.25);
+    background-color: rgba(107, 168, 113, 0.14);
+    border-color: rgba(83, 139, 91, 0.2);
 }
 
-.unity-theme-dark .update-notification-text {
-    color: rgba(150, 255, 150, 1);
+.unity-theme-light .update-notification-text {
+    color: rgba(49, 112, 58, 0.95);
 }

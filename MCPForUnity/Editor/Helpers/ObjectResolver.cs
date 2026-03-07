@@ -157,6 +157,7 @@ namespace MCPForUnity.Editor.Helpers
         private static bool IsAssetType(Type type)
         {
             return typeof(Material).IsAssignableFrom(type) ||
+                   typeof(Mesh).IsAssignableFrom(type) ||
                    typeof(Texture).IsAssignableFrom(type) ||
                    typeof(ScriptableObject).IsAssignableFrom(type) ||
                    type.FullName?.StartsWith("UnityEngine.U2D") == true ||

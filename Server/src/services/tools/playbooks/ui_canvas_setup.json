@@ -1,0 +1,66 @@
+{
+  "metadata": {
+    "name": "ui_canvas_setup",
+    "description": "Creates a Canvas with EventSystem for Unity UI",
+    "version": "1.0",
+    "author": "unity-mcp",
+    "tags": ["ui", "canvas", "event-system", "starter"],
+    "category": "ui"
+  },
+  "steps": [
+    {
+      "tool": "manage_gameobject",
+      "action": "create",
+      "params": {
+        "name": "Canvas"
+      }
+    },
+    {
+      "tool": "manage_components",
+      "action": "add",
+      "params": {
+        "target": "Canvas",
+        "components": ["Canvas", "CanvasScaler", "GraphicRaycaster"]
+      }
+    },
+    {
+      "tool": "manage_components",
+      "action": "set_property",
+      "params": {
+        "target": "Canvas",
+        "component_properties": {
+          "Canvas": {
+            "renderMode": "ScreenSpaceOverlay"
+          }
+        }
+      }
+    },
+    {
+      "tool": "manage_gameobject",
+      "action": "create",
+      "params": {
+        "name": "EventSystem"
+      }
+    },
+    {
+      "tool": "manage_components",
+      "action": "add",
+      "params": {
+        "target": "EventSystem",
+        "components": ["EventSystem", "StandaloneInputModule"]
+      }
+    }
+  ],
+  "parameters": {
+    "canvas_name": {
+      "description": "Name of the canvas GameObject",
+      "default": "Canvas",
+      "type": "string"
+    },
+    "render_mode": {
+      "description": "Canvas render mode (ScreenSpaceOverlay, ScreenSpaceCamera, WorldSpace)",
+      "default": "ScreenSpaceOverlay",
+      "type": "string"
+    }
+  }
+}

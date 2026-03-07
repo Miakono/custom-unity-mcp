@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Threading.Tasks;
 using MCPForUnity.Editor.Helpers;
 using Newtonsoft.Json.Linq;
@@ -23,19 +24,34 @@ namespace MCPForUnity.Editor.Tools.PackageManager
         {
             try
             {
-                var request = Client.List(true, false); // Include dependencies = true, offlineMode = false
-                
-                while (!request.IsCompleted)
+                PackageInfo[] packages;
+                if (!PackageRequestUtility.TryGetInstalledPackagesFromCache(out packages))
                 {
-                    await Task.Delay(10);
+                    packages = await PackageRequestUtility.RunExclusiveAsync(
+                        "list_installed",
+                        async () =>
+                        {
+                            // Listing installed packages should be satisfied from local package state.
+                            // Avoid network-backed refreshes here because a stalled Package Manager request
+                            // can wedge the MCP command lane and make unrelated tools time out.
+                            var request = Client.List(true, true);
+                            var wait = await PackageRequestUtility.WaitForCompletionAsync(
+                                request,
+                                "list_installed",
+                                PackageRequestUtility.ReadTimeoutMs
+                            );
+
+                            if (!wait.Success)
+                            {
+                                throw new InvalidOperationException(wait.ErrorMessage);
+                            }
+
+                            return request.Result.ToArray();
+                        }
+                    );
+                    PackageRequestUtility.StoreInstalledPackages(packages);
                 }
-                
-                if (request.Status == StatusCode.Failure)
-                {
-                    return new ErrorResponse($"Failed to list packages: {request.Error?.message}");
-                }
-                
-                var packages = request.Result;
+
                 var packageList = new List<object>();
                 
                 foreach (var pkg in packages)
@@ -59,6 +75,10 @@ namespace MCPForUnity.Editor.Tools.PackageManager
                     }
                 );
             }
+            catch (InvalidOperationException e)
+            {
+                return new ErrorResponse(e.Message);
+            }
             catch (Exception e)
             {
                 McpLog.Error($"[PackageList] Error getting installed packages: {e.Message}");
@@ -78,19 +98,32 @@ namespace MCPForUnity.Editor.Tools.PackageManager
             
             try
             {
-                var request = Client.List(true, false);
-                
-                while (!request.IsCompleted)
+                PackageInfo[] packages;
+                if (!PackageRequestUtility.TryGetInstalledPackagesFromCache(out packages))
                 {
-                    await Task.Delay(10);
+                    packages = await PackageRequestUtility.RunExclusiveAsync(
+                        "get_package_info",
+                        async () =>
+                        {
+                            var request = Client.List(true, true);
+                            var wait = await PackageRequestUtility.WaitForCompletionAsync(
+                                request,
+                                "get_package_info",
+                                PackageRequestUtility.ReadTimeoutMs
+                            );
+
+                            if (!wait.Success)
+                            {
+                                throw new InvalidOperationException(wait.ErrorMessage);
+                            }
+
+                            return request.Result.ToArray();
+                        }
+                    );
+                    PackageRequestUtility.StoreInstalledPackages(packages);
                 }
                 
-                if (request.Status == StatusCode.Failure)
-                {
-                    return new ErrorResponse($"Failed to list packages: {request.Error?.message}");
-                }
-                
-                var pkg = request.Result.FirstOrDefault(p => p.name == packageName);
+                var pkg = packages.FirstOrDefault(p => p.name == packageName);
                 
                 if (pkg == null)
                 {
@@ -101,6 +134,10 @@ namespace MCPForUnity.Editor.Tools.PackageManager
                     $"Package info for '{packageName}'.",
                     PackageToDictionary(pkg, includeDetails: true)
                 );
+            }
+            catch (InvalidOperationException e)
+            {
+                return new ErrorResponse(e.Message);
             }
             catch (Exception e)
             {
@@ -129,20 +166,25 @@ namespace MCPForUnity.Editor.Tools.PackageManager
                 pageSize = Math.Clamp(pageSize, 1, 100);
                 page = Math.Max(1, page);
                 
-                // Search for packages
-                var request = Client.SearchAll(includePrerelease);
-                
-                while (!request.IsCompleted)
-                {
-                    await Task.Delay(10);
-                }
-                
-                if (request.Status == StatusCode.Failure)
-                {
-                    return new ErrorResponse($"Failed to search packages: {request.Error?.message}");
-                }
-                
-                var allPackages = request.Result;
+                var allPackages = await PackageRequestUtility.RunExclusiveAsync(
+                    "search_packages",
+                    async () =>
+                    {
+                        var request = Client.SearchAll(includePrerelease);
+                        var wait = await PackageRequestUtility.WaitForCompletionAsync(
+                            request,
+                            "search_packages",
+                            PackageRequestUtility.MutationTimeoutMs
+                        );
+
+                        if (!wait.Success)
+                        {
+                            throw new InvalidOperationException(wait.ErrorMessage);
+                        }
+
+                        return request.Result;
+                    }
+                );
                 
                 // Filter by search query if provided
                 var filteredPackages = allPackages;
@@ -179,6 +221,10 @@ namespace MCPForUnity.Editor.Tools.PackageManager
                         includePrerelease = includePrerelease
                     }
                 );
+            }
+            catch (InvalidOperationException e)
+            {
+                return new ErrorResponse(e.Message);
             }
             catch (Exception e)
             {
@@ -315,11 +361,13 @@ namespace MCPForUnity.Editor.Tools.PackageManager
             if (pkg.keywords != null && pkg.keywords.Any())
                 dict["keywords"] = pkg.keywords;
             
-            if (!string.IsNullOrEmpty(pkg.unity))
-                dict["unityVersion"] = pkg.unity;
-            
-            if (!string.IsNullOrEmpty(pkg.unityRelease))
-                dict["unityRelease"] = pkg.unityRelease;
+            var unityVersion = TryGetStringProperty(pkg, "unity", "unityVersion");
+            if (!string.IsNullOrEmpty(unityVersion))
+                dict["unityVersion"] = unityVersion;
+
+            var unityRelease = TryGetStringProperty(pkg, "unityRelease");
+            if (!string.IsNullOrEmpty(unityRelease))
+                dict["unityRelease"] = unityRelease;
             
             // Git-specific info
             if (pkg.source == PackageSource.Git)
@@ -343,8 +391,20 @@ namespace MCPForUnity.Editor.Tools.PackageManager
                 if (pkg.documentationUrl != null)
                     dict["documentationUrl"] = pkg.documentationUrl.ToString();
                 
-                if (pkg.licenses != null && pkg.licenses.Any())
-                    dict["licenses"] = pkg.licenses.Select(l => l.name).ToList();
+                var licenses = TryGetObjectProperty(pkg, "licenses") as System.Collections.IEnumerable;
+                if (licenses != null)
+                {
+                    var licenseNames = new List<string>();
+                    foreach (var license in licenses)
+                    {
+                        var name = TryGetStringProperty(license, "name");
+                        if (!string.IsNullOrEmpty(name))
+                            licenseNames.Add(name);
+                    }
+
+                    if (licenseNames.Count > 0)
+                        dict["licenses"] = licenseNames;
+                }
                 
                 if (pkg.repository != null)
                 {
@@ -356,18 +416,55 @@ namespace MCPForUnity.Editor.Tools.PackageManager
                     };
                 }
                 
-                if (pkg.samples != null && pkg.samples.Any())
+                var samples = TryGetObjectProperty(pkg, "samples") as System.Collections.IEnumerable;
+                if (samples != null)
                 {
-                    dict["samples"] = pkg.samples.Select(s => new
+                    var sampleList = new List<object>();
+                    foreach (var sample in samples)
                     {
-                        displayName = s.displayName,
-                        description = s.description,
-                        path = s.path
-                    }).ToList();
+                        sampleList.Add(new
+                        {
+                            displayName = TryGetStringProperty(sample, "displayName"),
+                            description = TryGetStringProperty(sample, "description"),
+                            path = TryGetStringProperty(sample, "path")
+                        });
+                    }
+
+                    if (sampleList.Count > 0)
+                        dict["samples"] = sampleList;
                 }
             }
             
             return dict;
+        }
+
+        private static string TryGetStringProperty(object target, params string[] propertyNames)
+        {
+            foreach (var propertyName in propertyNames)
+            {
+                var value = TryGetObjectProperty(target, propertyName);
+                if (value is string s)
+                {
+                    return s;
+                }
+            }
+
+            return null;
+        }
+
+        private static object TryGetObjectProperty(object target, string propertyName)
+        {
+            if (target == null || string.IsNullOrEmpty(propertyName))
+            {
+                return null;
+            }
+
+            var property = target.GetType().GetProperty(
+                propertyName,
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.IgnoreCase
+            );
+
+            return property?.GetValue(target);
         }
     }
 }

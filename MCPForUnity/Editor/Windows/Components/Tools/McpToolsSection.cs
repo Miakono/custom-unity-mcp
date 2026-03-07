@@ -39,11 +39,23 @@ namespace MCPForUnity.Editor.Windows.Components.Tools
         private static readonly Dictionary<string, string> GroupDisplayNames = new(StringComparer.OrdinalIgnoreCase)
         {
             { "core", "Core Tools" },
+            { "spatial", "Spatial Tools" },
             { "vfx", "VFX & Shaders" },
             { "animation", "Animation" },
             { "ui", "UI Toolkit" },
             { "scripting_ext", "Scripting Extensions" },
             { "testing", "Testing" },
+            { "profiling", "Profiling" },
+            { "input", "Input System" },
+            { "project_config", "Project Config" },
+            { "asset_intelligence", "Asset Intelligence" },
+            { "pipeline", "Pipeline" },
+            { "pipeline_control", "Pipeline Control" },
+            { "navigation", "Navigation" },
+            { "transactions", "Transactions" },
+            { "events", "Events" },
+            { "diff_patch", "Diff & Patch" },
+            { "dev_tools", "Developer Tools" },
         };
 
         public VisualElement Root { get; }
@@ -272,8 +284,7 @@ namespace MCPForUnity.Editor.Windows.Components.Tools
             var tagsContainer = new VisualElement();
             tagsContainer.AddToClassList("tool-tags");
 
-            bool defaultEnabled = tool.AutoRegister || tool.IsBuiltIn;
-            tagsContainer.Add(CreateTag(defaultEnabled ? "On by default" : "Off by default"));
+            tagsContainer.Add(CreateTag(tool.DefaultEnabled ? "On by default" : "Off by default"));
 
             tagsContainer.Add(CreateTag(tool.StructuredOutput ? "Structured output" : "Free-form"));
 

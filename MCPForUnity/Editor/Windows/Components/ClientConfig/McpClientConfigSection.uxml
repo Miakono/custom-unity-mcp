@@ -7,13 +7,18 @@
                 <ui:Label text="Client:" class="setting-label" />
                 <ui:DropdownField name="client-dropdown" class="setting-dropdown-inline" />
             </ui:VisualElement>
-            <ui:VisualElement class="setting-row">
-                <ui:VisualElement class="status-container">
-                    <ui:VisualElement name="client-status-indicator" class="status-dot" />
-                    <ui:Label name="client-status" text="Not Configured" class="status-text" />
+            <ui:VisualElement class="setting-row action-status-row">
+                <ui:Label text="Status:" class="setting-label" />
+                <ui:VisualElement class="row-main">
+                    <ui:VisualElement class="status-inline">
+                        <ui:VisualElement name="client-status-indicator" class="status-dot" />
+                        <ui:Label name="client-status" text="Not Configured" class="status-text" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="action-group">
+                        <ui:Button name="configure-button" text="Configure" class="action-button strong-button" />
+                        <ui:Button name="install-skills-button" text="Install Skills" class="action-button" style="display: none;" />
+                    </ui:VisualElement>
                 </ui:VisualElement>
-                <ui:Button name="configure-button" text="Configure" class="action-button" />
-                <ui:Button name="install-skills-button" text="Install Skills" class="action-button" style="display: none;" />
             </ui:VisualElement>
             <ui:VisualElement class="setting-row" name="claude-cli-path-row" style="display: none;">
                 <ui:Label text="Claude CLI Path:" class="setting-label-small" />
@@ -43,7 +48,9 @@
                     <ui:Label name="installation-steps" class="installation-steps" />
                 </ui:VisualElement>
             </ui:Foldout>
-            <ui:Button name="configure-all-button" text="Configure All Detected Clients" class="secondary-button" style="width: auto; padding-left: 12px; padding-right: 12px;" />
+            <ui:VisualElement class="section-footer-row">
+                <ui:Button name="configure-all-button" text="Configure All Detected Clients" class="secondary-button footer-button" />
+            </ui:VisualElement>
         </ui:VisualElement>
     </ui:VisualElement>
 </ui:UXML>

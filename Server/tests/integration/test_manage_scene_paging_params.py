@@ -42,3 +42,55 @@ async def test_manage_scene_get_hierarchy_paging_params_pass_through(monkeypatch
     assert p["includeTransform"] in (True, "true")
 
 
+@pytest.mark.asyncio
+async def test_manage_scene_get_build_settings_action(monkeypatch):
+    captured = {}
+
+    async def fake_send(cmd, params, **kwargs):
+        captured["cmd"] = cmd
+        captured["params"] = params
+        return {"success": True, "data": {"scenes": []}}
+
+    monkeypatch.setattr(
+        manage_scene_mod,
+        "async_send_command_with_retry",
+        fake_send,
+    )
+
+    resp = await manage_scene_mod.manage_scene(
+        ctx=DummyContext(),
+        action="get_build_settings",
+    )
+
+    assert resp.get("success") is True
+    assert captured["cmd"] == "manage_scene"
+    assert captured["params"]["action"] == "get_build_settings"
+
+
+@pytest.mark.asyncio
+async def test_manage_scene_scene_view_frame_params(monkeypatch):
+    captured = {}
+
+    async def fake_send(cmd, params, **kwargs):
+        captured["cmd"] = cmd
+        captured["params"] = params
+        return {"success": True, "message": "SceneView framed"}
+
+    monkeypatch.setattr(
+        manage_scene_mod,
+        "async_send_command_with_retry",
+        fake_send,
+    )
+
+    resp = await manage_scene_mod.manage_scene(
+        ctx=DummyContext(),
+        action="scene_view_frame",
+        scene_view_target="Player",
+    )
+
+    assert resp.get("success") is True
+    assert captured["cmd"] == "manage_scene"
+    assert captured["params"]["action"] == "scene_view_frame"
+    assert captured["params"]["sceneViewTarget"] == "Player"
+
+

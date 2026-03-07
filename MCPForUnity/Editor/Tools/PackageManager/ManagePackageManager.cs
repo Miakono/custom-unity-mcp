@@ -36,7 +36,7 @@ namespace MCPForUnity.Editor.Tools.PackageManager
         /// <summary>
         /// Main entry point for the manage_package_manager tool.
         /// </summary>
-        public static object HandleCommand(JObject @params)
+        public static async Task<object> HandleCommand(JObject @params)
         {
             if (@params == null)
             {
@@ -69,8 +69,8 @@ namespace MCPForUnity.Editor.Tools.PackageManager
             string searchQuery = p.Get("searchQuery");
             string sourceFilter = p.Get("sourceFilter", "all");
             string gitRef = p.Get("gitRef");
-            int pageSize = p.GetInt("pageSize", 20);
-            int page = p.GetInt("page", 1);
+            int pageSize = p.GetInt("pageSize", 20) ?? 20;
+            int page = p.GetInt("page", 1) ?? 1;
             bool includePrerelease = p.GetBool("includePrerelease", false);
             
             // Route to the appropriate handler
@@ -79,32 +79,25 @@ namespace MCPForUnity.Editor.Tools.PackageManager
                 switch (action)
                 {
                     case "list_installed":
-                        // Async operation
-                        return ExecuteAsync(() => PackageList.GetInstalledPackagesAsync(sourceFilter));
+                        return await PackageList.GetInstalledPackagesAsync(sourceFilter);
                         
                     case "search_packages":
-                        // Async operation
-                        return ExecuteAsync(() => PackageList.SearchPackagesAsync(searchQuery, pageSize, page, includePrerelease));
+                        return await PackageList.SearchPackagesAsync(searchQuery, pageSize, page, includePrerelease);
                         
                     case "get_package_info":
-                        // Async operation
-                        return ExecuteAsync(() => PackageList.GetPackageInfoAsync(packageName));
+                        return await PackageList.GetPackageInfoAsync(packageName);
                         
                     case "list_registries":
-                        // Sync operation
                         return PackageList.ListRegistries();
                         
                     case "add_package":
-                        // Async operation - mutating
-                        return ExecuteAsync(() => PackageOperations.AddPackageAsync(packageName, version, gitRef));
+                        return await PackageOperations.AddPackageAsync(packageName, version, gitRef);
                         
                     case "remove_package":
-                        // Async operation - mutating
-                        return ExecuteAsync(() => PackageOperations.RemovePackageAsync(packageName));
+                        return await PackageOperations.RemovePackageAsync(packageName);
                         
                     case "resolve_dependencies":
-                        // Async operation - mutating
-                        return ExecuteAsync(() => PackageOperations.ResolveDependenciesAsync());
+                        return await PackageOperations.ResolveDependenciesAsync();
                         
                     default:
                         // This should not happen due to earlier validation
@@ -115,28 +108,6 @@ namespace MCPForUnity.Editor.Tools.PackageManager
             {
                 McpLog.Error($"[ManagePackageManager] Error executing action '{action}': {e.Message}");
                 return new ErrorResponse($"Error executing action '{action}': {e.Message}");
-            }
-        }
-        
-        /// <summary>
-        /// Executes an async function and returns the result in a way compatible with the command registry.
-        /// For synchronous handlers returning async operations, we need to handle the Task appropriately.
-        /// </summary>
-        private static object ExecuteAsync(Func<Task<object>> asyncFunc)
-        {
-            try
-            {
-                // Start the async operation
-                var task = asyncFunc();
-                
-                // Since this is called from a synchronous context, we need to handle the async operation
-                // The CommandRegistry will handle Task<object> return types properly
-                return task;
-            }
-            catch (Exception e)
-            {
-                McpLog.Error($"[ManagePackageManager] Error in async execution: {e.Message}");
-                return new ErrorResponse($"Async execution error: {e.Message}");
             }
         }
     }

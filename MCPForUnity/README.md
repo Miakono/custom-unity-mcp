@@ -5,6 +5,7 @@ Use this guide to configure and run MCP for Unity inside the Unity Editor. Insta
 ## Git install
 - This package can be installed from Git with a Unity Package Manager dependency that points at `?path=/MCPForUnity`.
 - When installed from Git, the Unity plugin derives the Python server source from the same Git repo automatically.
+- Current package id: `com.customgamedev.unity-mcp`
 - Example:
 ```json
 {

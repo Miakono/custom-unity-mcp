@@ -1,6 +1,7 @@
 """
 MCP Resources package - Auto-discovers and registers all resources in this directory.
 """
+import functools
 import inspect
 import json
 import logging
@@ -33,6 +34,15 @@ def _serialize_resource_result(result):
     if hasattr(result, "model_dump"):
         result = result.model_dump()
     return json.dumps(result, indent=2, sort_keys=True, default=str)
+
+
+def _build_resource_adapter(func):
+    @functools.wraps(func)
+    async def _resource_adapter(*args, **kwargs):
+        return _serialize_resource_result(await func(*args, **kwargs))
+
+    _resource_adapter.__signature__ = inspect.signature(func)
+    return _resource_adapter
 
 
 def register_all_resources(mcp: FastMCP, *, project_scoped_tools: bool = True):
@@ -72,9 +82,7 @@ def register_all_resources(mcp: FastMCP, *, project_scoped_tools: bool = True):
         has_query_params = '{?' in uri
 
         if has_query_params:
-            async def _template_adapter(*args, _func=func, **inner_kwargs):
-                return _serialize_resource_result(await _func(*args, **inner_kwargs))
-
+            _template_adapter = _build_resource_adapter(func)
             wrapped_template = log_execution(resource_name, "Resource")(_template_adapter)
             wrapped_template = telemetry_resource(
                 resource_name)(wrapped_template)
@@ -89,9 +97,7 @@ def register_all_resources(mcp: FastMCP, *, project_scoped_tools: bool = True):
             registered_count += 1
             resource_info['func'] = wrapped_template
         else:
-            async def _resource_adapter(*args, _func=func, **inner_kwargs):
-                return _serialize_resource_result(await _func(*args, **inner_kwargs))
-
+            _resource_adapter = _build_resource_adapter(func)
             wrapped = log_execution(resource_name, "Resource")(_resource_adapter)
             wrapped = telemetry_resource(resource_name)(wrapped)
             wrapped = mcp.resource(

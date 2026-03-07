@@ -135,6 +135,25 @@ namespace MCPForUnity.Editor.Tools
             int? buildIndex = cmd.buildIndex;
             // bool loadAdditive = @params["loadAdditive"]?.ToObject<bool>() ?? false; // Example for future extension
 
+            string explicitScenePath = null;
+            if (!string.IsNullOrEmpty(path))
+            {
+                string normalizedPath = AssetPathUtility.NormalizeSeparators(path).Trim();
+                if (normalizedPath.EndsWith(".unity", StringComparison.OrdinalIgnoreCase))
+                {
+                    explicitScenePath = AssetPathUtility.SanitizeAssetPath(normalizedPath);
+                    if (string.IsNullOrEmpty(explicitScenePath))
+                    {
+                        return new ErrorResponse($"Invalid scene path '{path}'.");
+                    }
+
+                    if (string.IsNullOrEmpty(name))
+                    {
+                        name = Path.GetFileNameWithoutExtension(explicitScenePath);
+                    }
+                }
+            }
+
             // Ensure path is relative to Assets/, removing any leading "Assets/"
             string relativeDir = path ?? string.Empty;
             if (!string.IsNullOrEmpty(relativeDir))
@@ -143,6 +162,14 @@ namespace MCPForUnity.Editor.Tools
                 if (relativeDir.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase))
                 {
                     relativeDir = relativeDir.Substring("Assets/".Length).TrimStart('/');
+                }
+                if (!string.IsNullOrEmpty(explicitScenePath))
+                {
+                    relativeDir = Path.GetDirectoryName(explicitScenePath)?.Replace('\\', '/') ?? string.Empty;
+                    if (relativeDir.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase))
+                    {
+                        relativeDir = relativeDir.Substring("Assets/".Length).TrimStart('/');
+                    }
                 }
             }
 
@@ -157,16 +184,22 @@ namespace MCPForUnity.Editor.Tools
                 return new ErrorResponse("Action parameter is required.");
             }
 
-            string sceneFileName = string.IsNullOrEmpty(name) ? null : $"{name}.unity";
+            string sceneFileName = !string.IsNullOrEmpty(explicitScenePath)
+                ? Path.GetFileName(explicitScenePath)
+                : (string.IsNullOrEmpty(name) ? null : $"{name}.unity");
             // Construct full system path correctly: ProjectRoot/Assets/relativeDir/sceneFileName
             string fullPathDir = Path.Combine(Application.dataPath, relativeDir); // Combine with Assets path (Application.dataPath ends in Assets)
             string fullPath = string.IsNullOrEmpty(sceneFileName)
                 ? null
-                : Path.Combine(fullPathDir, sceneFileName);
+                : (!string.IsNullOrEmpty(explicitScenePath)
+                    ? Path.Combine(Application.dataPath, explicitScenePath.Substring("Assets/".Length))
+                    : Path.Combine(fullPathDir, sceneFileName));
             // Ensure relativePath always starts with "Assets/" and uses forward slashes
             string relativePath = string.IsNullOrEmpty(sceneFileName)
                 ? null
-                : AssetPathUtility.NormalizeSeparators(Path.Combine("Assets", relativeDir, sceneFileName));
+                : (!string.IsNullOrEmpty(explicitScenePath)
+                    ? explicitScenePath
+                    : AssetPathUtility.NormalizeSeparators(Path.Combine("Assets", relativeDir, sceneFileName)));
 
             // Ensure directory exists for 'create'
             if (action == "create" && !string.IsNullOrEmpty(fullPathDir))
@@ -222,9 +255,31 @@ namespace MCPForUnity.Editor.Tools
                     return CaptureScreenshot(cmd);
                 case "scene_view_frame":
                     return FrameSceneView(cmd);
+                case "list_opened":
+                    return ListOpenedScenes();
+                case "set_active":
+                    if (!string.IsNullOrEmpty(relativePath))
+                        return SetActiveScene(relativePath);
+                    else if (buildIndex.HasValue)
+                        return SetActiveScene(buildIndex.Value);
+                    else
+                        return new ErrorResponse(
+                            "Either 'name'/'path' or 'buildIndex' must be provided for 'set_active' action."
+                        );
+                case "unload":
+                    if (!string.IsNullOrEmpty(relativePath))
+                        return UnloadScene(relativePath);
+                    else if (buildIndex.HasValue)
+                        return UnloadSceneByBuildIndex(buildIndex.Value);
+                    else if (!string.IsNullOrEmpty(name))
+                        return UnloadSceneByName(name);
+                    else
+                        return new ErrorResponse(
+                            "Either 'name', 'path', or 'buildIndex' must be provided for 'unload' action."
+                        );
                 default:
                     return new ErrorResponse(
-                        $"Unknown action: '{action}'. Valid actions: create, load, save, get_hierarchy, get_active, get_build_settings, screenshot, scene_view_frame."
+                        $"Unknown action: '{action}'. Valid actions: create, load, save, get_hierarchy, get_active, get_build_settings, screenshot, scene_view_frame, list_opened, set_active, unload."
                     );
             }
         }
@@ -481,7 +536,7 @@ namespace MCPForUnity.Editor.Tools
                         targetCamera = Camera.main;
                         if (targetCamera == null)
                         {
-                            var allCams = UnityEngine.Object.FindObjectsOfType<Camera>();
+                            var allCams = UnityObjectCompatibility.FindObjectsByType<Camera>();
                             targetCamera = allCams.Length > 0 ? allCams[0] : null;
                         }
                     }
@@ -518,7 +573,7 @@ namespace MCPForUnity.Editor.Tools
 
                 // Default path: use ScreenCapture API if available, camera fallback otherwise
                 bool screenCaptureAvailable = ScreenshotUtility.IsScreenCaptureModuleAvailable;
-                bool hasCameraFallback = Camera.main != null || UnityEngine.Object.FindObjectsOfType<Camera>().Length > 0;
+                bool hasCameraFallback = Camera.main != null || UnityObjectCompatibility.FindObjectsByType<Camera>().Length > 0;
 
 #if UNITY_2022_1_OR_NEWER
                 if (!screenCaptureAvailable && !hasCameraFallback)
@@ -613,7 +668,7 @@ namespace MCPForUnity.Editor.Tools
                     // Default: calculate combined bounds of all renderers in the scene
                     Bounds bounds = new Bounds(Vector3.zero, Vector3.zero);
                     bool hasBounds = false;
-                    var renderers = UnityEngine.Object.FindObjectsOfType<Renderer>();
+                    var renderers = UnityObjectCompatibility.FindObjectsByType<Renderer>();
                     foreach (var r in renderers)
                     {
                         if (r == null || !r.gameObject.activeInHierarchy) continue;
@@ -750,7 +805,7 @@ namespace MCPForUnity.Editor.Tools
                     // Default: calculate combined bounds of all renderers in the scene
                     Bounds bounds = new Bounds(Vector3.zero, Vector3.zero);
                     bool hasBounds = false;
-                    var renderers = UnityEngine.Object.FindObjectsOfType<Renderer>();
+                    var renderers = UnityObjectCompatibility.FindObjectsByType<Renderer>();
                     foreach (var r in renderers)
                     {
                         if (r == null || !r.gameObject.activeInHierarchy) continue;
@@ -963,13 +1018,13 @@ namespace MCPForUnity.Editor.Tools
             // Try instance ID
             if (int.TryParse(cameraRef, out int id))
             {
-                var obj = EditorUtility.InstanceIDToObject(id);
+                var obj = UnityEditorObjectLookup.FindObjectByInstanceId(id);
                 if (obj is Camera cam) return cam;
                 if (obj is GameObject go) return go.GetComponent<Camera>();
             }
 
             // Search all cameras by name or path
-            var allCams = UnityEngine.Object.FindObjectsOfType<Camera>();
+            var allCams = UnityObjectCompatibility.FindObjectsByType<Camera>();
             foreach (var cam in allCams)
             {
                 if (cam.name == cameraRef) return cam;
@@ -1044,7 +1099,7 @@ namespace MCPForUnity.Editor.Tools
                     // Frame entire scene by computing combined bounds of all renderers
                     Bounds allBounds = new Bounds(Vector3.zero, Vector3.zero);
                     bool hasAny = false;
-                    foreach (var r in UnityEngine.Object.FindObjectsOfType<Renderer>())
+                    foreach (var r in UnityObjectCompatibility.FindObjectsByType<Renderer>())
                     {
                         if (r == null || !r.gameObject.activeInHierarchy) continue;
                         if (!hasAny) { allBounds = r.bounds; hasAny = true; }
@@ -1335,7 +1390,7 @@ namespace MCPForUnity.Editor.Tools
                 {
                     if (int.TryParse(targetToken.ToString(), out int id))
                     {
-                        var obj = EditorUtility.InstanceIDToObject(id);
+                        var obj = UnityEditorObjectLookup.FindObjectByInstanceId(id);
                         if (obj is GameObject go) return go;
                         if (obj is Component c) return c.gameObject;
                     }
@@ -1458,6 +1513,226 @@ namespace MCPForUnity.Editor.Tools
             catch
             {
                 return go.name;
+            }
+        }
+
+        private static object ListOpenedScenes()
+        {
+            try
+            {
+                var scenes = new List<object>();
+                for (int i = 0; i < SceneManager.sceneCount; i++)
+                {
+                    var scene = SceneManager.GetSceneAt(i);
+                    if (scene.IsValid())
+                    {
+                        scenes.Add(new
+                        {
+                            name = scene.name,
+                            path = scene.path,
+                            buildIndex = scene.buildIndex,
+                            isLoaded = scene.isLoaded,
+                            isDirty = scene.isDirty,
+                            rootCount = scene.rootCount,
+                            isActive = scene == SceneManager.GetActiveScene()
+                        });
+                    }
+                }
+
+                return new SuccessResponse(
+                    $"Retrieved {scenes.Count} opened scenes.",
+                    new
+                    {
+                        count = scenes.Count,
+                        scenes = scenes,
+                        activeScene = SceneManager.GetActiveScene().name
+                    }
+                );
+            }
+            catch (Exception e)
+            {
+                return new ErrorResponse($"Error listing opened scenes: {e.Message}");
+            }
+        }
+
+        private static object SetActiveScene(string relativePath)
+        {
+            try
+            {
+                var scene = SceneManager.GetSceneByPath(relativePath);
+                if (!scene.IsValid())
+                {
+                    return new ErrorResponse($"Scene not found at path: {relativePath}");
+                }
+
+                if (!scene.isLoaded)
+                {
+                    return new ErrorResponse($"Scene is not loaded: {relativePath}. Load it first.");
+                }
+
+                bool success = SceneManager.SetActiveScene(scene);
+                if (success)
+                {
+                    return new SuccessResponse(
+                        $"Set active scene to '{scene.name}'.",
+                        new
+                        {
+                            name = scene.name,
+                            path = scene.path,
+                            buildIndex = scene.buildIndex
+                        }
+                    );
+                }
+                else
+                {
+                    return new ErrorResponse($"Failed to set active scene to: {relativePath}");
+                }
+            }
+            catch (Exception e)
+            {
+                return new ErrorResponse($"Error setting active scene: {e.Message}");
+            }
+        }
+
+        private static object SetActiveScene(int buildIndex)
+        {
+            try
+            {
+                var scene = SceneManager.GetSceneByBuildIndex(buildIndex);
+                if (!scene.IsValid())
+                {
+                    return new ErrorResponse($"Scene not found at build index: {buildIndex}");
+                }
+
+                if (!scene.isLoaded)
+                {
+                    return new ErrorResponse($"Scene is not loaded at build index: {buildIndex}. Load it first.");
+                }
+
+                bool success = SceneManager.SetActiveScene(scene);
+                if (success)
+                {
+                    return new SuccessResponse(
+                        $"Set active scene to '{scene.name}' (build index {buildIndex}).",
+                        new
+                        {
+                            name = scene.name,
+                            path = scene.path,
+                            buildIndex = buildIndex
+                        }
+                    );
+                }
+                else
+                {
+                    return new ErrorResponse($"Failed to set active scene at build index: {buildIndex}");
+                }
+            }
+            catch (Exception e)
+            {
+                return new ErrorResponse($"Error setting active scene: {e.Message}");
+            }
+        }
+
+        private static object UnloadScene(string relativePath)
+        {
+            try
+            {
+                var scene = SceneManager.GetSceneByPath(relativePath);
+                if (!scene.IsValid())
+                {
+                    return new ErrorResponse($"Scene not found at path: {relativePath}");
+                }
+
+                var unloadOp = SceneManager.UnloadSceneAsync(scene);
+                if (unloadOp != null)
+                {
+                    return new SuccessResponse(
+                        $"Started unloading scene '{scene.name}'.",
+                        new
+                        {
+                            name = scene.name,
+                            path = scene.path,
+                            isDone = unloadOp.isDone
+                        }
+                    );
+                }
+                else
+                {
+                    return new ErrorResponse($"Failed to start unloading scene: {relativePath}");
+                }
+            }
+            catch (Exception e)
+            {
+                return new ErrorResponse($"Error unloading scene: {e.Message}");
+            }
+        }
+
+        private static object UnloadSceneByBuildIndex(int buildIndex)
+        {
+            try
+            {
+                var scene = SceneManager.GetSceneByBuildIndex(buildIndex);
+                if (!scene.IsValid())
+                {
+                    return new ErrorResponse($"Scene not found at build index: {buildIndex}");
+                }
+
+                var unloadOp = SceneManager.UnloadSceneAsync(scene);
+                if (unloadOp != null)
+                {
+                    return new SuccessResponse(
+                        $"Started unloading scene '{scene.name}' (build index {buildIndex}).",
+                        new
+                        {
+                            name = scene.name,
+                            path = scene.path,
+                            buildIndex = buildIndex,
+                            isDone = unloadOp.isDone
+                        }
+                    );
+                }
+                else
+                {
+                    return new ErrorResponse($"Failed to start unloading scene at build index: {buildIndex}");
+                }
+            }
+            catch (Exception e)
+            {
+                return new ErrorResponse($"Error unloading scene: {e.Message}");
+            }
+        }
+
+        private static object UnloadSceneByName(string name)
+        {
+            try
+            {
+                var scene = SceneManager.GetSceneByName(name);
+                if (!scene.IsValid())
+                {
+                    return new ErrorResponse($"Scene not found with name: {name}");
+                }
+
+                var unloadOp = SceneManager.UnloadSceneAsync(scene);
+                if (unloadOp != null)
+                {
+                    return new SuccessResponse(
+                        $"Started unloading scene '{name}'.",
+                        new
+                        {
+                            name = scene.name,
+                            path = scene.path,
+                            isDone = unloadOp.isDone
+                        }
+                    );
+                }
+                else
+                {
+                    return new ErrorResponse($"Failed to start unloading scene: {name}");
+                }
+            }
+            catch (Exception e)
+            {
+                return new ErrorResponse($"Error unloading scene: {e.Message}");
             }
         }
 

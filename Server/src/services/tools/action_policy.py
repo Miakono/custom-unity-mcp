@@ -35,6 +35,27 @@ class ToolActionPolicy:
 
 
 _READ_ONLY_ACTIONS: dict[str, set[str]] = {
+    "manage_build_settings": {
+        "get_build_settings",
+        "get_scenes_in_build",
+    },
+    "manage_define_symbols": {
+        "get_define_symbols",
+        "get_symbols",
+    },
+    "manage_import_pipeline": {
+        "get_import_queue_status",
+        "get_queue",
+        "get_importer_settings",
+    },
+    "manage_player_settings": {
+        "get_player_settings",
+        "get_settings",
+        "get_resolution_settings",
+        "get_splash_settings",
+        "get_icon_settings",
+        "get_publishing_settings",
+    },
     "manage_addressables": {
         "analyze",
         "get_groups",
@@ -43,8 +64,9 @@ _READ_ONLY_ACTIONS: dict[str, set[str]] = {
         "validate",
         "get_settings",
     },
-    "manage_catalog": {"list"},
-    "manage_error_catalog": {"list"},
+    "manage_catalog": {"list", "get_tool", "query"},
+    "manage_checkpoints": {"list", "inspect", "verify"},
+    "manage_error_catalog": {"list", "get_code", "get_for_surface"},
     "manage_animation": {
         "animator_get_info",
         "animator_get_parameter",
@@ -60,17 +82,68 @@ _READ_ONLY_ACTIONS: dict[str, set[str]] = {
         "get_package_info",
         "list_registries",
     },
+    "manage_input_system": {
+        "actionmap_get_all",
+        "actionmap_get",
+        "action_get_all",
+        "action_get",
+        "binding_get_all",
+        "scheme_get_all",
+        "asset_get_all",
+        "asset_get_info",
+        "state_get_action_value",
+        "state_get_all_actions",
+        "state_is_action_pressed",
+        "state_get_control_value",
+    },
+    "manage_profiler": {
+        "get_status",
+        "get_snapshot",
+        "get_memory",
+        "get_cpu",
+        "get_rendering",
+        "get_audio",
+    },
     "manage_prefabs": {"get_info", "get_hierarchy"},
+    "manage_selection": {"get_selection"},
+    "manage_windows": {"list_windows", "get_active_tool"},
+    "ping": {"ping"},
+    "get_command_stats": {"get_stats"},
     "manage_scene": {
         "get_hierarchy",
         "get_active",
         "get_build_settings",
         "screenshot",
         "scene_view_frame",
+        "list_opened",
     },
     "manage_script": {"read"},
     "manage_subagents": {"list"},
+    "manage_code_intelligence": {
+        "search_code",
+        "find_symbol",
+        "find_references",
+        "get_symbols",
+        "get_index_status",
+    },
+    "manage_reflection": {
+        "discover_methods",
+        "discover_properties",
+        "discover_fields",
+        "get_type_info",
+        "get_property",
+        "get_field",
+        "find_objects",
+        "get_capability_status",
+    },
+    "manage_runtime_ui": {
+        "find_elements",
+        "get_element_state",
+        "wait_for_element",
+        "get_screenshot",
+    },
     "manage_shader": {"read"},
+    "manage_video_capture": {"get_status"},
     "manage_tools": {"list_groups"},
     "manage_ui": {"ping", "read", "get_visual_tree", "list"},
     "manage_vfx": {
@@ -83,26 +156,51 @@ _READ_ONLY_ACTIONS: dict[str, set[str]] = {
         "trail_get_info",
     },
     "read_console": {"get"},
+    # V3 Premium Tools - Mixed Actions
+    "manage_transactions": {
+        "get_transaction_state",
+        "list_transactions",
+    },
+    "navigate_editor": {
+        "get_context",
+    },
 }
 
 _ALWAYS_READ_ONLY_TOOLS = {
+    "analyze_screenshot",
     "audit_prefab_integrity",
     "audit_scene_integrity",
     "debug_request_context",
     "find_gameobjects",
     "find_in_file",
+    "get_runtime_connection_info",
+    "get_runtime_status",
     "get_sha",
     "get_test_job",
+    "list_runtime_tools",
     "manage_script_capabilities",
     "preflight_audit",
     "validate_compile_health",
     "validate_script",
+    # V3 Premium Tools - Always Read-Only
+    "preview_changes",
+    "wait_for_editor_condition",
+    "diff_scene",
+    "diff_prefab",
+    "diff_asset",
+    "search_assets_advanced",
+    "asset_index_status",
+    "find_asset_references",
+    "summarize_asset",
+    "dev_trace_tools",
+    "benchmark_tool_surface",
 }
 
 _ALWAYS_MUTATING_TOOLS = {
     "apply_text_edits",
     "create_script",
     "delete_script",
+    "execute_runtime_command",
     "execute_custom_tool",
     "execute_menu_item",
     "manage_components",
@@ -112,6 +210,19 @@ _ALWAYS_MUTATING_TOOLS = {
     "refresh_unity",
     "run_tests",
     "script_apply_edits",
+    # V3 Premium Tools - Always Mutating
+    "rollback_changes",
+    "subscribe_editor_events",
+    "unsubscribe_editor_events",
+    "apply_scene_patch",
+    "apply_prefab_patch",
+    "build_asset_index",
+    "reveal_asset",
+    "focus_hierarchy",
+    "frame_scene_target",
+    "open_inspector_target",
+    "capture_unity_fixture",
+    "replay_unity_fixture",
 }
 
 # Tools that support dry-run (preview) mode
@@ -134,24 +245,51 @@ _DRY_RUN_SUPPORTED_TOOLS = {
     "manage_animation",
     "manage_scriptable_object",
     "manage_addressables",  # Supports dry_run for build operations
+    "manage_checkpoints",
     "batch_execute",
+    # V3 Premium Tools - Dry Run Support
+    "manage_transactions",
+    "preview_changes",
+    "apply_scene_patch",
+    "apply_prefab_patch",
 }
 
 # Server-only tools that don't require Unity connection
 _LOCAL_ONLY_TOOLS = {
+    "analyze_screenshot",
+    "build_code_index",
+    "code_index_status",
     "debug_request_context",
+    "find_references",
+    "find_symbol",
+    "get_symbols",
     "manage_catalog",
+    "manage_checkpoints",
+    "manage_code_intelligence",
     "manage_error_catalog",
     "manage_script_capabilities",
     "manage_subagents",
     "manage_tools",
     "preflight_audit",
+    "search_code",
     "set_active_instance",
     "validate_compile_health",
+    "ping",  # Simple connectivity check is local-only
+    "get_command_stats",  # Usage statistics is local-only
+    # V3 Premium Tools - Local Only
+    "dev_trace_tools",
+    "capture_unity_fixture",
+    "replay_unity_fixture",
+    "benchmark_tool_surface",
 }
 
 # Tools that only work in Unity play mode
 _RUNTIME_ONLY_TOOLS = {
+    "execute_runtime_command",
+    "get_runtime_connection_info",
+    "get_runtime_status",
+    "list_runtime_tools",
+    "manage_runtime_ui",
     "read_console",
 }
 
@@ -162,6 +300,13 @@ _HIGH_RISK_TOOLS = {
     "batch_execute",
     "execute_custom_tool",
     "manage_addressables",  # Build operations are high-risk
+    "manage_editor",  # quit_editor is high-risk
+    # V3 Premium Tools - High Risk
+    "rollback_changes",
+    "apply_scene_patch",
+    "apply_prefab_patch",
+    "manage_build_settings",  # Platform switching is high-risk
+    "manage_import_pipeline",  # Mass reimport is high-risk
 }
 
 

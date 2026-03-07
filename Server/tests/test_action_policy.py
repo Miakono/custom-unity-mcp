@@ -259,6 +259,36 @@ def test_get_tool_capabilities_local_tool():
     assert caps["supports_dry_run"] is False
 
 
+def test_premium_and_runtime_action_policy_classification():
+    # Catalog/error catalog query actions are read-only; export remains mutating.
+    assert action_policy.tool_action_is_mutating("manage_catalog", action="query") is False
+    assert action_policy.tool_action_is_mutating("manage_error_catalog", action="get_code") is False
+    assert action_policy.tool_action_is_mutating("manage_error_catalog", action="export") is True
+
+    # Premium mixed tools classify read-only and mutating actions correctly.
+    assert action_policy.tool_action_is_mutating("manage_input_system", action="state_get_all_actions") is False
+    assert action_policy.tool_action_is_mutating("manage_input_system", action="simulate_key_press") is True
+    assert action_policy.tool_action_is_mutating("manage_profiler", action="get_status") is False
+    assert action_policy.tool_action_is_mutating("manage_profiler", action="start") is True
+    assert action_policy.tool_action_is_mutating("manage_runtime_ui", action="find_elements") is False
+    assert action_policy.tool_action_is_mutating("manage_runtime_ui", action="click") is True
+    assert action_policy.tool_action_is_mutating("manage_video_capture", action="get_status") is False
+    assert action_policy.tool_action_is_mutating("manage_video_capture", action="start") is True
+    assert action_policy.tool_action_is_mutating("manage_reflection", action="discover_methods") is False
+    assert action_policy.tool_action_is_mutating("manage_reflection", action="invoke_method") is True
+    assert action_policy.tool_action_is_mutating("manage_checkpoints", action="list") is False
+    assert action_policy.tool_action_is_mutating("manage_checkpoints", action="restore") is True
+
+    # Local-only and runtime-only capability flags for newer surfaces.
+    assert action_policy.get_tool_action_policy("manage_code_intelligence").local_only is True
+    assert action_policy.get_tool_action_policy("manage_checkpoints").local_only is True
+    assert action_policy.get_tool_action_policy("search_code").local_only is True
+    assert action_policy.get_tool_action_policy("manage_runtime_ui").runtime_only is True
+    assert action_policy.get_tool_action_policy("get_runtime_status").runtime_only is True
+    assert action_policy.get_tool_action_policy("execute_runtime_command").runtime_only is True
+    assert action_policy.get_tool_action_policy("get_runtime_status").requires_explicit_opt_in is True
+
+
 def test_unknown_tool_defaults_to_safe_mutating():
     """Test that unknown tools default to mutating/high-risk for safety."""
     policy = action_policy.get_tool_action_policy("unknown_tool_xyz")

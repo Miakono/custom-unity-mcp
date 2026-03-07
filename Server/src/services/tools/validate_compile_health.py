@@ -107,6 +107,7 @@ def _build_recommendation(compilation: dict[str, Any], advice: dict[str, Any], d
 
 @mcp_for_unity_tool(
     name="validate_compile_health",
+    unity_target=None,
     description=(
         "Check Unity compile readiness and summarize recent compiler diagnostics "
         "from editor state and console output."

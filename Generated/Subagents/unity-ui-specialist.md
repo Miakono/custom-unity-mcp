@@ -19,6 +19,7 @@ Shared meta-tools:
 - `set_active_instance`
 
 Primary tools:
+- `manage_runtime_ui`
 - `manage_ui`
 
 Use when:

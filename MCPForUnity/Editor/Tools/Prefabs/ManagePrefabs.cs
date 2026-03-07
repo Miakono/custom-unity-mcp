@@ -22,7 +22,10 @@ namespace MCPForUnity.Editor.Tools.Prefabs
         private const string ACTION_GET_INFO = "get_info";
         private const string ACTION_GET_HIERARCHY = "get_hierarchy";
         private const string ACTION_MODIFY_CONTENTS = "modify_contents";
-        private const string SupportedActions = ACTION_CREATE_FROM_GAMEOBJECT + ", " + ACTION_GET_INFO + ", " + ACTION_GET_HIERARCHY + ", " + ACTION_MODIFY_CONTENTS;
+        private const string ACTION_OPEN_STAGE = "open_stage";
+        private const string ACTION_SAVE_OPEN_STAGE = "save_open_stage";
+        private const string ACTION_CLOSE_STAGE = "close_stage";
+        private const string SupportedActions = ACTION_CREATE_FROM_GAMEOBJECT + ", " + ACTION_GET_INFO + ", " + ACTION_GET_HIERARCHY + ", " + ACTION_MODIFY_CONTENTS + ", " + ACTION_OPEN_STAGE + ", " + ACTION_SAVE_OPEN_STAGE + ", " + ACTION_CLOSE_STAGE;
 
         public static object HandleCommand(JObject @params)
         {
@@ -49,6 +52,13 @@ namespace MCPForUnity.Editor.Tools.Prefabs
                         return GetHierarchy(@params);
                     case ACTION_MODIFY_CONTENTS:
                         return ModifyContents(@params);
+                    case ACTION_OPEN_STAGE:
+                        return OpenPrefabStage(@params);
+                    case ACTION_SAVE_OPEN_STAGE:
+                        return SaveOpenPrefabStage();
+                    case ACTION_CLOSE_STAGE:
+                        bool saveChanges = @params["saveChanges"]?.ToObject<bool?>() ?? true;
+                        return ClosePrefabStage(saveChanges);
                     default:
                         return new ErrorResponse($"Unknown action: '{action}'. Valid actions are: {SupportedActions}.");
                 }
@@ -949,6 +959,176 @@ namespace MCPForUnity.Editor.Tools.Prefabs
 
             McpLog.Info($"[ManagePrefabs] Created child '{childName}' under '{parentTransform.name}' in prefab.");
             return (true, null);
+        }
+
+        #endregion
+
+        #region Prefab Stage Management
+
+        /// <summary>
+        /// Opens a prefab in isolation mode (Prefab Stage).
+        /// </summary>
+        private static object OpenPrefabStage(JObject @params)
+        {
+            string prefabPath = @params["prefabPath"]?.ToString() ?? @params["path"]?.ToString();
+            if (string.IsNullOrEmpty(prefabPath))
+            {
+                return new ErrorResponse("'prefabPath' parameter is required for open_stage.");
+            }
+
+            string sanitizedPath = AssetPathUtility.SanitizeAssetPath(prefabPath);
+            if (string.IsNullOrEmpty(sanitizedPath))
+            {
+                return new ErrorResponse($"Invalid prefab path '{prefabPath}'.");
+            }
+
+            GameObject prefabAsset = AssetDatabase.LoadAssetAtPath<GameObject>(sanitizedPath);
+            if (prefabAsset == null)
+            {
+                return new ErrorResponse($"No prefab asset found at path '{sanitizedPath}'.");
+            }
+
+            try
+            {
+                // Check if already in prefab stage
+                var currentStage = PrefabStageUtility.GetCurrentPrefabStage();
+                if (currentStage != null && currentStage.assetPath == sanitizedPath)
+                {
+                    return new SuccessResponse(
+                        $"Already editing prefab '{sanitizedPath}' in isolation mode.",
+                        new
+                        {
+                            prefabPath = sanitizedPath,
+                            prefabName = prefabAsset.name,
+                            isAlreadyOpen = true
+                        }
+                    );
+                }
+
+                // Open the prefab stage
+                var stage = PrefabStageUtility.OpenPrefab(sanitizedPath);
+                if (stage != null)
+                {
+                    return new SuccessResponse(
+                        $"Opened prefab '{sanitizedPath}' in isolation mode.",
+                        new
+                        {
+                            prefabPath = sanitizedPath,
+                            prefabName = prefabAsset.name,
+                            prefabRootInstanceId = stage.prefabContentsRoot != null
+                                ? stage.prefabContentsRoot.GetInstanceID()
+                                : 0
+                        }
+                    );
+                }
+                else
+                {
+                    return new ErrorResponse($"Failed to open prefab stage for '{sanitizedPath}'.");
+                }
+            }
+            catch (Exception e)
+            {
+                return new ErrorResponse($"Error opening prefab stage: {e.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Saves the currently open prefab stage.
+        /// </summary>
+        private static object SaveOpenPrefabStage()
+        {
+            var stage = PrefabStageUtility.GetCurrentPrefabStage();
+            if (stage == null)
+            {
+                return new ErrorResponse("No prefab is currently open in isolation mode.");
+            }
+
+            try
+            {
+                // Get the prefab contents root
+                GameObject prefabRoot = stage.prefabContentsRoot;
+                if (prefabRoot == null)
+                {
+                    return new ErrorResponse("Cannot access prefab contents.");
+                }
+
+                // Save the prefab
+                bool success;
+                PrefabUtility.SaveAsPrefabAsset(prefabRoot, stage.assetPath, out success);
+
+                if (success)
+                {
+                    AssetDatabase.Refresh();
+                    return new SuccessResponse(
+                        $"Saved prefab '{stage.assetPath}'.",
+                        new
+                        {
+                            prefabPath = stage.assetPath,
+                            prefabName = Path.GetFileNameWithoutExtension(stage.assetPath)
+                        }
+                    );
+                }
+                else
+                {
+                    return new ErrorResponse($"Failed to save prefab '{stage.assetPath}'.");
+                }
+            }
+            catch (Exception e)
+            {
+                return new ErrorResponse($"Error saving prefab stage: {e.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Closes the currently open prefab stage.
+        /// </summary>
+        private static object ClosePrefabStage(bool saveChanges)
+        {
+            var stage = PrefabStageUtility.GetCurrentPrefabStage();
+            if (stage == null)
+            {
+                return new SuccessResponse("No prefab stage is currently open.");
+            }
+
+            string prefabPath = stage.assetPath;
+            string prefabName = Path.GetFileNameWithoutExtension(prefabPath);
+
+            try
+            {
+                if (saveChanges)
+                {
+                    // Save before closing
+                    GameObject prefabRoot = stage.prefabContentsRoot;
+                    if (prefabRoot != null)
+                    {
+                        bool success;
+                        PrefabUtility.SaveAsPrefabAsset(prefabRoot, prefabPath, out success);
+                        if (!success)
+                        {
+                            return new ErrorResponse($"Failed to save prefab '{prefabPath}' before closing.");
+                        }
+                        AssetDatabase.Refresh();
+                    }
+                }
+
+                // Close the stage by going back to the main stage
+                StageUtility.GoBackToPreviousStage();
+
+                string action = saveChanges ? "saved and closed" : "closed (discarding changes)";
+                return new SuccessResponse(
+                    $"Prefab '{prefabName}' {action}.",
+                    new
+                    {
+                        prefabPath = prefabPath,
+                        prefabName = prefabName,
+                        changesSaved = saveChanges
+                    }
+                );
+            }
+            catch (Exception e)
+            {
+                return new ErrorResponse($"Error closing prefab stage: {e.Message}");
+            }
         }
 
         #endregion

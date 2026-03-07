@@ -46,12 +46,14 @@ class TestCapabilityFlags:
 
     def test_is_runtime_only_tool(self):
         assert is_runtime_only_tool("read_console") is True
+        assert is_runtime_only_tool("get_runtime_status") is True
         assert is_runtime_only_tool("manage_scene") is False
         assert is_runtime_only_tool(None) is False
 
     def test_supports_verification(self):
         assert supports_verification("manage_script") is True
         assert supports_verification("apply_text_edits") is True
+        assert supports_verification("manage_checkpoints") is True
         assert supports_verification("debug_request_context") is False
         assert supports_verification(None) is False
 
@@ -180,10 +182,12 @@ class TestToolSets:
     def test_local_only_tools_is_set(self):
         assert "debug_request_context" in LOCAL_ONLY_TOOLS
         assert "manage_catalog" in LOCAL_ONLY_TOOLS
+        assert "manage_checkpoints" in LOCAL_ONLY_TOOLS
         assert "manage_tools" in LOCAL_ONLY_TOOLS
 
     def test_runtime_only_tools_is_set(self):
         assert "read_console" in RUNTIME_ONLY_TOOLS
+        assert "get_runtime_status" in RUNTIME_ONLY_TOOLS
 
     def test_high_risk_tools_is_set(self):
         assert "delete_script" in HIGH_RISK_TOOLS

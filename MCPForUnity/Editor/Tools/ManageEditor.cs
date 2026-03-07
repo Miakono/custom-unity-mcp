@@ -134,9 +134,12 @@ namespace MCPForUnity.Editor.Tools
                 //     // Handle string name or int index
                 //     return SetQualityLevel(@params["qualityLevel"]);
 
+                case "quit_editor":
+                    return QuitEditor(p.GetBool("confirmQuit", false));
+
                 default:
                     return new ErrorResponse(
-                        $"Unknown action: '{action}'. Supported actions: play, pause, stop, set_active_tool, add_tag, remove_tag, add_layer, remove_layer. Use MCP resources for reading editor state, project info, tags, layers, selection, windows, prefab stage, and active tool."
+                        $"Unknown action: '{action}'. Supported actions: play, pause, stop, set_active_tool, add_tag, remove_tag, add_layer, remove_layer, quit_editor. Use MCP resources for reading editor state, project info, tags, layers, selection, windows, prefab stage, and active tool."
                     );
             }
         }
@@ -389,5 +392,25 @@ namespace MCPForUnity.Editor.Tools
         private static object SetGameViewResolution(int width, int height) { ... }
         private static object SetQualityLevel(JToken qualityLevelToken) { ... }
         */
+
+        private static object QuitEditor(bool confirmQuit)
+        {
+            if (!confirmQuit)
+            {
+                return new ErrorResponse(
+                    "quit_editor requires confirmQuit=true. This is a safety measure to prevent accidental editor closure."
+                );
+            }
+
+            try
+            {
+                EditorApplication.Exit(0);
+                return new SuccessResponse("Unity Editor is shutting down...");
+            }
+            catch (Exception e)
+            {
+                return new ErrorResponse($"Error quitting editor: {e.Message}");
+            }
+        }
     }
 }

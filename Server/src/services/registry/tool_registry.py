@@ -22,15 +22,28 @@ _tool_registry: list[dict[str, Any]] = []
 # Valid group names. ``None`` is also accepted (always-visible meta-tools).
 TOOL_GROUPS: dict[str, str] = {
     "core": "Essential scene, script, asset & editor tools (always on by default)",
+    "profiling": "Unity Profiler capture, analysis, and performance diagnostics",
+    "spatial": "Transform operations and spatial queries – advanced scene construction",
     "vfx": "Visual effects – VFX Graph, shaders, procedural textures",
     "animation": "Animator control & AnimationClip creation",
     "ui": "UI Toolkit (UXML, USS, UIDocument)",
     "scripting_ext": "ScriptableObject management",
     "testing": "Test runner & async test jobs",
     "input": "Unity Input System - Action Maps, Actions, Bindings, and Runtime Simulation",
+    "project_config": "Project and Asset Intelligence – settings, registries, dependencies, built-in assets",
+    "visual_qa": "Visual verification and screenshot analysis – AI-powered image validation",
+    "pipeline": "Pipeline recording, replay, and playbook automation tools",
+    # V3 Tool Groups
+    "transactions": "Transaction management with rollback and preview capabilities",
+    "events": "Editor event subscription and condition waiting",
+    "diff_patch": "Scene and prefab diff/patch operations",
+    "asset_intelligence": "Advanced asset search, indexing, and analysis",
+    "navigation": "Editor navigation and focus tools",
+    "pipeline_control": "Build settings, player settings, and import pipeline control",
+    "dev_tools": "Internal development and debugging tools",
 }
 
-DEFAULT_ENABLED_GROUPS: set[str] = {"core"}
+DEFAULT_ENABLED_GROUPS: set[str] = set(TOOL_GROUPS.keys())
 
 
 def mcp_for_unity_tool(

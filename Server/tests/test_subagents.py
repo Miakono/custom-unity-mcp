@@ -3,7 +3,7 @@ import json
 import pytest
 
 import services.subagents as subagents_module
-from services.registry import mcp_for_unity_tool
+from services.registry import TOOL_GROUPS, mcp_for_unity_tool
 import services.registry.tool_registry as tool_registry_module
 from services.subagents import build_subagent_catalog, export_subagent_artifacts
 
@@ -55,9 +55,10 @@ def test_build_subagent_catalog_includes_orchestrator_and_specialists():
     _register_minimal_toolset()
 
     catalog = build_subagent_catalog()
+    expected_subagent_count = 1 + len(TOOL_GROUPS)
 
     assert catalog["generated_from"] == "live_tool_registry"
-    assert catalog["subagent_count"] == 7
+    assert catalog["subagent_count"] == expected_subagent_count
 
     orchestrator = next(item for item in catalog["subagents"] if item["id"] == "unity-orchestrator")
     assert "_manage_tools" in orchestrator["shared_meta_tools"]
@@ -77,9 +78,11 @@ def test_export_subagent_artifacts_writes_catalog_and_markdown(tmp_path):
     _register_minimal_toolset()
 
     result = export_subagent_artifacts(tmp_path)
+    expected_subagent_count = 1 + len(TOOL_GROUPS)
+    expected_written_files = expected_subagent_count + 2  # catalog + README + one markdown per subagent
 
-    assert result["subagent_count"] == 7
-    assert len(result["written_files"]) == 9
+    assert result["subagent_count"] == expected_subagent_count
+    assert len(result["written_files"]) == expected_written_files
 
     catalog_path = tmp_path / "subagents.json"
     readme_path = tmp_path / "README.md"
@@ -90,7 +93,7 @@ def test_export_subagent_artifacts_writes_catalog_and_markdown(tmp_path):
     assert orchestrator_path.exists()
 
     catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
-    assert catalog["subagent_count"] == 7
+    assert catalog["subagent_count"] == expected_subagent_count
     assert "Unity Orchestrator" in orchestrator_path.read_text(encoding="utf-8")
     assert "Unity MCP Subagents" in readme_path.read_text(encoding="utf-8")
 

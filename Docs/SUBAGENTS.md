@@ -1,5 +1,13 @@
 # Subagents
 
+Status note:
+
+This is the current usage reference for the generated subagent/catalog surface.
+
+Use this file to understand how to consume live subagent and catalog artifacts.
+Use `../Generated/Subagents/` and `../Generated/Catalog/` for the generated release artifacts themselves.
+Use `Archive/SUBAGENT_V2_IMPLEMENTATION_PLAN.md` only as historical rollout planning context.
+
 The server now exposes a generated subagent catalog derived from the live tool registry.
 
 What is included:

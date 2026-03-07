@@ -2,6 +2,10 @@
 
 Date: 2026-03-05
 
+Status note: historical planning record.
+For the current repo-grounded remediation plan, see `../GAP_CLOSURE_PLAN.md`.
+For the latest validated implementation snapshot, see `../HANDOFF_2026-03-06.md`.
+
 ## Purpose
 - Define the next implementation phases after the safety/policy foundation.
 - Focus on premium-value features that materially expand capability instead of adding more low-level CRUD tools.
@@ -25,18 +29,12 @@ Date: 2026-03-05
   - tests
 
 ## Strategic Gaps
-The highest-value missing categories relative to more premium toolsets are:
-- local code intelligence
-- addressables
-- input system
-- profiler/performance diagnostics
-- video capture
-- runtime UI automation
-- package/project settings management
-- package manager tooling
-- generated skill/catalog artifacts from the live registry
-- gated reflection/object introspection
-- runtime/in-game MCP as a separate longer-term track
+The highest-value remaining gaps are now:
+- deeper test depth for premium/runtime tool families (beyond baseline coverage)
+- checkpoint/restore workflows for multi-step high-risk operations
+- stronger post-mutation verification and job-progress primitives across long-running operations
+- runtime/in-game MCP maturity and isolation hardening
+- ongoing documentation/metadata drift control as new tools are added
 
 ## Planning Principles
 - New feature families must route through the same policy/capability layer as existing tools.
@@ -48,7 +46,7 @@ The highest-value missing categories relative to more premium toolsets are:
 ## Delivery Order
 
 ### Phase 1: Capability Metadata and Error Contracts
-Status: Planned
+Status: Complete
 
 #### Scope
 - Finish machine-readable capability metadata per tool/action:
@@ -74,8 +72,12 @@ Status: Planned
 - Error codes are stable and documented.
 - A generated tool catalog and skill/catalog artifacts can be produced from the registry.
 
+#### Implementation Notes
+- Completed via centralized action policy coverage, generated catalog/subagent/error artifacts, and synced registry exports.
+- Metadata now includes local-only/runtime-only/high-risk/read-only signals for premium tool families.
+
 ### Phase 2: Local Code Intelligence
-Status: Planned
+Status: Complete
 
 #### Scope
 - Add server-local code tools that do not require a live Unity editor:
@@ -98,8 +100,12 @@ Status: Planned
 - Index build/update is incremental.
 - Tool metadata exposes local/read-only capability.
 
+#### Implementation Notes
+- Implemented via `manage_code_intelligence` plus helper tools (`search_code`, `find_symbol`, `find_references`, `get_symbols`, `build_code_index`, `code_index_status`).
+- Local-only classification now routes through the centralized policy metadata and generated catalog.
+
 ### Phase 3: Package and Project Management
-Status: Planned
+Status: Complete
 
 #### Scope
 - Add `manage_package_manager` with actions for:
@@ -115,8 +121,12 @@ Status: Planned
 - Package list/search/inspect flows work reliably.
 - Add/remove operations are gated, classified as mutating, and return normalized results.
 
+#### Implementation Notes
+- `manage_package_manager` implemented with read-only and mutating action split.
+- Package operations are preflight-gated for mutating actions and covered by targeted tests.
+
 ### Phase 4: Addressables
-Status: Planned
+Status: Complete
 
 #### Scope
 - Add `manage_addressables` with scoped actions for:
@@ -133,8 +143,12 @@ Status: Planned
 - Wide-scope changes support `dry_run`.
 - Failures return stable codes and actionable hints.
 
+#### Implementation Notes
+- `manage_addressables` is implemented with explicit read-only/build/mutating action families.
+- `dry_run` is surfaced for build-style operations and reflected in capability metadata.
+
 ### Phase 5: Input System
-Status: Planned
+Status: Complete
 
 #### Scope
 - Add `manage_input_system` for:
@@ -150,8 +164,12 @@ Status: Planned
 - Input assets can be inspected and updated safely.
 - Runtime simulation actions are marked as higher-risk/runtime-dependent.
 
+#### Implementation Notes
+- `manage_input_system` implemented across action maps/actions/bindings/schemes/assets/simulation/state.
+- Runtime-sensitive simulation/state actions are represented in policy and generated metadata.
+
 ### Phase 6: Profiler and Diagnostics
-Status: Planned
+Status: Complete
 
 #### Scope
 - Add `manage_profiler` for:
@@ -170,8 +188,12 @@ Status: Planned
 - Profiler status and snapshot calls work reliably.
 - Long-running diagnostics expose progress and normalized result payloads.
 
+#### Implementation Notes
+- `manage_profiler` and `record_profiler_session` are implemented.
+- `get_diagnostics` is available for aggregated operational status.
+
 ### Phase 7: Visual QA and Runtime UI Automation
-Status: Planned
+Status: Complete
 
 #### Scope
 - Extend capture tooling with video start/status/stop.
@@ -187,8 +209,12 @@ Status: Planned
 - Runtime UI flows can be queried and driven for QA tasks.
 - Runtime-only actions are clearly classified and guarded.
 
+#### Implementation Notes
+- Implemented via `manage_video_capture` and `manage_runtime_ui`.
+- Runtime-only/tool-risk metadata is now generated from centralized policy state.
+
 ### Phase 8: Reflection and Object Introspection
-Status: Planned
+Status: Complete
 
 #### Scope
 - Add a gated reflection/object-inspection family for:
@@ -209,8 +235,12 @@ Status: Planned
 - Invocation/mutation paths cannot be used unless opt-in is enabled.
 - Error responses clearly state why access is blocked when the feature is disabled.
 
+#### Implementation Notes
+- Implemented via `manage_reflection` with explicit capability checks and action-level controls.
+- High-risk reflection operations are differentiated from read-only discovery paths.
+
 ### Phase 9: Runtime/In-Game MCP
-Status: Planned
+Status: Complete
 
 #### Scope
 - Design and implement a separate runtime MCP track for play mode / built game support.
@@ -224,6 +254,13 @@ Status: Planned
 #### Acceptance
 - Runtime tools are isolated, classifiable, and discoverable.
 - The runtime track does not weaken editor-side safety assumptions.
+
+#### Implementation Notes
+- Runtime bridge foundations are present (`get_runtime_status`, `list_runtime_tools`, `execute_runtime_command`, `get_runtime_connection_info`).
+- Runtime MCP now requires explicit opt-in via server configuration (`runtime_mcp_enabled`).
+- Runtime bridge and runtime UI automation tools now fail closed with explicit guidance when runtime MCP is disabled.
+- Runtime-only capability metadata is aligned with centralized policy and capability flag registries.
+- Runtime gating and routing behavior now has dedicated integration test coverage.
 
 ## Cross-Cutting Work
 
@@ -249,10 +286,23 @@ Status: Planned
   - prefab/scene object exists
   - compile completed successfully
 
+Status: Complete
+
+Implementation Notes:
+- Added server-local `manage_checkpoints` with `create`, `list`, `inspect`, `verify`, `restore`, and `delete` actions.
+- Checkpoint verification now reports changed/missing/unchanged paths using file-hash comparisons.
+- Restore and delete support `dry_run` preview mode for safer rollback workflows.
+
 ### Long-Running Job UX
 - Normalize long operations into job-based patterns.
 - Expose progress/status polling.
 - Ensure retries do not duplicate already-started work.
+
+Status: Complete
+
+Implementation Notes:
+- Async test jobs (`run_tests` + `get_test_job`) remain the canonical job contract with progress/status payloads.
+- Runtime command execution continues to support async behavior (`wait_for_completion=false`) with job-style response handling.
 
 ### Tool Catalog Discipline
 - Generate a current tool catalog from the live registry.
@@ -260,15 +310,11 @@ Status: Planned
 - Add generated skill/catalog artifacts for tool families and high-level workflows.
 
 ## Recommended Execution Sequence
-1. Finish capability metadata, generated catalog/skills, and response/error contracts.
-2. Implement local code intelligence.
-3. Implement package manager and project/package inspection.
-4. Implement addressables.
-5. Implement input system.
-6. Implement profiler/diagnostics.
-7. Implement visual QA and runtime UI automation.
-8. Design and then implement gated reflection/object introspection.
-9. Design and then implement runtime/in-game MCP.
+1. Deepen E2E and resilience tests for premium/runtime families (especially runtime bridge flows). (Complete)
+2. Implement checkpoint/restore primitives for high-risk multi-step workflows. (Complete)
+3. Expand post-mutation verification hooks and long-running job progress normalization. (Complete)
+4. Continue runtime/in-game MCP isolation and safety hardening. (Complete)
+5. Enforce generated-artifact sync checks in CI to prevent drift. (Next)
 
 ## Non-Goals
 - Rewriting the server as a Rust CLI.

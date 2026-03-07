@@ -8,6 +8,7 @@ using Newtonsoft.Json.Linq;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.LowLevel;
+using UnityInputSystem = UnityEngine.InputSystem.InputSystem;
 
 namespace MCPForUnity.Editor.Tools.InputSystem
 {
@@ -42,7 +43,7 @@ namespace MCPForUnity.Editor.Tools.InputSystem
             {
                 if (device != null && device.added)
                 {
-                    InputSystem.RemoveDevice(device);
+                    UnityInputSystem.RemoveDevice(device);
                 }
             }
             _simulatedDevices.Clear();
@@ -75,12 +76,12 @@ namespace MCPForUnity.Editor.Tools.InputSystem
 
                 // Press and release the key
                 var keyboard = GetOrCreateKeyboard();
-                InputSystem.QueueStateEvent(keyboard, new KeyboardState(key));
+                UnityInputSystem.QueueStateEvent(keyboard, new KeyboardState(key));
                 
                 // Schedule release
                 if (duration > 0)
                 {
-                    keyboard.ScheduleStateChange(key, false, TimeSpan.FromSeconds(duration));
+                    UnityInputSystem.QueueStateEvent(keyboard, new KeyboardState(), Time.time + (float)duration);
                 }
 
                 return new SuccessResponse($"Simulated key press: {keyName}", new { key = keyName, duration });
@@ -111,7 +112,7 @@ namespace MCPForUnity.Editor.Tools.InputSystem
                 }
 
                 var keyboard = GetOrCreateKeyboard();
-                InputSystem.QueueStateEvent(keyboard, new KeyboardState(key));
+                UnityInputSystem.QueueStateEvent(keyboard, new KeyboardState(key));
 
                 return new SuccessResponse($"Holding key: {keyName}", new { key = keyName, action = "hold" });
             }
@@ -141,7 +142,7 @@ namespace MCPForUnity.Editor.Tools.InputSystem
                 }
 
                 var keyboard = GetOrCreateKeyboard();
-                keyboard.ScheduleStateChange(key, false, TimeSpan.Zero);
+                UnityInputSystem.QueueStateEvent(keyboard, new KeyboardState());
 
                 return new SuccessResponse($"Released key: {keyName}", new { key = keyName, action = "release" });
             }
@@ -171,9 +172,11 @@ namespace MCPForUnity.Editor.Tools.InputSystem
                     var control = ParseGamepadButton(button);
                     
                     // Simulate button press
-                    var state = new GamepadState();
-                    state.Press(control);
-                    InputSystem.QueueStateEvent(gamepad, state);
+                    var state = new GamepadState
+                    {
+                        buttons = (uint)(1 << (int)control)
+                    };
+                    UnityInputSystem.QueueStateEvent(gamepad, state);
 
                     return new SuccessResponse($"Simulated {button} press on {deviceType}", 
                         new { button, device = deviceType, duration });
@@ -184,7 +187,9 @@ namespace MCPForUnity.Editor.Tools.InputSystem
                     var buttonControl = ParseMouseButton(button);
                     
                     // Press mouse button
-                    InputSystem.QueueStateEvent(mouse, new MouseState { buttons = (uint)(1 << (int)buttonControl) });
+                    var mouseState = new MouseState();
+                    mouseState.WithButton(buttonControl, true);
+                    UnityInputSystem.QueueStateEvent(mouse, mouseState);
 
                     return new SuccessResponse($"Simulated {button} press on {deviceType}",
                         new { button, device = deviceType, duration });
@@ -223,11 +228,11 @@ namespace MCPForUnity.Editor.Tools.InputSystem
                 {
                     case "lefttrigger":
                     case "left_trigger":
-                        InputSystem.QueueStateEvent(gamepad, new GamepadState { leftTrigger = value });
+                        UnityInputSystem.QueueStateEvent(gamepad, new GamepadState { leftTrigger = value });
                         break;
                     case "righttrigger":
                     case "right_trigger":
-                        InputSystem.QueueStateEvent(gamepad, new GamepadState { rightTrigger = value });
+                        UnityInputSystem.QueueStateEvent(gamepad, new GamepadState { rightTrigger = value });
                         break;
                     default:
                         return new ErrorResponse($"Unknown axis: {axisName}");
@@ -267,13 +272,18 @@ namespace MCPForUnity.Editor.Tools.InputSystem
                         state.rightStick = vector;
                         break;
                     case "dpad":
-                        state.Set(GamepadState.DpadControlIndexFromVector(vector));
+                        uint buttons = 0;
+                        if (vector.y > 0.5f) buttons |= 1u << (int)GamepadButton.DpadUp;
+                        if (vector.x > 0.5f) buttons |= 1u << (int)GamepadButton.DpadRight;
+                        if (vector.y < -0.5f) buttons |= 1u << (int)GamepadButton.DpadDown;
+                        if (vector.x < -0.5f) buttons |= 1u << (int)GamepadButton.DpadLeft;
+                        state.buttons = buttons;
                         break;
                     default:
                         return new ErrorResponse($"Unknown Vector2 control: {controlName}");
                 }
 
-                InputSystem.QueueStateEvent(gamepad, state);
+                UnityInputSystem.QueueStateEvent(gamepad, state);
 
                 return new SuccessResponse($"Simulated {controlName} = ({x}, {y})", 
                     new { control = controlName, x, y });
@@ -311,7 +321,7 @@ namespace MCPForUnity.Editor.Tools.InputSystem
                     state.position = new Vector2(positionX.Value, positionY.Value);
                 }
 
-                InputSystem.QueueStateEvent(mouse, state);
+                UnityInputSystem.QueueStateEvent(mouse, state);
 
                 return new SuccessResponse($"Simulated mouse move: delta=({deltaX}, {deltaY})",
                     new { deltaX, deltaY, positionX, positionY });
@@ -340,10 +350,12 @@ namespace MCPForUnity.Editor.Tools.InputSystem
                 var mouse = GetOrCreateMouse();
 
                 // Press
-                InputSystem.QueueStateEvent(mouse, new MouseState { buttons = (uint)(1 << buttonIndex) });
+                var pressState = new MouseState();
+                pressState.WithButton((MouseButton)buttonIndex, true);
+                UnityInputSystem.QueueStateEvent(mouse, pressState);
                 
                 // Release after short delay
-                InputSystem.QueueStateEvent(mouse, new MouseState { buttons = 0 }, Time.time + 0.1f);
+                UnityInputSystem.QueueStateEvent(mouse, new MouseState(), Time.time + 0.1f);
 
                 return new SuccessResponse($"Simulated {button} mouse click", new { button });
             }
@@ -388,10 +400,15 @@ namespace MCPForUnity.Editor.Tools.InputSystem
                 if (touchPhase == UnityEngine.InputSystem.TouchPhase.Began)
                 {
                     // Schedule release
-                    touchscreen.ScheduleValueChange(
-                        touchscreen.touches[touchId].phase,
-                        UnityEngine.InputSystem.TouchPhase.Ended,
-                        TimeSpan.FromMilliseconds(100));
+                    var endState = new TouchState
+                    {
+                        touchId = touchId,
+                        position = new Vector2(x, y),
+                        phase = UnityEngine.InputSystem.TouchPhase.Ended,
+                        pressure = pressure,
+                        tapCount = 1
+                    };
+                    UnityInputSystem.QueueStateEvent(touchscreen, endState, Time.time + 0.1f);
                 }
 
                 return new SuccessResponse($"Simulated touch {touchId} at ({x}, {y}) phase={phase}",
@@ -415,7 +432,7 @@ namespace MCPForUnity.Editor.Tools.InputSystem
                 tapCount = 1
             };
 
-            InputSystem.QueueStateEvent(touchscreen, state);
+            UnityInputSystem.QueueStateEvent(touchscreen, state);
         }
 
         #endregion
@@ -431,7 +448,7 @@ namespace MCPForUnity.Editor.Tools.InputSystem
                 return (Keyboard)device;
             }
 
-            var keyboard = InputSystem.AddDevice<Keyboard>();
+            var keyboard = UnityInputSystem.AddDevice<Keyboard>();
             _simulatedDevices[deviceKey] = keyboard;
             return keyboard;
         }
@@ -445,7 +462,7 @@ namespace MCPForUnity.Editor.Tools.InputSystem
                 return (Mouse)device;
             }
 
-            var mouse = InputSystem.AddDevice<Mouse>();
+            var mouse = UnityInputSystem.AddDevice<Mouse>();
             _simulatedDevices[deviceKey] = mouse;
             return mouse;
         }
@@ -459,7 +476,7 @@ namespace MCPForUnity.Editor.Tools.InputSystem
                 return (Gamepad)device;
             }
 
-            var gamepad = InputSystem.AddDevice<Gamepad>();
+            var gamepad = UnityInputSystem.AddDevice<Gamepad>();
             _simulatedDevices[deviceKey] = gamepad;
             return gamepad;
         }
@@ -473,7 +490,7 @@ namespace MCPForUnity.Editor.Tools.InputSystem
                 return (Touchscreen)device;
             }
 
-            var touchscreen = InputSystem.AddDevice<Touchscreen>();
+            var touchscreen = UnityInputSystem.AddDevice<Touchscreen>();
             _simulatedDevices[deviceKey] = touchscreen;
             return touchscreen;
         }

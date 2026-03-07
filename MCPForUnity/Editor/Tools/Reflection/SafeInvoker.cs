@@ -293,7 +293,7 @@ namespace MCPForUnity.Editor.Tools.Reflection
                         {
                             args[i] = CoerceParameter(value, param.ParameterType);
                         }
-                        catch (Exception ex)
+                        catch (Exception)
                         {
                             allMatch = false;
                             break;

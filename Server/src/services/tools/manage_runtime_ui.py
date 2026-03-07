@@ -16,6 +16,7 @@ from mcp.types import ToolAnnotations
 from services.registry import mcp_for_unity_tool
 from services.tools import get_unity_instance_from_context
 from services.tools.action_policy import maybe_run_tool_preflight, tool_action_is_mutating
+from services.tools.runtime_guard import get_runtime_opt_in_gate
 from services.tools.refresh_unity import send_mutation
 from transport.unity_transport import send_with_unity_instance
 from transport.legacy.unity_connection import async_send_command_with_retry
@@ -23,6 +24,7 @@ from transport.legacy.unity_connection import async_send_command_with_retry
 
 @mcp_for_unity_tool(
     group="ui",
+    unity_target=None,
     description=(
         "Runtime UI automation for Play mode - interact with uGUI and UI Toolkit elements. "
         "WARNING: Only works during Play mode. High-risk tool that simulates user input. "
@@ -107,6 +109,10 @@ async def manage_runtime_ui(
     """
     Automate runtime UI interactions in Play mode.
     """
+    gate = get_runtime_opt_in_gate("manage_runtime_ui")
+    if gate is not None:
+        return gate
+
     action_lower = action.lower()
     uses_mutation_transport = tool_action_is_mutating("manage_runtime_ui", action=action_lower)
 

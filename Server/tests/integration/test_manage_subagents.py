@@ -1,6 +1,6 @@
 import pytest
 
-from services.registry import mcp_for_unity_tool
+from services.registry import TOOL_GROUPS, mcp_for_unity_tool
 import services.registry.tool_registry as tool_registry_module
 from services.resources.subagents import get_subagent_catalog
 from services.tools.manage_subagents import manage_subagents
@@ -38,7 +38,7 @@ async def test_manage_subagents_list_returns_catalog():
 
     result = await manage_subagents(ctx, action="list")
 
-    assert result["subagent_count"] == 7
+    assert result["subagent_count"] == 1 + len(TOOL_GROUPS)
     assert any(item["id"] == "unity-orchestrator" for item in result["subagents"])
 
 
@@ -49,5 +49,22 @@ async def test_subagent_catalog_resource_returns_catalog():
 
     result = await get_subagent_catalog(ctx)
 
-    assert result["group_count"] == 6
+    assert result["group_count"] == len(TOOL_GROUPS)
     assert result["subagents"][0]["id"] == "unity-orchestrator"
+
+
+@pytest.mark.asyncio
+async def test_manage_subagents_export_writes_artifacts(tmp_path):
+    _register_minimal_toolset()
+    ctx = DummyContext()
+
+    result = await manage_subagents(
+        ctx,
+        action="export",
+        output_dir=str(tmp_path),
+        format="json",
+    )
+
+    assert result["exported"] is True
+    assert result["subagent_count"] == 1 + len(TOOL_GROUPS)
+    assert any(path.endswith("subagents.json") for path in result["written_files"])

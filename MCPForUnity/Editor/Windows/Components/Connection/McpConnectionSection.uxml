@@ -27,20 +27,32 @@
                     <ui:Button name="clear-api-key-button" text="Clear" class="action-button" />
                 </ui:VisualElement>
             </ui:VisualElement>
-            <ui:VisualElement class="setting-row" name="http-server-control-row">
+            <ui:VisualElement class="setting-row action-status-row" name="http-server-control-row">
                 <ui:Label text="Local Server:" class="setting-label" />
-                <ui:Button name="start-http-server-button" text="Start Server" class="action-button start-server-button" />
+                <ui:VisualElement class="row-main">
+                    <ui:VisualElement class="status-inline">
+                        <ui:VisualElement name="status-indicator" class="status-dot" />
+                        <ui:Label name="connection-status" text="Disconnected" class="status-text" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="action-group">
+                        <ui:Button name="start-http-server-button" text="Start Server" class="action-button start-server-button strong-button" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
             </ui:VisualElement>
             <ui:VisualElement class="setting-row" name="unity-socket-port-row">
                 <ui:Label text="Unity Socket Port:" class="setting-label" />
                 <ui:TextField name="unity-port" class="port-field" />
             </ui:VisualElement>
-            <ui:VisualElement class="setting-row">
-                <ui:VisualElement class="status-container">
-                    <ui:VisualElement name="status-indicator" class="status-dot" />
-                    <ui:Label name="connection-status" text="Disconnected" class="status-text" />
+            <ui:VisualElement class="setting-row action-status-row">
+                <ui:Label text="Session:" class="setting-label" />
+                <ui:VisualElement class="row-main">
+                    <ui:VisualElement class="status-inline">
+                        <ui:Label text="Bridge Control" class="status-caption" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="action-group">
+                        <ui:Button name="connection-toggle" text="Start" class="action-button" />
+                    </ui:VisualElement>
                 </ui:VisualElement>
-                <ui:Button name="connection-toggle" text="Start" class="action-button" />
             </ui:VisualElement>
             <ui:Foldout name="manual-command-foldout" text="Manual Server Launch" value="false" class="manual-config-foldout">
                 <ui:VisualElement name="http-server-command-section" class="manual-config-content">

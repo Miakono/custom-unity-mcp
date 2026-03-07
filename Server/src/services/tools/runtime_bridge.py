@@ -14,6 +14,7 @@ from mcp.types import ToolAnnotations
 
 from services.registry import mcp_for_unity_tool
 from services.tools import get_unity_instance_from_context
+from services.tools.runtime_guard import get_runtime_opt_in_gate
 from transport.unity_transport import send_with_unity_instance
 from transport.legacy.unity_connection import async_send_command_with_retry
 from services.tools.utils import coerce_bool, parse_json_payload
@@ -28,6 +29,7 @@ RUNTIME_CAPABILITY_FLAGS = {
 
 
 @mcp_for_unity_tool(
+    unity_target=None,
     description=(
         "Check if Runtime MCP is available and get runtime status. "
         "Returns connection state, active scene, play mode status, and available runtime tools. "
@@ -47,6 +49,10 @@ async def get_runtime_status(
     ] | None = True,
 ) -> dict[str, Any]:
     """Check if Runtime MCP is available and return status information."""
+    gate = get_runtime_opt_in_gate("get_runtime_status")
+    if gate is not None:
+        return gate
+
     unity_instance = await get_unity_instance_from_context(ctx)
     include_capabilities = coerce_bool(include_capabilities, default=True)
 
@@ -85,6 +91,7 @@ async def get_runtime_status(
 
 
 @mcp_for_unity_tool(
+    unity_target=None,
     description=(
         "List tools available in runtime context. "
         "Returns runtime-only tools that can be executed in Play Mode or Built Games. "
@@ -108,6 +115,10 @@ async def list_runtime_tools(
     ] | None = True,
 ) -> dict[str, Any]:
     """List tools available in runtime context."""
+    gate = get_runtime_opt_in_gate("list_runtime_tools")
+    if gate is not None:
+        return gate
+
     unity_instance = await get_unity_instance_from_context(ctx)
     include_metadata = coerce_bool(include_metadata, default=True)
 
@@ -147,6 +158,7 @@ async def list_runtime_tools(
 
 
 @mcp_for_unity_tool(
+    unity_target=None,
     description=(
         "Execute a command in runtime context (Play Mode or Built Game). "
         "Commands are routed to the Runtime MCP Bridge in the active Unity instance. "
@@ -184,6 +196,10 @@ async def execute_runtime_command(
     This routes commands to the Runtime MCP Bridge which operates in Play Mode
     or Built Games, separate from the Editor-only tool set.
     """
+    gate = get_runtime_opt_in_gate("execute_runtime_command")
+    if gate is not None:
+        return gate
+
     unity_instance = await get_unity_instance_from_context(ctx)
 
     # Parse parameters if provided as string
@@ -250,6 +266,7 @@ async def execute_runtime_command(
 
 
 @mcp_for_unity_tool(
+    unity_target=None,
     description=(
         "Get runtime connection details including WebSocket endpoint and port. "
         "Runtime uses a separate connection from Editor MCP. "
@@ -265,6 +282,10 @@ async def get_runtime_connection_info(
     ctx: Context,
 ) -> dict[str, Any]:
     """Get runtime connection details including WebSocket endpoint."""
+    gate = get_runtime_opt_in_gate("get_runtime_connection_info")
+    if gate is not None:
+        return gate
+
     unity_instance = await get_unity_instance_from_context(ctx)
 
     try:

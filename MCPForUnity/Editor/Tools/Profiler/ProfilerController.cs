@@ -2,12 +2,14 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using MCPForUnity.Editor.Helpers;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Unity.Profiling;
 using UnityEditor;
 using UnityEngine;
+using UnityEngineProfiler = UnityEngine.Profiling.Profiler;
 
 namespace MCPForUnity.Editor.Tools.Profiler
 {
@@ -21,6 +23,7 @@ namespace MCPForUnity.Editor.Tools.Profiler
         private static ProfilerDataCollector _collector;
         private static bool _isRecording;
         private static List<ProfilerCategory> _enabledCategories = new List<ProfilerCategory>();
+        private static readonly IReadOnlyDictionary<string, ProfilerCategory> SupportedCategoryMap = BuildSupportedCategoryMap();
         
         // Default capture directory
         private static string CaptureDirectory => ProfilerDataCollector.GetDefaultCaptureDirectory();
@@ -96,7 +99,7 @@ namespace MCPForUnity.Editor.Tools.Profiler
         {
             try
             {
-                int intervalFrames = p.GetInt("intervalFrames", 10);
+                int intervalFrames = p.GetInt("intervalFrames", 10) ?? 10;
                 bool deepProfiling = p.GetBool("deepProfiling", false);
 
                 // Initialize collector if needed
@@ -106,10 +109,10 @@ namespace MCPForUnity.Editor.Tools.Profiler
                 }
 
                 // Enable deep profiling if requested
-                if (deepProfiling && !Profiler.enabled)
+                if (deepProfiling && !UnityEngineProfiler.enabled)
                 {
-                    Profiler.enabled = true;
-                    Profiler.deepProfiling = true;
+                    UnityEngineProfiler.enabled = true;
+                    SetDeepProfilingEnabled(true);
                 }
 
                 // Start collection
@@ -146,9 +149,9 @@ namespace MCPForUnity.Editor.Tools.Profiler
                 EditorApplication.update -= OnEditorUpdate;
 
                 // Disable deep profiling if it was enabled
-                if (Profiler.deepProfiling)
+                if (IsDeepProfilingEnabled())
                 {
-                    Profiler.deepProfiling = false;
+                    SetDeepProfilingEnabled(false);
                 }
 
                 return new SuccessResponse("Profiling session stopped.", new
@@ -168,6 +171,70 @@ namespace MCPForUnity.Editor.Tools.Profiler
             _collector?.Update();
         }
 
+        private static bool IsDeepProfilingEnabled()
+        {
+            return TryGetDeepProfilingProperty(out bool value) ? value : false;
+        }
+
+        private static void SetDeepProfilingEnabled(bool enabled)
+        {
+            if (!TrySetDeepProfilingProperty(enabled))
+            {
+                McpLog.Warn("[ProfilerController] Deep profiling is not available in this Unity editor version.");
+            }
+        }
+
+        private static bool TryGetDeepProfilingProperty(out bool value)
+        {
+            value = false;
+
+            var property = GetDeepProfilingProperty();
+            if (property == null || !property.CanRead)
+            {
+                return false;
+            }
+
+            try
+            {
+                value = (bool)property.GetValue(null);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static bool TrySetDeepProfilingProperty(bool enabled)
+        {
+            var property = GetDeepProfilingProperty();
+            if (property == null || !property.CanWrite)
+            {
+                return false;
+            }
+
+            try
+            {
+                property.SetValue(null, enabled);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static PropertyInfo GetDeepProfilingProperty()
+        {
+            var profilerDriverType =
+                Type.GetType("UnityEditor.Profiling.ProfilerDriver, UnityEditor") ??
+                Type.GetType("UnityEditorInternal.ProfilerDriver, UnityEditor");
+
+            return profilerDriverType?.GetProperty(
+                "deepProfiling",
+                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
+        }
+
         #endregion
 
         #region Status and Snapshots
@@ -178,8 +245,8 @@ namespace MCPForUnity.Editor.Tools.Profiler
             {
                 isRecording = _isRecording,
                 snapshotCount = _collector?.SnapshotCount ?? 0,
-                profilerEnabled = Profiler.enabled,
-                deepProfiling = Profiler.deepProfiling,
+                profilerEnabled = UnityEngineProfiler.enabled,
+                deepProfiling = IsDeepProfilingEnabled(),
                 supportedCategories = GetSupportedCategories(),
                 enabledCategories = _enabledCategories.Select(c => c.ToString()).ToList(),
                 unityVersion = Application.unityVersion,
@@ -454,7 +521,7 @@ namespace MCPForUnity.Editor.Tools.Profiler
                 var result = new List<string>();
                 foreach (var catName in categories)
                 {
-                    if (Enum.TryParse<ProfilerCategory>(catName, true, out var category))
+                    if (TryGetProfilerCategory(catName, out var category))
                     {
                         if (enable)
                         {
@@ -491,7 +558,53 @@ namespace MCPForUnity.Editor.Tools.Profiler
 
         private static List<string> GetSupportedCategories()
         {
-            return Enum.GetNames(typeof(ProfilerCategory)).ToList();
+            return SupportedCategoryMap.Keys.OrderBy(name => name, StringComparer.OrdinalIgnoreCase).ToList();
+        }
+
+        private static bool TryGetProfilerCategory(string categoryName, out ProfilerCategory category)
+        {
+            if (!string.IsNullOrWhiteSpace(categoryName) &&
+                SupportedCategoryMap.TryGetValue(categoryName, out category))
+            {
+                return true;
+            }
+
+            category = default;
+            return false;
+        }
+
+        private static IReadOnlyDictionary<string, ProfilerCategory> BuildSupportedCategoryMap()
+        {
+            var categoryType = typeof(ProfilerCategory);
+            var categories = new Dictionary<string, ProfilerCategory>(StringComparer.OrdinalIgnoreCase);
+
+            if (categoryType.IsEnum)
+            {
+                foreach (string name in Enum.GetNames(categoryType))
+                {
+                    categories[name] = (ProfilerCategory)Enum.Parse(categoryType, name);
+                }
+
+                return categories;
+            }
+
+            foreach (var field in categoryType.GetFields(BindingFlags.Public | BindingFlags.Static))
+            {
+                if (field.FieldType == categoryType)
+                {
+                    categories[field.Name] = (ProfilerCategory)field.GetValue(null);
+                }
+            }
+
+            foreach (var property in categoryType.GetProperties(BindingFlags.Public | BindingFlags.Static))
+            {
+                if (property.PropertyType == categoryType && property.CanRead)
+                {
+                    categories[property.Name] = (ProfilerCategory)property.GetValue(null);
+                }
+            }
+
+            return categories;
         }
 
         private static List<string> GetMemoryRecommendations(MemoryData memory)

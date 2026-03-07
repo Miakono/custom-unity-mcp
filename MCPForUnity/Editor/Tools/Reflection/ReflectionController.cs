@@ -498,7 +498,7 @@ namespace MCPForUnity.Editor.Tools.Reflection
             string typeName = ParamCoercion.CoerceString(@params["targetType"], null);
             if (string.IsNullOrEmpty(typeName))
             {
-                return typeResult.ErrorValue(new ErrorResponse("'targetType' parameter is required."));
+                return TypeResult.Failure(new ErrorResponse("'targetType' parameter is required."));
             }
 
             // Try to resolve the type using UnityTypeResolver
@@ -515,7 +515,7 @@ namespace MCPForUnity.Editor.Tools.Reflection
 
             if (type == null)
             {
-                return typeResult.ErrorValue(new ErrorResponse($"Type '{typeName}' not found. Ensure the assembly is loaded and the type name is correct."));
+                return TypeResult.Failure(new ErrorResponse($"Type '{typeName}' not found. Ensure the assembly is loaded and the type name is correct."));
             }
 
             return TypeResult.Success(type);
@@ -538,7 +538,7 @@ namespace MCPForUnity.Editor.Tools.Reflection
                     return obj;
 
                 // Try as UnityEngine.Object
-                var unityObj = UnityEditor.EditorUtility.InstanceIDToObject(instanceId);
+                var unityObj = UnityEditorObjectLookup.FindObjectByInstanceId(instanceId);
                 if (unityObj != null)
                     return unityObj;
             }
@@ -552,7 +552,7 @@ namespace MCPForUnity.Editor.Tools.Reflection
                 if (obj != null)
                     return obj;
 
-                var unityObj = UnityEditor.EditorUtility.InstanceIDToObject(parsedId);
+                var unityObj = UnityEditorObjectLookup.FindObjectByInstanceId(parsedId);
                 if (unityObj != null)
                     return unityObj;
             }

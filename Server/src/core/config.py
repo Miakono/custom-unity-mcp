@@ -68,6 +68,11 @@ class ServerConfig:
     # feature that should only be enabled in trusted environments.
     reflection_enabled: bool = False
 
+    # Runtime MCP settings
+    # WARNING: Runtime MCP can interact with live game state in Play Mode.
+    # Disabled by default and must be explicitly enabled in trusted environments.
+    runtime_mcp_enabled: bool = False
+
 
 # Create a global config instance
 config = ServerConfig()

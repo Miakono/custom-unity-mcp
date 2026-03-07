@@ -38,6 +38,7 @@ dependencies = [
  "uvicorn>=0.35.0",
  "click>=8.1.0",
  "pyyaml>=6.0",
+ "Pillow>=10.0.0",
 ]
 
 [project.optional-dependencies]
@@ -90,3 +91,9 @@ show_missing = true
 
 [tool.coverage.html]
 directory = "htmlcov"
+
+[tool.pytest.ini_options]
+markers = [
+    "integration: Integration tests that test multiple components together",
+    "unit: Unit tests for individual functions or classes",
+]

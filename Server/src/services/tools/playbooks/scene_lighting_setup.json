@@ -1,0 +1,66 @@
+{
+  "metadata": {
+    "name": "scene_lighting_setup",
+    "description": "Sets up basic scene lighting with directional light and ambient lighting",
+    "version": "1.0",
+    "author": "unity-mcp",
+    "tags": ["lighting", "directional-light", "ambient", "starter"],
+    "category": "lighting"
+  },
+  "steps": [
+    {
+      "tool": "manage_gameobject",
+      "action": "create",
+      "params": {
+        "name": "Directional Light"
+      }
+    },
+    {
+      "tool": "manage_components",
+      "action": "add",
+      "params": {
+        "target": "Directional Light",
+        "components": ["Light"]
+      }
+    },
+    {
+      "tool": "manage_components",
+      "action": "set_property",
+      "params": {
+        "target": "Directional Light",
+        "component_properties": {
+          "Light": {
+            "type": "Directional",
+            "intensity": 1.0,
+            "color": [1, 0.956, 0.839, 1]
+          }
+        }
+      }
+    },
+    {
+      "tool": "manage_gameobject",
+      "action": "modify",
+      "params": {
+        "target": "Directional Light",
+        "rotation": [50, -30, 0]
+      }
+    }
+  ],
+  "parameters": {
+    "light_rotation": {
+      "description": "Directional light rotation as [x, y, z] euler angles",
+      "default": [50, -30, 0],
+      "type": "vector3"
+    },
+    "light_intensity": {
+      "description": "Directional light intensity",
+      "default": 1.0,
+      "type": "float"
+    },
+    "light_color": {
+      "description": "Directional light color as [r, g, b, a]",
+      "default": [1, 0.956, 0.839, 1],
+      "type": "color"
+    }
+  }
+}

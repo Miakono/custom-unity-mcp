@@ -18,11 +18,16 @@
 /* Section Styling */
 .section {
     margin-bottom: 14px;
-    padding: 8px;
-    background-color: rgba(0, 0, 0, 0.04);
-    border-radius: 4px;
+    padding: 14px 16px 14px 16px;
+    background-color: rgba(46, 46, 49, 0.96);
+    border-radius: 6px;
     border-width: 1px;
-    border-color: rgba(0, 0, 0, 0.15);
+    border-color: rgba(255, 255, 255, 0.08);
+}
+
+.section-hero {
+    background-color: rgba(46, 46, 49, 0.96);
+    border-color: rgba(255, 255, 255, 0.08);
 }
 
 /* Remove bottom margin from last section in a stack */
@@ -33,17 +38,16 @@
 }
 
 .section-title {
-    font-size: 13px;
+    font-size: 14px;
     -unity-font-style: bold;
-    margin-bottom: 8px;
-    padding-bottom: 6px;
-    letter-spacing: 0.3px;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
     border-bottom-width: 1px;
     border-bottom-color: rgba(255, 255, 255, 0.08);
 }
 
 .section-content {
-    padding: 4px;
+    padding: 2px 0px 0px 0px;
 }
 
 /* Setting Rows */
@@ -52,8 +56,24 @@
     flex-wrap: wrap;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 4px;
-    min-height: 24px;
+    margin-bottom: 12px;
+    min-height: 30px;
+    flex-shrink: 1;
+    min-width: 0;
+    padding: 0px;
+    background-color: transparent;
+    border-width: 0px;
+}
+
+.action-status-row {
+    margin-top: 2px;
+}
+
+.row-main {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    flex-grow: 1;
     flex-shrink: 1;
     min-width: 0;
 }
@@ -66,9 +86,11 @@
 }
 
 .setting-label {
-    min-width: 140px;
+    min-width: 124px;
     flex-shrink: 0;
     -unity-text-align: middle-left;
+    color: rgba(220, 220, 224, 0.9);
+    -unity-font-style: normal;
 }
 
 .setting-value {
@@ -90,8 +112,15 @@
 .setting-dropdown-inline {
     flex-grow: 1;
     flex-shrink: 1;
-    min-width: 150px;
-    flex-basis: 200px;
+    min-width: 180px;
+    flex-basis: 220px;
+    min-height: 28px;
+    padding-left: 6px;
+    padding-right: 6px;
+    background-color: rgba(31, 31, 33, 1);
+    border-width: 1px;
+    border-color: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
 }
 
 /* Validation Description */
@@ -106,34 +135,92 @@
 
 /* Port Fields */
 .port-field {
-    width: 100px;
+    width: 112px;
     margin-left: auto;
+    min-height: 28px;
+    background-color: rgba(31, 31, 33, 1);
+    border-width: 1px;
+    border-color: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
 }
 
 /* URL Fields */
 .url-field {
     flex-grow: 1;
     flex-shrink: 1;
-    min-width: 200px;
-    flex-basis: 250px;
+    min-width: 240px;
+    flex-basis: 300px;
+    min-height: 28px;
+    padding-left: 6px;
+    padding-right: 6px;
+    background-color: rgba(31, 31, 33, 1);
+    border-width: 1px;
+    border-color: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
 }
 
 .port-field > .unity-text-field__input {
-    background-color: rgba(0, 0, 0, 0.1);
+    background-color: transparent;
     -unity-text-align: middle-center;
+}
+
+.url-field > .unity-text-field__input,
+.path-display-field > .unity-text-field__input,
+.config-path-field > .unity-text-field__input,
+.config-json-field > .unity-text-field__input,
+.override-field > .unity-text-field__input {
+    background-color: transparent;
 }
 
 /* Status Container */
 .status-container {
     flex-direction: row;
     align-items: center;
-    flex-grow: 1;
+    flex-grow: 0;
+}
+
+.status-inline {
+    flex-direction: row;
+    align-items: center;
+    flex-shrink: 1;
+    min-width: 0;
+}
+
+.status-caption {
+    color: rgba(168, 168, 174, 0.78);
+    font-size: 11px;
+}
+
+.status-row {
+    align-items: center;
+    justify-content: space-between;
+    padding: 0px;
+    background-color: transparent;
+    border-width: 0px;
+}
+
+.status-pill {
+    min-height: 24px;
+    padding: 0px 10px;
+    background-color: rgba(255, 255, 255, 0.04);
+    border-radius: 999px;
+    border-width: 1px;
+    border-color: rgba(255, 255, 255, 0.07);
+}
+
+.status-badge {
+    min-height: 24px;
+    padding: 0px 10px;
+    background-color: rgba(255, 255, 255, 0.04);
+    border-radius: 999px;
+    border-width: 1px;
+    border-color: rgba(255, 255, 255, 0.08);
 }
 
 .status-dot {
-    width: 12px;
-    height: 12px;
-    border-radius: 6px;
+    width: 8px;
+    height: 8px;
+    border-radius: 4px;
     margin-right: 8px;
     background-color: rgba(150, 150, 150, 1);
 }
@@ -168,6 +255,15 @@
 
 .status-text {
     -unity-text-align: middle-left;
+    color: rgba(232, 232, 236, 0.96);
+    -unity-font-style: bold;
+}
+
+.action-group {
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-end;
+    flex-shrink: 0;
 }
 
 .status-indicator-small {
@@ -192,20 +288,27 @@
 
 /* Buttons */
 .action-button {
-    min-width: 80px;
+    min-width: 92px;
     height: 28px;
     margin-left: 8px;
-    background-color: rgba(50, 150, 250, 0.8);
+    background-color: rgba(59, 124, 198, 0.92);
     border-radius: 4px;
+    border-width: 1px;
+    border-color: rgba(124, 177, 238, 0.18);
     -unity-font-style: bold;
+    color: rgba(245, 248, 255, 0.98);
 }
 
 .action-button:hover {
-    background-color: rgba(50, 150, 250, 1);
+    background-color: rgba(76, 149, 232, 0.95);
 }
 
 .action-button:active {
-    background-color: rgba(30, 120, 200, 1);
+    background-color: rgba(48, 118, 196, 1);
+}
+
+.strong-button {
+    min-width: 100px;
 }
 
 /* Start Server button in the manual config section should align flush left like other full-width controls */
@@ -229,26 +332,49 @@
 .secondary-button {
     width: 100%;
     height: 28px;
-    background-color: rgba(100, 100, 100, 0.3);
+    background-color: rgba(255, 255, 255, 0.03);
     border-radius: 4px;
+    border-width: 1px;
+    border-color: rgba(255, 255, 255, 0.08);
+    color: rgba(220, 220, 224, 0.92);
 }
 
 .secondary-button:hover {
-    background-color: rgba(100, 100, 100, 0.5);
+    background-color: rgba(255, 255, 255, 0.1);
 }
 
 .secondary-button:active {
-    background-color: rgba(80, 80, 80, 0.5);
+    background-color: rgba(255, 255, 255, 0.08);
+}
+
+.prominent-secondary-button {
+    margin-top: 2px;
+}
+
+.section-footer-row {
+    flex-direction: row;
+    justify-content: flex-end;
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top-width: 1px;
+    border-top-color: rgba(255, 255, 255, 0.06);
+}
+
+.footer-button {
+    width: auto;
+    min-width: 240px;
 }
 
 /* Manual Configuration */
 .manual-config-content {
-    padding: 8px;
+    padding: 10px;
     margin-top: 8px;
-    background-color: rgba(0, 0, 0, 0.05);
+    background-color: rgba(31, 31, 33, 0.85);
     border-radius: 4px;
     flex-shrink: 1;
     min-width: 0;
+    border-width: 1px;
+    border-color: rgba(255, 255, 255, 0.05);
 }
 
 .config-label {
@@ -256,6 +382,7 @@
     -unity-font-style: bold;
     margin-top: 8px;
     margin-bottom: 4px;
+    color: rgba(215, 215, 220, 0.9);
 }
 
 .path-row {
@@ -275,7 +402,6 @@
 }
 
 .config-path-field > .unity-text-field__input {
-    background-color: rgba(0, 0, 0, 0.1);
     font-size: 11px;
     overflow: hidden;
     text-overflow: clip;
@@ -304,7 +430,6 @@
 }
 
 .config-json-field > .unity-text-field__input {
-    background-color: rgba(0, 0, 0, 0.1);
     font-size: 10px;
     -unity-font-style: normal;
     white-space: normal;
@@ -319,11 +444,13 @@
 
 .installation-steps {
     padding: 8px;
-    background-color: rgba(0, 0, 0, 0.05);
+    background-color: rgba(255, 255, 255, 0.03);
     border-radius: 4px;
     font-size: 11px;
     white-space: normal;
     margin-top: 4px;
+    border-width: 1px;
+    border-color: rgba(255, 255, 255, 0.05);
 }
 
 /* Tools Section */
@@ -427,9 +554,9 @@
 
 .manual-command-foldout > .unity-foldout__toggle {
     font-size: 11px;
-    padding: 4px;
-    background-color: rgba(0, 0, 0, 0.05);
-    border-radius: 3px;
+    padding: 6px 0px;
+    background-color: transparent;
+    border-radius: 0px;
 }
 
 .manual-command-foldout > .unity-foldout__content {
@@ -437,9 +564,9 @@
 }
 
 .advanced-settings-content {
-    padding: 8px;
+    padding: 10px;
     margin-top: 8px;
-    background-color: rgba(0, 0, 0, 0.05);
+    background-color: rgba(31, 31, 33, 0.85);
     border-radius: 4px;
     flex-shrink: 1;
     min-width: 0;
@@ -472,7 +599,7 @@
 
 .help-text {
     font-size: 10px;
-    color: rgba(120, 120, 120, 1);
+    color: rgba(172, 172, 178, 0.8);
     white-space: normal;
     flex-shrink: 1;
     min-width: 0;
@@ -501,7 +628,6 @@
 }
 
 .override-field > .unity-text-field__input {
-    background-color: rgba(0, 0, 0, 0.1);
     font-size: 11px;
     overflow: hidden;
     text-overflow: clip;
@@ -522,7 +648,6 @@
 }
 
 .path-display-field > .unity-text-field__input {
-    background-color: rgba(0, 0, 0, 0.1);
     font-size: 11px;
     overflow: hidden;
     text-overflow: clip;
@@ -534,12 +659,49 @@
 }
 
 .unity-theme-light .section {
-    background-color: rgba(0, 0, 0, 0.03);
-    border-color: rgba(0, 0, 0, 0.15);
+    background-color: rgba(248, 248, 250, 1);
+    border-color: rgba(0, 0, 0, 0.12);
+}
+
+.unity-theme-light .section-hero {
+    background-color: rgba(248, 248, 250, 1);
+    border-color: rgba(0, 0, 0, 0.12);
 }
 
 .unity-theme-light .section-title {
     border-bottom-color: rgba(0, 0, 0, 0.1);
+}
+
+.unity-theme-light .setting-row {
+    background-color: transparent;
+    border-width: 0px;
+}
+
+.unity-theme-light .setting-label {
+    color: rgba(46, 46, 50, 0.92);
+}
+
+.unity-theme-light .status-pill {
+    background-color: rgba(0, 0, 0, 0.04);
+    border-color: rgba(0, 0, 0, 0.06);
+}
+
+.unity-theme-light .status-badge {
+    background-color: rgba(0, 0, 0, 0.04);
+    border-color: rgba(0, 0, 0, 0.08);
+}
+
+.unity-theme-light .status-row {
+    background-color: transparent;
+    border-width: 0px;
+}
+
+.unity-theme-light .status-text {
+    color: rgba(42, 42, 46, 0.96);
+}
+
+.unity-theme-light .status-caption {
+    color: rgba(94, 94, 100, 0.82);
 }
 
 .unity-theme-dark .tool-tag {
@@ -600,10 +762,10 @@
     display: none;
     padding: 8px 12px;
     margin-bottom: 6px;
-    background-color: rgba(255, 180, 0, 0.2);
-    border-radius: 4px;
+    background-color: rgba(255, 180, 0, 0.16);
+    border-radius: 8px;
     border-width: 1px;
-    border-color: rgba(255, 180, 0, 0.5);
+    border-color: rgba(255, 180, 0, 0.34);
 }
 
 .warning-banner.visible {
@@ -626,5 +788,9 @@
 }
 
 .unity-theme-light .manual-command-foldout > .unity-foldout__toggle {
-    background-color: rgba(0, 0, 0, 0.03);
+    background-color: transparent;
+}
+
+.unity-theme-light .section-footer-row {
+    border-top-color: rgba(0, 0, 0, 0.08);
 }

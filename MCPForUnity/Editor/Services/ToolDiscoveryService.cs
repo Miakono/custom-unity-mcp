@@ -11,6 +11,7 @@ namespace MCPForUnity.Editor.Services
 {
     public class ToolDiscoveryService : IToolDiscoveryService
     {
+        private const int CurrentToolPreferenceSchemaVersion = 2;
         private Dictionary<string, ToolMetadata> _cachedTools;
 
 
@@ -50,8 +51,14 @@ namespace MCPForUnity.Editor.Services
                         McpLog.Warn($"Duplicate tool name '{metadata.Name}' from {type.FullName}; overwriting previous registration.");
                     }
                     _cachedTools[metadata.Name] = metadata;
-                    EnsurePreferenceInitialized(metadata);
                 }
+            }
+
+            MigrateToolPreferencesIfNeeded(_cachedTools.Values);
+
+            foreach (var metadata in _cachedTools.Values)
+            {
+                EnsurePreferenceInitialized(metadata);
             }
 
             McpLog.Info($"Discovered {_cachedTools.Count} MCP tools via reflection", false);
@@ -89,7 +96,7 @@ namespace MCPForUnity.Editor.Services
             }
 
             var metadata = GetToolMetadata(toolName);
-            return metadata?.AutoRegister ?? false;
+            return metadata?.DefaultEnabled ?? false;
         }
 
         public void SetToolEnabled(string toolName, bool enabled)
@@ -133,6 +140,7 @@ namespace MCPForUnity.Editor.Services
                     AutoRegister = toolAttr.AutoRegister,
                     RequiresPolling = toolAttr.RequiresPolling,
                     PollAction = string.IsNullOrEmpty(toolAttr.PollAction) ? "status" : toolAttr.PollAction,
+                    DefaultEnabled = true,
                     Group = toolAttr.Group ?? "core"
                 };
 
@@ -215,6 +223,32 @@ namespace MCPForUnity.Editor.Services
             _cachedTools = null;
         }
 
+        private void MigrateToolPreferencesIfNeeded(IEnumerable<ToolMetadata> tools)
+        {
+            int storedVersion = EditorPrefs.GetInt(EditorPrefKeys.ToolPreferenceSchemaVersion, 0);
+            if (storedVersion >= CurrentToolPreferenceSchemaVersion)
+            {
+                return;
+            }
+
+            int migratedCount = 0;
+            foreach (var metadata in tools)
+            {
+                if (metadata == null || string.IsNullOrEmpty(metadata.Name))
+                {
+                    continue;
+                }
+
+                EditorPrefs.SetBool(GetToolPreferenceKey(metadata.Name), metadata.DefaultEnabled);
+                migratedCount++;
+            }
+
+            EditorPrefs.SetInt(EditorPrefKeys.ToolPreferenceSchemaVersion, CurrentToolPreferenceSchemaVersion);
+            McpLog.Info(
+                $"Migrated MCP tool preferences to schema v{CurrentToolPreferenceSchemaVersion}; reset {migratedCount} tools to their new defaults.",
+                false);
+        }
+
         private void EnsurePreferenceInitialized(ToolMetadata metadata)
         {
             if (metadata == null || string.IsNullOrEmpty(metadata.Name))
@@ -225,8 +259,7 @@ namespace MCPForUnity.Editor.Services
             string key = GetToolPreferenceKey(metadata.Name);
             if (!EditorPrefs.HasKey(key))
             {
-                bool defaultValue = metadata.AutoRegister || metadata.IsBuiltIn;
-                EditorPrefs.SetBool(key, defaultValue);
+                EditorPrefs.SetBool(key, metadata.DefaultEnabled);
             }
         }
 

@@ -3,6 +3,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using MCPForUnity.Runtime.Helpers;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -45,7 +46,7 @@ namespace MCPForUnity.Runtime.UI
             }
 
             // Get all canvases
-            var canvases = FindObjectsOfType<Canvas>();
+            var canvases = UnityObjectCompatibility.FindObjectsByType<Canvas>();
             foreach (var canvas in canvases)
             {
                 if (!canvas.enabled) continue;
@@ -528,7 +529,7 @@ namespace MCPForUnity.Runtime.UI
                 return null;
 
             // Try direct name match first
-            var allTransforms = FindObjectsOfType<Transform>(true);
+            var allTransforms = UnityObjectCompatibility.FindObjectsByType<Transform>(true);
             foreach (var t in allTransforms)
             {
                 if (GetFullPath(t).Equals(path, StringComparison.OrdinalIgnoreCase))

@@ -1,5 +1,5 @@
 {
-  "domain_count": 2,
+  "domain_count": 9,
   "domains": [
     {
       "description": "Stable machine-readable codes emitted by script edit and validation flows.",
@@ -103,9 +103,48 @@
             "script_apply_edits"
           ],
           "typical_fix": "Simplify the edit request and retry after re-reading the file."
+        },
+        {
+          "code": "sha_mismatch",
+          "meaning": "The content SHA256 did not match, indicating concurrent modification.",
+          "surface": [
+            "apply_text_edits",
+            "create_script",
+            "delete_script"
+          ],
+          "typical_fix": "Re-read the file and retry the operation with the updated SHA."
+        },
+        {
+          "code": "file_not_found",
+          "meaning": "The target script file could not be found.",
+          "surface": [
+            "apply_text_edits",
+            "delete_script",
+            "validate_script"
+          ],
+          "typical_fix": "Verify the file path exists and is correctly spelled."
+        },
+        {
+          "code": "file_locked",
+          "meaning": "The target file is locked by another process (e.g., IDE, version control).",
+          "surface": [
+            "apply_text_edits",
+            "create_script",
+            "delete_script"
+          ],
+          "typical_fix": "Close the file in other applications and retry."
+        },
+        {
+          "code": "syntax_error",
+          "meaning": "The resulting script would have syntax errors.",
+          "surface": [
+            "validate_script",
+            "apply_text_edits"
+          ],
+          "typical_fix": "Review the edit for unbalanced braces, missing semicolons, etc."
         }
       ],
-      "entry_count": 12,
+      "entry_count": 16,
       "id": "script_editing",
       "title": "Script Editing"
     },
@@ -159,11 +198,320 @@
             "manage_scriptable_object"
           ],
           "typical_fix": "Inspect the payload and target path, then retry after Unity is idle."
+        },
+        {
+          "code": "asset_modify_failed",
+          "meaning": "Unity failed while modifying the ScriptableObject.",
+          "surface": [
+            "manage_scriptable_object"
+          ],
+          "typical_fix": "Check that all serialized fields exist and types match."
+        },
+        {
+          "code": "type_mismatch",
+          "meaning": "The provided value type does not match the expected field type.",
+          "surface": [
+            "manage_scriptable_object"
+          ],
+          "typical_fix": "Ensure JSON values match the C# field types (e.g., use numbers for int/float)."
         }
       ],
-      "entry_count": 6,
+      "entry_count": 8,
       "id": "scriptable_objects",
       "title": "Scriptable Objects"
+    },
+    {
+      "description": "Error codes for GameObject CRUD operations.",
+      "entries": [
+        {
+          "code": "gameobject_not_found",
+          "meaning": "The target GameObject could not be found by name, path, or ID.",
+          "surface": [
+            "manage_gameobject"
+          ],
+          "typical_fix": "Verify the GameObject exists in the current scene. Use find_gameobjects to search."
+        },
+        {
+          "code": "invalid_parent",
+          "meaning": "The specified parent GameObject is invalid or not found.",
+          "surface": [
+            "manage_gameobject"
+          ],
+          "typical_fix": "Verify the parent exists, or use null for root-level objects."
+        },
+        {
+          "code": "component_not_found",
+          "meaning": "The requested component could not be found on the target GameObject.",
+          "surface": [
+            "manage_gameobject",
+            "manage_components"
+          ],
+          "typical_fix": "Verify the component name is correct and exists on the GameObject."
+        },
+        {
+          "code": "component_add_failed",
+          "meaning": "Failed to add the component (type may not exist or be allowed).",
+          "surface": [
+            "manage_components"
+          ],
+          "typical_fix": "Verify the component type name is fully qualified and the assembly is loaded."
+        },
+        {
+          "code": "invalid_transform",
+          "meaning": "The provided position, rotation, or scale values are invalid.",
+          "surface": [
+            "manage_gameobject"
+          ],
+          "typical_fix": "Use valid numeric arrays with 3 elements [x, y, z]."
+        }
+      ],
+      "entry_count": 5,
+      "id": "gameobject_management",
+      "title": "GameObject Management"
+    },
+    {
+      "description": "Error codes for scene operations.",
+      "entries": [
+        {
+          "code": "scene_not_found",
+          "meaning": "The requested scene could not be found.",
+          "surface": [
+            "manage_scene"
+          ],
+          "typical_fix": "Verify the scene path is correct and the scene exists in the project."
+        },
+        {
+          "code": "scene_load_failed",
+          "meaning": "Unity failed to load the scene.",
+          "surface": [
+            "manage_scene"
+          ],
+          "typical_fix": "Check that the scene is in the build settings and has no load errors."
+        },
+        {
+          "code": "scene_save_failed",
+          "meaning": "Unity failed to save the scene.",
+          "surface": [
+            "manage_scene"
+          ],
+          "typical_fix": "Check file permissions and disk space."
+        },
+        {
+          "code": "active_scene_unchanged",
+          "meaning": "The requested scene is already the active scene.",
+          "surface": [
+            "manage_scene"
+          ],
+          "typical_fix": "No action needed, or specify a different scene to activate."
+        }
+      ],
+      "entry_count": 4,
+      "id": "scene_management",
+      "title": "Scene Management"
+    },
+    {
+      "description": "Error codes for prefab management.",
+      "entries": [
+        {
+          "code": "prefab_not_found",
+          "meaning": "The prefab asset could not be found.",
+          "surface": [
+            "manage_prefabs"
+          ],
+          "typical_fix": "Verify the prefab path is correct and exists in the project."
+        },
+        {
+          "code": "prefab_instantiate_failed",
+          "meaning": "Failed to instantiate the prefab into the scene.",
+          "surface": [
+            "manage_prefabs"
+          ],
+          "typical_fix": "Verify the prefab is valid and can be instantiated."
+        },
+        {
+          "code": "prefab_variant_not_supported",
+          "meaning": "The operation is not supported on prefab variants.",
+          "surface": [
+            "manage_prefabs"
+          ],
+          "typical_fix": "Apply the operation to the base prefab or use supported actions."
+        },
+        {
+          "code": "nested_prefab_modified",
+          "meaning": "Attempted to modify a nested prefab which requires special handling.",
+          "surface": [
+            "manage_prefabs"
+          ],
+          "typical_fix": "Unpack or open the prefab for editing before making changes."
+        }
+      ],
+      "entry_count": 4,
+      "id": "prefab_operations",
+      "title": "Prefab Operations"
+    },
+    {
+      "description": "Error codes for asset operations.",
+      "entries": [
+        {
+          "code": "asset_not_found",
+          "meaning": "The asset could not be found at the specified path.",
+          "surface": [
+            "manage_asset",
+            "manage_material",
+            "manage_texture"
+          ],
+          "typical_fix": "Verify the asset path is correct and the asset exists."
+        },
+        {
+          "code": "asset_import_failed",
+          "meaning": "Unity failed to import the asset.",
+          "surface": [
+            "manage_asset"
+          ],
+          "typical_fix": "Check the asset file format and integrity."
+        },
+        {
+          "code": "invalid_guid",
+          "meaning": "The provided GUID is invalid or malformed.",
+          "surface": [
+            "manage_asset"
+          ],
+          "typical_fix": "Use a valid Unity GUID (32 hexadecimal characters)."
+        },
+        {
+          "code": "guid_not_found",
+          "meaning": "No asset found with the specified GUID.",
+          "surface": [
+            "manage_asset"
+          ],
+          "typical_fix": "Verify the GUID is correct and the asset exists in the project."
+        }
+      ],
+      "entry_count": 4,
+      "id": "asset_management",
+      "title": "Asset Management"
+    },
+    {
+      "description": "Error codes for batch_execute operations.",
+      "entries": [
+        {
+          "code": "batch_too_large",
+          "meaning": "The batch contains more commands than the configured maximum.",
+          "surface": [
+            "batch_execute"
+          ],
+          "typical_fix": "Split the batch into smaller chunks or increase the limit in Unity settings."
+        },
+        {
+          "code": "invalid_command",
+          "meaning": "One or more commands in the batch are malformed or missing required fields.",
+          "surface": [
+            "batch_execute"
+          ],
+          "typical_fix": "Ensure each command has 'tool' and 'params' fields with valid values."
+        },
+        {
+          "code": "batch_partial_failure",
+          "meaning": "Some commands in the batch succeeded while others failed.",
+          "surface": [
+            "batch_execute"
+          ],
+          "typical_fix": "Review the per-command results and retry failed commands individually."
+        },
+        {
+          "code": "circular_reference",
+          "meaning": "Commands in the batch have circular dependencies.",
+          "surface": [
+            "batch_execute"
+          ],
+          "typical_fix": "Restructure the batch to remove circular dependencies."
+        }
+      ],
+      "entry_count": 4,
+      "id": "batch_execution",
+      "title": "Batch Execution"
+    },
+    {
+      "description": "Error codes for Unity connection issues.",
+      "entries": [
+        {
+          "code": "unity_not_connected",
+          "meaning": "No Unity instance is currently connected.",
+          "surface": [
+            "*"
+          ],
+          "typical_fix": "Ensure Unity is running with the MCP plugin enabled."
+        },
+        {
+          "code": "connection_timeout",
+          "meaning": "The connection to Unity timed out.",
+          "surface": [
+            "*"
+          ],
+          "typical_fix": "Check Unity is responsive and retry the operation."
+        },
+        {
+          "code": "instance_not_found",
+          "meaning": "The specified Unity instance could not be found.",
+          "surface": [
+            "set_active_instance"
+          ],
+          "typical_fix": "List available instances with mcpforunity://instances and use a valid Name@hash."
+        },
+        {
+          "code": "serialization_error",
+          "meaning": "Failed to serialize or deserialize the request/response.",
+          "surface": [
+            "*"
+          ],
+          "typical_fix": "Check that all parameters are JSON-serializable."
+        }
+      ],
+      "entry_count": 4,
+      "id": "connection_errors",
+      "title": "Connection and Transport"
+    },
+    {
+      "description": "Error codes for capability and permission issues.",
+      "entries": [
+        {
+          "code": "tool_disabled",
+          "meaning": "The tool is disabled by configuration or group settings.",
+          "surface": [
+            "*"
+          ],
+          "typical_fix": "Enable the tool group with manage_tools(action='activate') or check capability config."
+        },
+        {
+          "code": "opt_in_required",
+          "meaning": "This tool requires explicit user opt-in before use.",
+          "surface": [
+            "execute_menu_item",
+            "batch_execute",
+            "delete_script"
+          ],
+          "typical_fix": "Add the tool to the tool_opt_in section of capabilities.json."
+        },
+        {
+          "code": "runtime_only_tool",
+          "meaning": "This tool only works when Unity is in play mode.",
+          "surface": [
+            "read_console"
+          ],
+          "typical_fix": "Enter play mode in Unity before using this tool."
+        },
+        {
+          "code": "dry_run_not_supported",
+          "meaning": "The requested dry-run (preview) mode is not supported by this tool.",
+          "surface": [
+            "*"
+          ],
+          "typical_fix": "Remove the dry_run flag or use a different tool."
+        }
+      ],
+      "entry_count": 4,
+      "id": "tool_capabilities",
+      "title": "Tool Capability Errors"
     }
   ],
   "generated_from": "fork_error_contract_registry",
@@ -185,15 +533,39 @@
       "pattern": "manage_tools(action='sync') returns unsupported wording",
       "surface": "tool visibility sync",
       "typical_fix": "Update the Unity package or toggle groups manually with activate/deactivate."
+    },
+    {
+      "meaning": "The server is temporarily unable to process the request (compiling, testing, etc.).",
+      "pattern": "busy response with retry_after_ms",
+      "surface": "all tools with preflight",
+      "typical_fix": "Wait for the specified retry_after_ms period and retry the request."
+    },
+    {
+      "meaning": "A recoverable error occurred with machine-readable details.",
+      "pattern": "success=false with code and data fields",
+      "surface": "structured error responses",
+      "typical_fix": "Check the 'code' field against the error catalog and apply the typical fix."
     }
   ],
-  "stable_code_count": 18,
+  "stable_code_count": 53,
   "surfaces": [
+    "*",
     "apply_text_edits",
+    "batch_execute",
     "create_script",
     "delete_script",
+    "execute_menu_item",
+    "manage_asset",
+    "manage_components",
+    "manage_gameobject",
+    "manage_material",
+    "manage_prefabs",
+    "manage_scene",
     "manage_scriptable_object",
+    "manage_texture",
+    "read_console",
     "script_apply_edits",
+    "set_active_instance",
     "validate_script"
   ],
   "version": 1

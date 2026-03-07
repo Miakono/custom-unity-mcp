@@ -1,0 +1,63 @@
+{
+  "metadata": {
+    "name": "basic_player_controller",
+    "description": "Creates a player GameObject with movement script and CharacterController",
+    "version": "1.0",
+    "author": "unity-mcp",
+    "tags": ["player", "controller", "movement", "starter", "gameplay"],
+    "category": "gameplay"
+  },
+  "steps": [
+    {
+      "tool": "manage_gameobject",
+      "action": "create",
+      "params": {
+        "name": "Player",
+        "primitive": "Capsule",
+        "position": [0, 1, 0]
+      }
+    },
+    {
+      "tool": "manage_components",
+      "action": "add",
+      "params": {
+        "target": "Player",
+        "components": ["CharacterController"]
+      }
+    },
+    {
+      "tool": "manage_script",
+      "action": "create",
+      "params": {
+        "name": "PlayerMovement",
+        "template": "MonoBehaviour",
+        "content": "using UnityEngine;\n\n[RequireComponent(typeof(CharacterController))]\npublic class PlayerMovement : MonoBehaviour\n{\n    public float moveSpeed = 5f;\n    public float rotationSpeed = 10f;\n    private CharacterController controller;\n    \n    void Start()\n    {\n        controller = GetComponent<CharacterController>();\n    }\n    \n    void Update()\n    {\n        float horizontal = Input.GetAxis(\"Horizontal\");\n        float vertical = Input.GetAxis(\"Vertical\");\n        \n        Vector3 movement = new Vector3(horizontal, 0f, vertical);\n        \n        if (movement.magnitude > 0)\n        {\n            movement.Normalize();\n            controller.Move(movement * moveSpeed * Time.deltaTime);\n            \n            Quaternion targetRotation = Quaternion.LookRotation(movement);\n            transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, rotationSpeed * Time.deltaTime);\n        }\n    }\n}"
+      }
+    },
+    {
+      "tool": "manage_components",
+      "action": "add",
+      "params": {
+        "target": "Player",
+        "components": ["PlayerMovement"]
+      }
+    }
+  ],
+  "parameters": {
+    "player_name": {
+      "description": "Name of the player GameObject",
+      "default": "Player",
+      "type": "string"
+    },
+    "move_speed": {
+      "description": "Player movement speed",
+      "default": 5.0,
+      "type": "float"
+    },
+    "position": {
+      "description": "Initial player position [x, y, z]",
+      "default": [0, 1, 0],
+      "type": "vector3"
+    }
+  }
+}

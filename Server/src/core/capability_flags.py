@@ -50,16 +50,26 @@ TOOLS_SUPPORTING_DRY_RUN: set[str] = {
     "manage_scriptable_object",
     # Batch operations
     "batch_execute",
+    # Checkpoint/restore operations
+    "manage_checkpoints",
 }
 
 # Tools that are local/server-only (don't require Unity connection)
 LOCAL_ONLY_TOOLS: set[str] = {
     "debug_request_context",
     "manage_catalog",
+    "manage_checkpoints",
+    "manage_code_intelligence",
     "manage_error_catalog",
     "manage_script_capabilities",
     "manage_subagents",
     "manage_tools",
+    "search_code",
+    "find_symbol",
+    "find_references",
+    "get_symbols",
+    "build_code_index",
+    "code_index_status",
     "preflight_audit",
     "set_active_instance",
     "validate_compile_health",
@@ -67,6 +77,11 @@ LOCAL_ONLY_TOOLS: set[str] = {
 
 # Tools that only work when Unity is in play mode
 RUNTIME_ONLY_TOOLS: set[str] = {
+    "execute_runtime_command",
+    "get_runtime_connection_info",
+    "get_runtime_status",
+    "list_runtime_tools",
+    "manage_runtime_ui",
     "read_console",
 }
 
@@ -105,6 +120,8 @@ TOOLS_SUPPORTING_VERIFICATION: set[str] = {
     "manage_components",
     # Asset operations
     "manage_asset",
+    # Checkpoint workflows
+    "manage_checkpoints",
 }
 
 
@@ -143,8 +160,8 @@ class CapabilityConfig:
         if tool_name in self.tool_opt_in:
             return False  # Already explicitly configured
 
-        # Tool is high-risk and doesn't have explicit opt-in
-        return tool_name in HIGH_RISK_TOOLS
+        # Runtime-only tools and high-risk tools require explicit opt-in by default.
+        return tool_name in HIGH_RISK_TOOLS or tool_name in RUNTIME_ONLY_TOOLS
 
 
 # Global capability configuration instance

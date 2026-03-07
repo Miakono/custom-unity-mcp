@@ -58,6 +58,28 @@ namespace MCPForUnity.Editor.Tools.Vfx
             return new { success = false, message = "VFX Graph package (com.unity.visualeffectgraph) not installed" };
         }
 #else
+        private static bool HasParameter(VisualEffect vfx, string parameterName, string methodName)
+        {
+            if (vfx == null || string.IsNullOrEmpty(parameterName))
+            {
+                return false;
+            }
+
+            var method = typeof(VisualEffect).GetMethod(methodName, new[] { typeof(string) });
+            if (method == null)
+            {
+                return true;
+            }
+
+            object result = method.Invoke(vfx, new object[] { parameterName });
+            return result is bool hasParameter && hasParameter;
+        }
+
+        private static object MissingParameterResponse(string parameterName, string expectedType)
+        {
+            return new { success = false, message = $"Value of name '{parameterName}' was not found as a {expectedType} parameter on the target VisualEffect." };
+        }
+
         public static object SetParameter<T>(JObject @params, Action<VisualEffect, string, T> setter)
         {
             VisualEffect vfx = VfxGraphCommon.FindVisualEffect(@params);
@@ -76,6 +98,19 @@ namespace MCPForUnity.Editor.Tools.Vfx
             if (valueToken == null)
             {
                 return new { success = false, message = "Value required" };
+            }
+
+            string hasMethodName = typeof(T) == typeof(float) ? "HasFloat"
+                : typeof(T) == typeof(int) ? "HasInt"
+                : typeof(T) == typeof(bool) ? "HasBool"
+                : null;
+
+            if (!string.IsNullOrEmpty(hasMethodName) && !HasParameter(vfx, param, hasMethodName))
+            {
+                string expectedType = typeof(T) == typeof(float) ? "float"
+                    : typeof(T) == typeof(int) ? "int"
+                    : "bool";
+                return MissingParameterResponse(param, expectedType);
             }
 
             // Safely deserialize the value
@@ -119,6 +154,12 @@ namespace MCPForUnity.Editor.Tools.Vfx
                 return new { success = false, message = $"Unsupported vector dimension: {dims}. Expected 2, 3, or 4." };
             }
 
+            string hasMethodName = dims == 2 ? "HasVector2" : dims == 3 ? "HasVector3" : "HasVector4";
+            if (!HasParameter(vfx, param, hasMethodName))
+            {
+                return MissingParameterResponse(param, $"vector{dims}");
+            }
+
             Vector4 vec = ManageVfxCommon.ParseVector4(@params["value"]);
             Undo.RecordObject(vfx, $"Set VFX {param}");
 
@@ -147,6 +188,11 @@ namespace MCPForUnity.Editor.Tools.Vfx
                 return new { success = false, message = "Parameter name required" };
             }
 
+            if (!HasParameter(vfx, param, "HasVector4"))
+            {
+                return MissingParameterResponse(param, "color/vector4");
+            }
+
             Color color = ManageVfxCommon.ParseColor(@params["value"]);
             Undo.RecordObject(vfx, $"Set VFX Color {param}");
             vfx.SetVector4(param, new Vector4(color.r, color.g, color.b, color.a));
@@ -167,6 +213,11 @@ namespace MCPForUnity.Editor.Tools.Vfx
             if (string.IsNullOrEmpty(param))
             {
                 return new { success = false, message = "Parameter name required" };
+            }
+
+            if (!HasParameter(vfx, param, "HasGradient"))
+            {
+                return MissingParameterResponse(param, "gradient");
             }
 
             Gradient gradient = ManageVfxCommon.ParseGradient(@params["gradient"]);
@@ -190,6 +241,11 @@ namespace MCPForUnity.Editor.Tools.Vfx
             if (string.IsNullOrEmpty(param) || string.IsNullOrEmpty(path))
             {
                 return new { success = false, message = "Parameter and texturePath required" };
+            }
+
+            if (!HasParameter(vfx, param, "HasTexture"))
+            {
+                return MissingParameterResponse(param, "texture");
             }
 
             var findInst = new JObject { ["find"] = path };
@@ -221,6 +277,11 @@ namespace MCPForUnity.Editor.Tools.Vfx
                 return new { success = false, message = "Parameter and meshPath required" };
             }
 
+            if (!HasParameter(vfx, param, "HasMesh"))
+            {
+                return MissingParameterResponse(param, "mesh");
+            }
+
             var findInst = new JObject { ["find"] = path };
             Mesh mesh = ObjectResolver.Resolve(findInst, typeof(Mesh)) as Mesh;
             if (mesh == null)
@@ -247,6 +308,11 @@ namespace MCPForUnity.Editor.Tools.Vfx
             if (string.IsNullOrEmpty(param))
             {
                 return new { success = false, message = "Parameter name required" };
+            }
+
+            if (!HasParameter(vfx, param, "HasAnimationCurve"))
+            {
+                return MissingParameterResponse(param, "animation curve");
             }
 
             AnimationCurve curve = ManageVfxCommon.ParseAnimationCurve(@params["curve"], 1f);

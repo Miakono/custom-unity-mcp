@@ -94,6 +94,7 @@ class DiagnosticsResponse(MCPResponse):
 
 @mcp_for_unity_tool(
     group="core",
+    unity_target=None,
     description=(
         "Gets comprehensive diagnostics for the Unity project in a single call. "
         "Aggregates: compile state, console errors/warnings, profiler snapshot, "

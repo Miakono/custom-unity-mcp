@@ -24,3 +24,19 @@ async def test_error_catalog_resource_returns_catalog():
 
     assert result["domain_count"] >= 2
     assert any(domain["id"] == "scriptable_objects" for domain in result["domains"])
+
+
+@pytest.mark.asyncio
+async def test_manage_error_catalog_export_writes_artifacts(tmp_path):
+    ctx = DummyContext()
+
+    result = await manage_error_catalog(
+        ctx,
+        action="export",
+        output_dir=str(tmp_path),
+        format="json",
+    )
+
+    assert result["exported"] is True
+    assert result["stable_code_count"] >= 18
+    assert any(path.endswith("error_catalog.json") for path in result["written_files"])

@@ -28,9 +28,9 @@ def register_all_tools(mcp: FastMCP, *, project_scoped_tools: bool = True):
     Any .py file in this directory or subdirectories with @mcp_for_unity_tool decorated
     functions will be automatically registered.
 
-    After registration, non-default tool groups are disabled at the server level
-    so that new sessions only see the *core* tools (plus always-visible meta-tools).
-    Clients can activate additional groups at any time via ``manage_tools``.
+    After registration, server-level visibility defaults are applied for HTTP
+    sessions. Clients can still activate or deactivate groups at any time via
+    ``manage_tools``.
     """
     logger.info("Auto-discovering MCP for Unity Server tools...")
     # Dynamic import of all modules in this directory
@@ -68,8 +68,8 @@ def register_all_tools(mcp: FastMCP, *, project_scoped_tools: bool = True):
 
     logger.info(f"Registered {len(tools)} MCP tools")
 
-    # In HTTP mode, disable non-default groups at the server level so new
-    # sessions start lean.  Unity will re-enable groups via register_tools
+    # In HTTP mode, apply the configured server default groups at startup.
+    # Unity may later refine visibility via register_tools
     # (PluginHub._sync_server_tool_visibility) once it connects.
     # In stdio mode we skip this: the legacy TCP bridge has no register_tools
     # message, so disabled groups would stay invisible for the entire session.
@@ -82,11 +82,17 @@ def register_all_tools(mcp: FastMCP, *, project_scoped_tools: bool = True):
             tag = f"group:{group_name}"
             mcp.disable(tags={tag}, components={"tool"})
             logger.debug(f"Disabled tool group at startup: {group_name}")
-        logger.info(
-            f"Default tool groups: {', '.join(sorted(DEFAULT_ENABLED_GROUPS))}. "
-            f"Disabled: {', '.join(sorted(groups_to_disable))}. "
-            "Use manage_tools to activate more."
-        )
+        if groups_to_disable:
+            logger.info(
+                f"Default tool groups: {', '.join(sorted(DEFAULT_ENABLED_GROUPS))}. "
+                f"Disabled: {', '.join(sorted(groups_to_disable))}. "
+                "Use manage_tools to activate more."
+            )
+        else:
+            logger.info(
+                f"Default tool groups: {', '.join(sorted(DEFAULT_ENABLED_GROUPS))}. "
+                "All tool groups are enabled at startup."
+            )
     else:
         logger.info(
             "Stdio transport: all tool groups enabled at startup. "
