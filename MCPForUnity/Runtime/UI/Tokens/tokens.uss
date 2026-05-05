@@ -1,0 +1,71 @@
+/*
+ * tokens.uss — MCPForUnity UI design tokens (dark-theme defaults).
+ *
+ * Defines CSS custom properties (variables) on :root so descendants inherit them.
+ * Components reference these via var(--name); never hard-code colors / spacing /
+ * sizes inside component USS.
+ *
+ * Categories: colors, spacing, typography, radius, animation, z-layers.
+ *
+ * To consume in a UXML: <ui:Style src="/Packages/com.customgamedev.unity-mcp/Runtime/UI/Tokens/tokens.uss" />
+ */
+
+:root {
+    /* Colors — dark theme */
+    --color-bg: rgb(20, 22, 28);
+    --color-bg-elevated: rgb(32, 36, 44);
+    --color-scrim: rgba(0, 0, 0, 0.5);
+
+    --color-text-primary: rgb(240, 242, 248);
+    --color-text-secondary: rgb(190, 196, 210);
+    --color-text-muted: rgb(132, 140, 158);
+
+    --color-primary: rgb(94, 158, 255);
+    --color-primary-hover: rgb(124, 178, 255);
+    --color-danger: rgb(232, 90, 96);
+    --color-success: rgb(96, 200, 130);
+
+    --color-border: rgba(255, 255, 255, 0.10);
+
+    /* Rarity tints (used by LevelUpChoice and other reward UIs) */
+    --color-rarity-common: rgb(180, 184, 196);
+    --color-rarity-uncommon: rgb(96, 200, 130);
+    --color-rarity-rare: rgb(94, 158, 255);
+    --color-rarity-epic: rgb(170, 110, 230);
+    --color-rarity-legendary: rgb(240, 188, 90);
+
+    /* Spacing scale */
+    --space-xs: 4px;
+    --space-sm: 8px;
+    --space-md: 16px;
+    --space-lg: 24px;
+    --space-xl: 32px;
+    --space-2xl: 48px;
+
+    /* Typography */
+    --text-body: 14px;
+    --text-body-lg: 16px;
+    --text-h3: 20px;
+    --text-h2: 28px;
+    --text-h1: 40px;
+
+    --font-weight-regular: 400;
+    --font-weight-bold: 700;
+
+    /* Radius */
+    --radius-sm: 4px;
+    --radius-md: 8px;
+    --radius-lg: 16px;
+    --radius-pill: 999px;
+
+    /* Animation (durations in ms; UI Toolkit transition properties expect "ms"/"s") */
+    --anim-fast: 120ms;
+    --anim-default: 200ms;
+    --anim-slow: 320ms;
+
+    /* Z-layers (set on absolute-positioned overlays via -unity-paragraph-spacing tricks
+       are not supported in USS — these are reference values for code/layout to consult). */
+    --z-hud: 100;
+    --z-modal: 1000;
+    --z-toast: 2000;
+}

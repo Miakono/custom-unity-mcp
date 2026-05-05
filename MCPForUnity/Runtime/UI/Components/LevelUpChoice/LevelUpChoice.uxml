@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    LevelUpChoice.uxml — canonical authoring template for the LevelUpChoice
+    VisualElement.
+
+    Tokens: tokens.uss (var(--color-bg-elevated), var(--color-text-primary),
+            var(--color-text-secondary), var(--color-rarity-*), var(--space-md),
+            var(--space-lg), var(--radius-md), var(--text-h2), var(--text-body),
+            var(--color-primary), var(--anim-default))
+    Class:  MCPForUnity.UIElements.LevelUpChoice
+
+    The LevelUpChoice C# class builds the title row + cards container in code.
+    Cards are added programmatically via SetChoices(...) at runtime, OR may be
+    placed inline as classed VisualElements (.luc-card with name labels). The
+    component scans for author-time cards on AttachToPanel and wires their
+    "Pick" buttons to OnChoicePicked.
+
+    Card structure (each):
+      <ui:VisualElement class="luc-card luc-card--rarity-rare">
+        <ui:VisualElement class="luc-card__icon" />
+        <ui:Label class="luc-card__name" text="Choice name" />
+        <ui:Label class="luc-card__description" text="Choice description" />
+        <ui:Button class="luc-card__pick" text="Pick" />
+      </ui:VisualElement>
+-->
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+    <ui:VisualElement name="luc__root" class="luc">
+        <ui:Label name="luc__title" class="luc__title" text="Level Up!" />
+        <ui:VisualElement name="luc__cards" class="luc__cards" />
+    </ui:VisualElement>
+</ui:UXML>

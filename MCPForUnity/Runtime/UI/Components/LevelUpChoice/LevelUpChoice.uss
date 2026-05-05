@@ -1,0 +1,106 @@
+/*
+ * LevelUpChoice.uss — styles for MCPForUnity.UIElements.LevelUpChoice.
+ *
+ * Tokens used (must be loaded in the same panel via a sibling <ui:Style> reference):
+ *   --color-bg, --color-bg-elevated, --color-text-primary, --color-text-secondary,
+ *   --color-text-muted, --color-border, --color-primary, --color-rarity-*,
+ *   --space-xs, --space-sm, --space-md, --space-lg, --radius-md, --radius-sm,
+ *   --text-body, --text-body-lg, --text-h2, --font-weight-bold, --anim-default
+ *
+ * Card lifts on hover (scale 1.02) and shows an accent ring on keyboard focus.
+ * Min hit-target height is 64px — adjust per game-feel needs but don't go below.
+ */
+
+.luc {
+    align-items: center;
+    padding: var(--space-lg);
+}
+
+.luc__title {
+    color: var(--color-text-primary);
+    font-size: var(--text-h2);
+    -unity-font-style: bold;
+    margin-bottom: var(--space-lg);
+    -unity-text-align: middle-center;
+}
+
+.luc__cards {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.luc-card {
+    flex-direction: column;
+    background-color: var(--color-bg-elevated);
+    border-color: var(--color-border);
+    border-width: 2px;
+    border-radius: var(--radius-md);
+    padding: var(--space-md);
+    margin: var(--space-sm);
+    width: 200px;
+    min-height: 64px;
+    transition-property: scale, border-color, background-color;
+    transition-duration: var(--anim-default);
+}
+
+.luc-card:hover {
+    scale: 1.02 1.02;
+    border-color: var(--color-text-secondary);
+}
+
+.luc-card:focus {
+    border-color: var(--color-primary);
+}
+
+.luc-card--primary {
+    background-color: rgb(38, 48, 70);
+    border-color: var(--color-primary);
+}
+
+.luc-card--rarity-common { border-color: var(--color-rarity-common); }
+.luc-card--rarity-uncommon { border-color: var(--color-rarity-uncommon); }
+.luc-card--rarity-rare { border-color: var(--color-rarity-rare); }
+.luc-card--rarity-epic { border-color: var(--color-rarity-epic); }
+.luc-card--rarity-legendary { border-color: var(--color-rarity-legendary); }
+
+.luc-card__icon {
+    width: 48px;
+    height: 48px;
+    align-self: center;
+    margin-bottom: var(--space-sm);
+    background-color: var(--color-bg);
+    border-radius: var(--radius-sm);
+}
+
+.luc-card__name {
+    color: var(--color-text-primary);
+    font-size: var(--text-body-lg);
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+    margin-bottom: var(--space-xs);
+}
+
+.luc-card__description {
+    color: var(--color-text-secondary);
+    font-size: var(--text-body);
+    white-space: normal;
+    -unity-text-align: middle-center;
+    margin-bottom: var(--space-sm);
+    flex-grow: 1;
+}
+
+.luc-card__pick {
+    background-color: var(--color-primary);
+    color: var(--color-text-primary);
+    border-width: 0;
+    border-radius: var(--radius-sm);
+    padding: var(--space-sm) var(--space-md);
+    -unity-font-style: bold;
+    transition-property: background-color;
+    transition-duration: var(--anim-default);
+}
+
+.luc-card__pick:hover {
+    background-color: var(--color-primary-hover);
+}

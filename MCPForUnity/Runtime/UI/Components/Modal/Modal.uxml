@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Modal.uxml — canonical authoring template for the Modal VisualElement.
+
+    Tokens: tokens.uss (var(--color-bg-elevated), var(--color-scrim), var(--space-lg),
+            var(--radius-md), var(--color-border), var(--color-text-primary),
+            var(--text-h3), var(--anim-default))
+    Class:  MCPForUnity.UIElements.Modal
+
+    The Modal C# class constructs the same tree in code so this file is not loaded at
+    runtime; it exists for designers, documentation, and as the structural reference
+    for the generator. Named children must stay in sync with Modal.cs:
+      modal__scrim, modal__content, modal__title, modal__close, modal__body
+-->
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+    <ui:VisualElement name="modal__scrim" class="modal__scrim">
+        <ui:VisualElement name="modal__content" class="modal__content">
+            <ui:VisualElement name="modal__header" class="modal__header">
+                <ui:Label name="modal__title" class="modal__title" text="Modal" />
+                <ui:Button name="modal__close" class="modal__close" text="×" />
+            </ui:VisualElement>
+            <ui:VisualElement name="modal__body" class="modal__body" />
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

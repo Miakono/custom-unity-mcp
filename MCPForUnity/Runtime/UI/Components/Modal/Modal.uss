@@ -1,0 +1,104 @@
+/*
+ * Modal.uss — styles for MCPForUnity.UIElements.Modal.
+ *
+ * Tokens used (must be loaded in the same panel via a sibling <ui:Style> reference):
+ *   --color-scrim, --color-bg-elevated, --color-border, --color-text-primary,
+ *   --color-text-secondary, --space-md, --space-lg, --space-sm, --radius-md,
+ *   --radius-sm, --text-h3, --text-body, --font-weight-bold, --anim-default
+ *
+ * Open/close animation: scale + opacity, eased over var(--anim-default).
+ * The .modal--open class on the root toggles the open state.
+ */
+
+.modal__scrim {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    background-color: var(--color-scrim);
+    align-items: center;
+    justify-content: center;
+
+    /* Closed state */
+    opacity: 0;
+    display: none;
+    transition-property: opacity;
+    transition-duration: var(--anim-default);
+    transition-timing-function: ease-in;
+}
+
+.modal--open > .modal__scrim {
+    display: flex;
+    opacity: 1;
+    transition-timing-function: ease-out;
+}
+
+.modal__content {
+    background-color: var(--color-bg-elevated);
+    border-color: var(--color-border);
+    border-width: 1px;
+    border-radius: var(--radius-md);
+    padding: var(--space-lg);
+    min-width: 320px;
+    max-width: 480px;
+    flex-direction: column;
+
+    /* Closed state */
+    scale: 0.96 0.96;
+    opacity: 0;
+    transition-property: scale, opacity;
+    transition-duration: var(--anim-default);
+    transition-timing-function: ease-in;
+}
+
+.modal--open > .modal__scrim > .modal__content {
+    scale: 1 1;
+    opacity: 1;
+    transition-timing-function: ease-out;
+}
+
+.modal__header {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-md);
+}
+
+.modal__title {
+    color: var(--color-text-primary);
+    font-size: var(--text-h3);
+    -unity-font-style: bold;
+    flex-grow: 1;
+    flex-shrink: 1;
+}
+
+.modal__close {
+    color: var(--color-text-secondary);
+    background-color: rgba(0, 0, 0, 0);
+    border-width: 0;
+    border-radius: var(--radius-sm);
+    width: 28px;
+    height: 28px;
+    margin-left: var(--space-sm);
+    padding: 0;
+    font-size: 18px;
+    -unity-text-align: middle-center;
+    transition-property: background-color, color;
+    transition-duration: var(--anim-default);
+}
+
+.modal__close:hover {
+    background-color: var(--color-border);
+    color: var(--color-text-primary);
+}
+
+.modal__close--hidden {
+    display: none;
+}
+
+.modal__body {
+    color: var(--color-text-primary);
+    font-size: var(--text-body);
+    flex-grow: 1;
+}
