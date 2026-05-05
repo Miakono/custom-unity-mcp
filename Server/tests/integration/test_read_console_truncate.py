@@ -213,6 +213,13 @@ async def test_read_console_types_json_string(monkeypatch):
     assert isinstance(captured["params"]["types"], list)
     assert captured["params"]["types"] == ["error", "warning"]
 
+    # Test with a plain string single filter
+    captured.clear()
+    resp = await read_console(ctx=DummyContext(), action="get", types="error")
+    assert resp["success"] is True
+    assert isinstance(captured["params"]["types"], list)
+    assert captured["params"]["types"] == ["error"]
+
 
 @pytest.mark.asyncio
 async def test_read_console_types_validation(monkeypatch):

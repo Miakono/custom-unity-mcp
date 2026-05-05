@@ -3,6 +3,7 @@ import pytest
 from services.registry import DEFAULT_ENABLED_GROUPS, TOOL_GROUPS
 from services.registry import mcp_for_unity_tool
 import services.registry.tool_registry as tool_registry_module
+import services.unity_tool_source as unity_tool_source_module
 from services.resources.tool_catalog import get_tool_catalog
 from services.tools.manage_catalog import manage_catalog
 
@@ -28,9 +29,21 @@ def _register_minimal_toolset():
         return None
 
 
+def _stub_unity_handlers(monkeypatch: pytest.MonkeyPatch, *tool_names: str) -> None:
+    handlers = dict(unity_tool_source_module.discover_unity_tool_handlers())
+    for tool_name in tool_names:
+        handlers.setdefault(tool_name, (f"tests/{tool_name}.cs",))
+    monkeypatch.setattr(
+        unity_tool_source_module,
+        "discover_unity_tool_handlers",
+        lambda: handlers,
+    )
+
+
 @pytest.mark.asyncio
-async def test_manage_catalog_list_returns_catalog():
+async def test_manage_catalog_list_returns_catalog(monkeypatch):
     _register_minimal_toolset()
+    _stub_unity_handlers(monkeypatch, "_manage_scene")
     ctx = DummyContext()
 
     result = await manage_catalog(ctx, action="list")
@@ -40,8 +53,9 @@ async def test_manage_catalog_list_returns_catalog():
 
 
 @pytest.mark.asyncio
-async def test_tool_catalog_resource_returns_catalog():
+async def test_tool_catalog_resource_returns_catalog(monkeypatch):
     _register_minimal_toolset()
+    _stub_unity_handlers(monkeypatch, "_manage_scene")
     ctx = DummyContext()
 
     result = await get_tool_catalog(ctx)
@@ -53,8 +67,9 @@ async def test_tool_catalog_resource_returns_catalog():
 
 
 @pytest.mark.asyncio
-async def test_manage_catalog_export_writes_artifacts(tmp_path):
+async def test_manage_catalog_export_writes_artifacts(tmp_path, monkeypatch):
     _register_minimal_toolset()
+    _stub_unity_handlers(monkeypatch, "_manage_scene")
     ctx = DummyContext()
 
     result = await manage_catalog(

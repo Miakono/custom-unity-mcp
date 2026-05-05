@@ -35,6 +35,11 @@ _lock = threading.RLock()
 # Maximum events to buffer per subscription
 MAX_BUFFER_SIZE = 1000
 
+# Hard cap on total subscriptions held in memory.
+_MAX_SUBSCRIPTIONS = 200
+# Subscriptions with no explicit expiry are treated as stale after this many hours.
+_IMPLICIT_EXPIRY_HOURS = 24
+
 
 class EventPayload(BaseModel):
     """Standard event payload format."""
@@ -82,7 +87,18 @@ class SubscriptionDetailData(BaseModel):
 
 def add_subscription(subscription_id: str, data: dict[str, Any]) -> None:
     """Add a new subscription to the registry."""
+    # Opportunistically purge expired/stale entries before adding so the dict
+    # stays bounded even without a background cleanup task.
+    cleanup_expired_subscriptions()
     with _lock:
+        # If still at the hard cap after cleanup, evict the oldest entry.
+        while len(_subscriptions) >= _MAX_SUBSCRIPTIONS:
+            oldest_id = next(iter(_subscriptions))
+            _subscriptions.pop(oldest_id, None)
+            _event_waiters.pop(oldest_id, None)
+            logger.warning(
+                "Subscription cap reached; evicted oldest subscription %s", oldest_id
+            )
         _subscriptions[subscription_id] = data
         _event_waiters[subscription_id] = asyncio.Event()
         logger.debug(f"Added subscription {subscription_id}")
@@ -157,20 +173,34 @@ def _is_subscription_expired(sub: dict[str, Any]) -> bool:
 
 
 def cleanup_expired_subscriptions() -> int:
-    """Remove expired subscriptions. Returns count removed."""
+    """Remove expired subscriptions and those older than the implicit expiry window.
+
+    Returns count removed.
+    """
     with _lock:
+        now_utc = datetime.now(timezone.utc)
         to_remove = []
         for sub_id, sub in _subscriptions.items():
             if _is_subscription_expired(sub):
                 to_remove.append(sub_id)
-        
+                continue
+            # Treat subscriptions with no expiry as stale after _IMPLICIT_EXPIRY_HOURS
+            if not sub.get("expires_at"):
+                try:
+                    created = datetime.fromisoformat(sub["created_at"])
+                    age_hours = (now_utc - created).total_seconds() / 3600
+                    if age_hours > _IMPLICIT_EXPIRY_HOURS:
+                        to_remove.append(sub_id)
+                except (KeyError, ValueError, TypeError):
+                    pass
+
         for sub_id in to_remove:
             _subscriptions.pop(sub_id, None)
             _event_waiters.pop(sub_id, None)
-        
+
         if to_remove:
             logger.info(f"Cleaned up {len(to_remove)} expired subscription(s)")
-        
+
         return len(to_remove)
 
 

@@ -17,6 +17,7 @@ Actions:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Annotated, Any, Literal
 
@@ -27,6 +28,24 @@ from services.registry import mcp_for_unity_tool
 from services.code_indexer import get_index_manager
 
 logger = logging.getLogger("mcp-for-unity-server")
+
+
+async def _get_manager(project_root: str | None):
+    return await asyncio.to_thread(get_index_manager, project_root)
+
+
+async def _manager_call(manager: Any, method_name: str, *args: Any, **kwargs: Any) -> dict[str, Any]:
+    method = getattr(manager, method_name)
+    return await asyncio.to_thread(method, *args, **kwargs)
+
+
+async def _ensure_index(ctx: Context, manager: Any, include_packages: bool = False) -> dict[str, Any]:
+    status = await _manager_call(manager, "get_index_status")
+    if not status["loaded"] or status["files_indexed"] == 0:
+        await ctx.info("Index not found, building...")
+        await _manager_call(manager, "build_index", include_packages=include_packages)
+        status = await _manager_call(manager, "get_index_status")
+    return status
 
 
 @mcp_for_unity_tool(
@@ -141,7 +160,7 @@ async def manage_code_intelligence(
     
     try:
         # Get or create index manager
-        manager = get_index_manager(project_root)
+        manager = await _get_manager(project_root)
         
         if action == "search_code":
             if not pattern:
@@ -151,12 +170,11 @@ async def manage_code_intelligence(
                 }
             
             # Ensure index is built
-            status = manager.get_index_status()
-            if not status["loaded"] or status["files_indexed"] == 0:
-                await ctx.info("Index not found, building...")
-                manager.build_index(include_packages=include_packages)
+            await _ensure_index(ctx, manager, include_packages=include_packages)
             
-            result = manager.search_code(
+            result = await _manager_call(
+                manager,
+                "search_code",
                 pattern=pattern,
                 regex=use_regex,
                 ignore_case=ignore_case,
@@ -174,12 +192,11 @@ async def manage_code_intelligence(
                 }
             
             # Ensure index is built
-            status = manager.get_index_status()
-            if not status["loaded"] or status["files_indexed"] == 0:
-                await ctx.info("Index not found, building...")
-                manager.build_index(include_packages=include_packages)
+            await _ensure_index(ctx, manager, include_packages=include_packages)
             
-            result = manager.find_symbol(
+            result = await _manager_call(
+                manager,
+                "find_symbol",
                 name=symbol_name,
                 symbol_type=symbol_type,
                 exact_match=exact_match
@@ -194,12 +211,11 @@ async def manage_code_intelligence(
                 }
             
             # Ensure index is built
-            status = manager.get_index_status()
-            if not status["loaded"] or status["files_indexed"] == 0:
-                await ctx.info("Index not found, building...")
-                manager.build_index(include_packages=include_packages)
+            await _ensure_index(ctx, manager, include_packages=include_packages)
             
-            result = manager.find_references(
+            result = await _manager_call(
+                manager,
+                "find_references",
                 symbol_name=symbol_name,
                 max_results=max_results,
                 offset=offset
@@ -208,12 +224,11 @@ async def manage_code_intelligence(
         
         elif action == "get_symbols":
             # Ensure index is built
-            status = manager.get_index_status()
-            if not status["loaded"] or status["files_indexed"] == 0:
-                await ctx.info("Index not found, building...")
-                manager.build_index(include_packages=include_packages)
+            await _ensure_index(ctx, manager, include_packages=include_packages)
             
-            result = manager.get_symbols(
+            result = await _manager_call(
+                manager,
+                "get_symbols",
                 file_path=file_path,
                 symbol_type=symbol_type,
                 namespace=namespace,
@@ -223,22 +238,24 @@ async def manage_code_intelligence(
             return result
         
         elif action == "build_code_index":
-            result = manager.build_index(
+            result = await _manager_call(
+                manager,
+                "build_index",
                 include_packages=include_packages,
                 force_rebuild=force_rebuild
             )
             return result
         
         elif action == "update_code_index":
-            result = manager.update_index(include_packages=include_packages)
+            result = await _manager_call(manager, "update_index", include_packages=include_packages)
             return result
         
         elif action == "get_index_status":
-            result = manager.get_index_status()
+            result = await _manager_call(manager, "get_index_status")
             return result
         
         elif action == "clear_code_index":
-            result = manager.clear_index()
+            result = await _manager_call(manager, "clear_index")
             return result
         
         else:
@@ -287,15 +304,17 @@ async def search_code(
     await ctx.info(f"Searching code: {pattern}")
     
     try:
-        manager = get_index_manager(project_root)
+        manager = await _get_manager(project_root)
         
         # Auto-build index if needed
-        status = manager.get_index_status()
+        status = await _manager_call(manager, "get_index_status")
         if not status["loaded"] or status["files_indexed"] == 0:
             await ctx.info("Building code index...")
-            manager.build_index()
+            await _manager_call(manager, "build_index")
         
-        result = manager.search_code(
+        result = await _manager_call(
+            manager,
+            "search_code",
             pattern=pattern,
             regex=use_regex,
             ignore_case=ignore_case,
@@ -341,15 +360,17 @@ async def find_symbol(
     await ctx.info(f"Finding symbol: {name}")
     
     try:
-        manager = get_index_manager(project_root)
+        manager = await _get_manager(project_root)
         
         # Auto-build index if needed
-        status = manager.get_index_status()
+        status = await _manager_call(manager, "get_index_status")
         if not status["loaded"] or status["files_indexed"] == 0:
             await ctx.info("Building code index...")
-            manager.build_index()
+            await _manager_call(manager, "build_index")
         
-        result = manager.find_symbol(
+        result = await _manager_call(
+            manager,
+            "find_symbol",
             name=name,
             symbol_type=symbol_type,
             exact_match=exact_match
@@ -385,15 +406,17 @@ async def find_references(
     await ctx.info(f"Finding references: {symbol_name}")
     
     try:
-        manager = get_index_manager(project_root)
+        manager = await _get_manager(project_root)
         
         # Auto-build index if needed
-        status = manager.get_index_status()
+        status = await _manager_call(manager, "get_index_status")
         if not status["loaded"] or status["files_indexed"] == 0:
             await ctx.info("Building code index...")
-            manager.build_index()
+            await _manager_call(manager, "build_index")
         
-        result = manager.find_references(
+        result = await _manager_call(
+            manager,
+            "find_references",
             symbol_name=symbol_name,
             max_results=min(max_results, 500)
         )
@@ -433,15 +456,17 @@ async def get_symbols(
     await ctx.info("Getting symbols")
     
     try:
-        manager = get_index_manager(project_root)
+        manager = await _get_manager(project_root)
         
         # Auto-build index if needed
-        status = manager.get_index_status()
+        status = await _manager_call(manager, "get_index_status")
         if not status["loaded"] or status["files_indexed"] == 0:
             await ctx.info("Building code index...")
-            manager.build_index()
+            await _manager_call(manager, "build_index")
         
-        result = manager.get_symbols(
+        result = await _manager_call(
+            manager,
+            "get_symbols",
             file_path=file_path,
             symbol_type=symbol_type,
             namespace=namespace,
@@ -479,8 +504,10 @@ async def build_code_index(
     await ctx.info("Building code index")
     
     try:
-        manager = get_index_manager(project_root)
-        result = manager.build_index(
+        manager = await _get_manager(project_root)
+        result = await _manager_call(
+            manager,
+            "build_index",
             include_packages=include_packages,
             force_rebuild=force_rebuild
         )
@@ -512,8 +539,8 @@ async def code_index_status(
     await ctx.info("Getting code index status")
     
     try:
-        manager = get_index_manager(project_root)
-        result = manager.get_index_status()
+        manager = await _get_manager(project_root)
+        result = await _manager_call(manager, "get_index_status")
         return result
     
     except Exception as e:

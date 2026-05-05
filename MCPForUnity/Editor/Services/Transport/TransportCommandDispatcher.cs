@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using MCPForUnity.Editor.Helpers;
@@ -235,6 +236,7 @@ namespace MCPForUnity.Editor.Services.Transport
                 // Early exit inside lock to prevent per-frame List allocations (GitHub issue #577)
                 if (Pending.Count == 0)
                 {
+                    PerfMetrics.RecordIdleTick();
                     return;
                 }
 
@@ -257,6 +259,7 @@ namespace MCPForUnity.Editor.Services.Transport
                 }
             }
 
+            PerfMetrics.RecordActiveTick();
             foreach (var (id, pending) in ready)
             {
                 ProcessCommand(id, pending);
@@ -310,6 +313,9 @@ namespace MCPForUnity.Editor.Services.Transport
                 return;
             }
 
+            string toolNameForMetrics = "(unknown)";
+            long queueWaitMs = (long)(DateTime.UtcNow - pending.QueuedAt).TotalMilliseconds;
+            var handlerSw = Stopwatch.StartNew();
             try
             {
                 var command = JsonConvert.DeserializeObject<Command>(commandText);
@@ -317,6 +323,8 @@ namespace MCPForUnity.Editor.Services.Transport
                 {
                     pending.TrySetResult(SerializeError("Command deserialized to null", "Unknown", commandText));
                     RemovePending(id, pending);
+                    handlerSw.Stop();
+                    PerfMetrics.RecordCommand(toolNameForMetrics, queueWaitMs, handlerSw.ElapsedMilliseconds, false);
                     return;
                 }
 
@@ -324,8 +332,12 @@ namespace MCPForUnity.Editor.Services.Transport
                 {
                     pending.TrySetResult(SerializeError("Command type cannot be empty"));
                     RemovePending(id, pending);
+                    handlerSw.Stop();
+                    PerfMetrics.RecordCommand(toolNameForMetrics, queueWaitMs, handlerSw.ElapsedMilliseconds, false);
                     return;
                 }
+
+                toolNameForMetrics = command.type;
 
                 if (string.Equals(command.type, "ping", StringComparison.OrdinalIgnoreCase))
                 {
@@ -336,6 +348,8 @@ namespace MCPForUnity.Editor.Services.Transport
                     };
                     pending.TrySetResult(JsonConvert.SerializeObject(pingResponse));
                     RemovePending(id, pending);
+                    handlerSw.Stop();
+                    PerfMetrics.RecordCommand(toolNameForMetrics, queueWaitMs, handlerSw.ElapsedMilliseconds, true);
                     return;
                 }
 
@@ -348,6 +362,8 @@ namespace MCPForUnity.Editor.Services.Transport
                     pending.TrySetResult(SerializeError(
                         $"Resource '{command.type}' is disabled in the Unity Editor."));
                     RemovePending(id, pending);
+                    handlerSw.Stop();
+                    PerfMetrics.RecordCommand(toolNameForMetrics, queueWaitMs, handlerSw.ElapsedMilliseconds, false);
                     return;
                 }
 
@@ -358,6 +374,8 @@ namespace MCPForUnity.Editor.Services.Transport
                     pending.TrySetResult(SerializeError(
                         $"Tool '{command.type}' is disabled in the Unity Editor."));
                     RemovePending(id, pending);
+                    handlerSw.Stop();
+                    PerfMetrics.RecordCommand(toolNameForMetrics, queueWaitMs, handlerSw.ElapsedMilliseconds, false);
                     return;
                 }
 
@@ -365,9 +383,15 @@ namespace MCPForUnity.Editor.Services.Transport
 
                 if (result == null)
                 {
-                    // Async command – cleanup after completion on next editor frame to preserve order.
-                    pending.CompletionSource.Task.ContinueWith(_ =>
+                    // Async command — record latency when the task actually completes, not when ExecuteCommand returned.
+                    string capturedTool = toolNameForMetrics;
+                    long capturedQueue = queueWaitMs;
+                    var asyncStart = handlerSw.ElapsedMilliseconds;
+                    pending.CompletionSource.Task.ContinueWith(t =>
                     {
+                        handlerSw.Stop();
+                        bool ok = t.Status == TaskStatus.RanToCompletion;
+                        PerfMetrics.RecordCommand(capturedTool, capturedQueue, handlerSw.ElapsedMilliseconds, ok);
                         EditorApplication.delayCall += () => RemovePending(id, pending);
                     }, TaskScheduler.Default);
                     return;
@@ -376,12 +400,16 @@ namespace MCPForUnity.Editor.Services.Transport
                 var response = new { status = "success", result };
                 pending.TrySetResult(JsonConvert.SerializeObject(response));
                 RemovePending(id, pending);
+                handlerSw.Stop();
+                PerfMetrics.RecordCommand(toolNameForMetrics, queueWaitMs, handlerSw.ElapsedMilliseconds, true);
             }
             catch (Exception ex)
             {
                 McpLog.Error($"Error processing command: {ex.Message}\n{ex.StackTrace}");
                 pending.TrySetResult(SerializeError(ex.Message, "Unknown (error during processing)", ex.StackTrace));
                 RemovePending(id, pending);
+                handlerSw.Stop();
+                PerfMetrics.RecordCommand(toolNameForMetrics, queueWaitMs, handlerSw.ElapsedMilliseconds, false);
             }
         }
 

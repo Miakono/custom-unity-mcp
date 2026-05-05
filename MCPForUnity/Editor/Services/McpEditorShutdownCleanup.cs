@@ -1,5 +1,4 @@
 using System;
-using System.Threading.Tasks;
 using MCPForUnity.Editor.Constants;
 using MCPForUnity.Editor.Helpers;
 using MCPForUnity.Editor.Services.Transport;
@@ -24,15 +23,15 @@ namespace MCPForUnity.Editor.Services
 
         private static void OnEditorQuitting()
         {
-            // 1) Stop transports (best-effort, bounded wait).
+            // 1) Force-stop transports synchronously.
+            // A graceful async stop can leave receive/listener tasks alive during editor quit,
+            // which in turn leaves the Unity process hanging in Mono teardown.
             try
             {
                 var transport = MCPServiceLocator.TransportManager;
 
-                Task stopHttp = transport.StopAsync(TransportMode.Http);
-                Task stopStdio = transport.StopAsync(TransportMode.Stdio);
-
-                try { Task.WaitAll(new[] { stopHttp, stopStdio }, 750); } catch { }
+                transport.ForceStop(TransportMode.Http);
+                transport.ForceStop(TransportMode.Stdio);
             }
             catch (Exception ex)
             {

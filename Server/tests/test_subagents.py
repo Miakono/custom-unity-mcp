@@ -6,6 +6,7 @@ import services.subagents as subagents_module
 from services.registry import TOOL_GROUPS, mcp_for_unity_tool
 import services.registry.tool_registry as tool_registry_module
 from services.subagents import build_subagent_catalog, export_subagent_artifacts
+import services.unity_tool_source as unity_tool_source_module
 
 
 @pytest.fixture(autouse=True)
@@ -51,13 +52,34 @@ def _register_minimal_toolset():
         return None
 
 
-def test_build_subagent_catalog_includes_orchestrator_and_specialists():
+def _stub_unity_handlers(monkeypatch: pytest.MonkeyPatch, *tool_names: str) -> None:
+    handlers = dict(unity_tool_source_module.discover_unity_tool_handlers())
+    for tool_name in tool_names:
+        handlers.setdefault(tool_name, (f"tests/{tool_name}.cs",))
+    monkeypatch.setattr(
+        unity_tool_source_module,
+        "discover_unity_tool_handlers",
+        lambda: handlers,
+    )
+
+
+def test_build_subagent_catalog_includes_orchestrator_and_specialists(monkeypatch):
     _register_minimal_toolset()
+    _stub_unity_handlers(
+        monkeypatch,
+        "_manage_scene",
+        "_manage_vfx",
+        "_manage_animation",
+        "_manage_ui",
+        "_manage_scriptable_object",
+        "_run_tests",
+    )
 
     catalog = build_subagent_catalog()
     expected_subagent_count = 1 + len(TOOL_GROUPS)
 
-    assert catalog["generated_from"] == "live_tool_registry"
+    assert catalog["generated_from"] == "server_tool_registry"
+    assert catalog["compatibility_source"] == "unity_csharp_source_scan"
     assert catalog["subagent_count"] == expected_subagent_count
 
     orchestrator = next(item for item in catalog["subagents"] if item["id"] == "unity-orchestrator")
@@ -74,8 +96,17 @@ def test_build_subagent_catalog_includes_orchestrator_and_specialists():
     assert "_run_tests" in testing["tools"]
 
 
-def test_export_subagent_artifacts_writes_catalog_and_markdown(tmp_path):
+def test_export_subagent_artifacts_writes_catalog_and_markdown(tmp_path, monkeypatch):
     _register_minimal_toolset()
+    _stub_unity_handlers(
+        monkeypatch,
+        "_manage_scene",
+        "_manage_vfx",
+        "_manage_animation",
+        "_manage_ui",
+        "_manage_scriptable_object",
+        "_run_tests",
+    )
 
     result = export_subagent_artifacts(tmp_path)
     expected_subagent_count = 1 + len(TOOL_GROUPS)
@@ -117,6 +148,7 @@ def test_build_subagent_catalog_bootstraps_registry_when_empty(monkeypatch):
         return 2
 
     monkeypatch.setattr(subagents_module, "ensure_tool_registry_populated", fake_ensure)
+    _stub_unity_handlers(monkeypatch, "_manage_scene")
 
     catalog = build_subagent_catalog()
 
@@ -126,8 +158,29 @@ def test_build_subagent_catalog_bootstraps_registry_when_empty(monkeypatch):
 
 
 def test_build_subagent_catalog_includes_visual_qa_specialist_tools_from_runtime_registry():
+    tool_registry_module._tool_registry.clear()
     catalog = build_subagent_catalog()
 
     visual_qa = next(item for item in catalog["subagents"] if item.get("group") == "visual_qa")
 
     assert "manage_screenshot" in visual_qa["tools"]
+
+
+def test_build_subagent_catalog_excludes_unsupported_unity_targeted_tools(monkeypatch):
+    _register_minimal_toolset()
+
+    @mcp_for_unity_tool(group="core")
+    def unsupported_unity_tool():
+        return None
+
+    monkeypatch.setattr(
+        unity_tool_source_module,
+        "discover_unity_tool_handlers",
+        lambda: {"_manage_scene": ("MCPForUnity/Editor/Tools/ManageScene.cs",)},
+    )
+
+    catalog = build_subagent_catalog()
+    core = next(item for item in catalog["subagents"] if item["id"] == "unity-core-specialist")
+
+    assert "unsupported_unity_tool" not in core["tools"]
+    assert "unsupported_unity_tool" in catalog["compatibility_summary"]["unsupported_tools"]

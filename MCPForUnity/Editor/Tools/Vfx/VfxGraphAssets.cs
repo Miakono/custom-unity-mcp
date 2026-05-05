@@ -102,7 +102,7 @@ namespace MCPForUnity.Editor.Tools.Vfx
                 {
                     return new { success = false, message = $"Failed to copy VFX template from {templateAssetPath}" };
                 }
-                AssetDatabase.Refresh();
+                // CopyAsset already imports the destination — no project-wide Refresh needed.
                 newAsset = AssetDatabase.LoadAssetAtPath<VisualEffectAsset>(assetPath);
             }
             else

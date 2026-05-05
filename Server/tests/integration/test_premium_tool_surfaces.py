@@ -162,6 +162,45 @@ async def test_manage_code_intelligence_search_code_uses_index_manager(monkeypat
 
 
 @pytest.mark.asyncio
+async def test_search_code_offloads_local_index_work(monkeypatch):
+    calls = []
+
+    class FakeManager:
+        def get_index_status(self):
+            calls.append("get_index_status")
+            return {"loaded": False, "files_indexed": 0}
+
+        def build_index(self):
+            calls.append("build_index")
+            return {"success": True}
+
+        def search_code(self, **kwargs):
+            calls.append(("search_code", kwargs["pattern"]))
+            return {"success": True, "results": []}
+
+    async def fake_to_thread(func, *args, **kwargs):
+        calls.append(getattr(func, "__name__", repr(func)))
+        return func(*args, **kwargs)
+
+    def get_index_manager(_root):
+        return FakeManager()
+
+    monkeypatch.setattr(manage_code_intelligence_mod.asyncio, "to_thread", fake_to_thread)
+    monkeypatch.setattr(manage_code_intelligence_mod, "get_index_manager", get_index_manager)
+
+    result = await manage_code_intelligence_mod.search_code(
+        ctx=DummyContext(),
+        pattern="Stats",
+    )
+
+    assert result["success"] is True
+    assert "get_index_manager" in calls
+    assert "get_index_status" in calls
+    assert "build_index" in calls
+    assert ("search_code", "Stats") in calls
+
+
+@pytest.mark.asyncio
 async def test_manage_runtime_ui_routes_read_only_and_mutating_actions(monkeypatch):
     captured = {"read_only_called": False, "mutation_called": False}
 

@@ -46,6 +46,9 @@ class TraceSession:
 _active_traces: dict[str, TraceSession] = {}
 _completed_traces: dict[str, TraceSession] = {}
 
+# Maximum completed traces to keep in memory; oldest are evicted when exceeded.
+_MAX_COMPLETED_TRACES = 50
+
 # Global trace collector for middleware integration
 _current_trace_id: str | None = None
 _cleared_active_trace_without_flag = False
@@ -274,7 +277,12 @@ async def stop_trace(
     trace = _active_traces.pop(target_id)
     trace.is_active = False
     _completed_traces[target_id] = trace
-    
+
+    # Evict oldest completed traces when the cap is exceeded.
+    while len(_completed_traces) > _MAX_COMPLETED_TRACES:
+        oldest_id = next(iter(_completed_traces))
+        del _completed_traces[oldest_id]
+
     # Clear current trace if this was it
     if _current_trace_id == target_id:
         set_current_trace_id(None)

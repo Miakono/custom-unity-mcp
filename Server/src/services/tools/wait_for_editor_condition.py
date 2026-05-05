@@ -131,23 +131,27 @@ async def wait_for_editor_condition(
     timeout = _parse_float(timeout_seconds, DEFAULT_TIMEOUT_SECONDS)
     timeout = max(1.0, min(float(timeout), MAX_TIMEOUT_SECONDS))
 
-    # Parse and validate poll interval
-    poll_interval = _parse_float(poll_interval_seconds, 0.5)
-    poll_interval = max(0.1, min(float(poll_interval), 5.0))
+    # Parse and validate poll interval. The caller-supplied value is treated as the
+    # *initial* cadence; we adaptively back off (capped at 5x) so a long-running compile
+    # doesn't pound the editor while still feeling responsive on quick conditions.
+    initial_poll_interval = _parse_float(poll_interval_seconds, 0.1)
+    initial_poll_interval = max(0.05, min(float(initial_poll_interval), 5.0))
+    max_poll_interval = min(2.0, initial_poll_interval * 5.0)
+    poll_interval = initial_poll_interval
 
     # Validate condition-specific parameters
-    validation_error = _validate_condition_params(condition, play_mode_target, 
-                                                   prefab_stage_target, object_name, 
+    validation_error = _validate_condition_params(condition, play_mode_target,
+                                                   prefab_stage_target, object_name,
                                                    object_guid)
     if validation_error:
         return MCPResponse(success=False, error="invalid_parameters", message=validation_error)
 
     start_time = time.time()
     deadline = start_time + timeout
-    
+
     logger.info(
         f"Starting wait for condition '{condition}' with timeout {timeout}s "
-        f"and poll interval {poll_interval}s"
+        f"and poll interval {initial_poll_interval}s (adaptive, max {max_poll_interval}s)"
     )
 
     try:
@@ -205,11 +209,13 @@ async def wait_for_editor_condition(
                     data=result
                 )
 
-            # Wait before next poll
-            # Use asyncio.wait_for to allow cancellation
+            # Wait before next poll. Adaptive backoff: each miss grows the interval by 1.5x
+            # up to max_poll_interval. This keeps the first few checks responsive (catches
+            # quick state changes) while easing editor pressure during long compiles/imports.
             remaining = deadline - time.time()
-            sleep_duration = min(poll_interval, max(0.1, remaining))
+            sleep_duration = min(poll_interval, max(0.05, remaining))
             await asyncio.sleep(sleep_duration)
+            poll_interval = min(max_poll_interval, poll_interval * 1.5)
 
     except asyncio.CancelledError:
         duration_ms = int((time.time() - start_time) * 1000)

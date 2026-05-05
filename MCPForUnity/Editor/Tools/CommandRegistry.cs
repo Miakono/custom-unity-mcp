@@ -1,12 +1,12 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 using MCPForUnity.Editor.Helpers;
 using MCPForUnity.Editor.Resources;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using UnityEditor;
 
 namespace MCPForUnity.Editor.Tools
 {
@@ -59,28 +59,17 @@ namespace MCPForUnity.Editor.Tools
         {
             try
             {
-                var allTypes = AppDomain.CurrentDomain.GetAssemblies()
-                    .Where(a => !a.IsDynamic)
-                    .SelectMany(a =>
-                    {
-                        try { return a.GetTypes(); }
-                        catch { return new Type[0]; }
-                    })
-                    .ToList();
-
-                // Discover tools
-                var toolTypes = allTypes.Where(t => t.GetCustomAttribute<McpForUnityToolAttribute>() != null);
+                // TypeCache is an indexed Unity Editor lookup — orders of magnitude faster
+                // than scanning every loaded assembly with GetTypes() on each domain reload.
                 int toolCount = 0;
-                foreach (var type in toolTypes)
+                foreach (var type in TypeCache.GetTypesWithAttribute<McpForUnityToolAttribute>())
                 {
                     if (RegisterCommandType(type, isResource: false))
                         toolCount++;
                 }
 
-                // Discover resources
-                var resourceTypes = allTypes.Where(t => t.GetCustomAttribute<McpForUnityResourceAttribute>() != null);
                 int resourceCount = 0;
-                foreach (var type in resourceTypes)
+                foreach (var type in TypeCache.GetTypesWithAttribute<McpForUnityResourceAttribute>())
                 {
                     if (RegisterCommandType(type, isResource: true))
                         resourceCount++;
@@ -276,44 +265,42 @@ namespace MCPForUnity.Editor.Tools
         /// <exception cref="InvalidOperationException"></exception>
         private static Func<JObject, Task<object>> CreateAsyncHandlerDelegate(MethodInfo method, string commandName)
         {
-            return async (JObject parameters) =>
+            // Bind the method to a cached delegate at registration time. Delegate return-type
+            // covariance lets a Task<T>-returning method bind to Func<JObject, Task>, so the
+            // hot path no longer pays for MethodInfo.Invoke or per-call GetProperty lookups.
+            Func<JObject, Task> handlerDelegate;
+            try
             {
-                object rawResult;
+                handlerDelegate = (Func<JObject, Task>)Delegate.CreateDelegate(
+                    typeof(Func<JObject, Task>),
+                    method
+                );
+            }
+            catch (ArgumentException ex)
+            {
+                throw new InvalidOperationException(
+                    $"Async handler '{commandName}' has an incompatible signature: {ex.Message}",
+                    ex
+                );
+            }
 
-                try
-                {
-                    rawResult = method.Invoke(null, new object[] { parameters });
-                }
-                catch (TargetInvocationException ex)
-                {
-                    throw ex.InnerException ?? ex;
-                }
+            // Resolve Task<T>.Result once at registration; null for non-generic Task handlers.
+            PropertyInfo resultProperty = null;
+            if (method.ReturnType.IsGenericType && typeof(Task).IsAssignableFrom(method.ReturnType))
+            {
+                resultProperty = method.ReturnType.GetProperty("Result");
+            }
 
-                if (rawResult == null)
+            return async parameters =>
+            {
+                Task task = handlerDelegate(parameters);
+                if (task == null)
                 {
                     return null;
                 }
 
-                if (rawResult is not Task task)
-                {
-                    throw new InvalidOperationException(
-                        $"Async handler '{commandName}' returned an object that is not a Task"
-                    );
-                }
-
                 await task.ConfigureAwait(true);
-
-                var taskType = task.GetType();
-                if (taskType.IsGenericType)
-                {
-                    var resultProperty = taskType.GetProperty("Result");
-                    if (resultProperty != null)
-                    {
-                        return resultProperty.GetValue(task);
-                    }
-                }
-
-                return null;
+                return resultProperty?.GetValue(task);
             };
         }
 

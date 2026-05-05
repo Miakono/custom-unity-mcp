@@ -18,12 +18,34 @@ import json
 import logging
 import os
 import re
+import tempfile
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field, asdict
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
+
+def _parser_worker_count() -> int:
+    """Worker count for parallel C# parsing. Capped to avoid thrashing tiny machines and
+    overshooting the I/O-overlap sweet spot — past ~8 threads the GIL-held regex work
+    dominates and extra threads just add scheduling overhead."""
+    cpu = os.cpu_count() or 4
+    return max(2, min(8, cpu))
+
 logger = logging.getLogger("mcp-for-unity-server")
+
+
+def normalize_project_root(project_root: str | None = None) -> str:
+    """Normalize a project root path for cache keys and file discovery."""
+    root = project_root or os.getcwd()
+    return os.path.normpath(os.path.abspath(os.path.expanduser(root)))
+
+
+def get_project_root_key(project_root: str | None = None) -> str:
+    """Return a stable cache key for a project root across path casing variants."""
+    return os.path.normcase(normalize_project_root(project_root))
 
 
 @dataclass
@@ -488,10 +510,13 @@ class CodeIndexManager:
     """Manager for building and querying the code index."""
     
     def __init__(self, project_root: str | None = None, cache_dir: str | None = None):
-        self.project_root = project_root or os.getcwd()
+        self.project_root = normalize_project_root(project_root)
+        if not os.path.isdir(self.project_root):
+            raise FileNotFoundError(f"Project root does not exist: {self.project_root}")
         self.cache_dir = cache_dir or os.path.expanduser("~/.unity-mcp/code-index")
         self.index: CodeIndex = CodeIndex(project_root=self.project_root)
         self._index_loaded = False
+        self._lock = threading.RLock()
         
         # Ensure cache directory exists
         os.makedirs(self.cache_dir, exist_ok=True)
@@ -504,32 +529,48 @@ class CodeIndexManager:
     
     def load_index(self) -> bool:
         """Load index from cache file. Returns True if successful."""
-        cache_file = self._get_cache_file_path()
-        if not os.path.exists(cache_file):
-            return False
-        
-        try:
-            with open(cache_file, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-            self.index = CodeIndex.from_dict(data)
-            self._index_loaded = True
-            logger.info(f"Loaded code index from {cache_file}")
-            return True
-        except Exception as e:
-            logger.warning(f"Failed to load index from cache: {e}")
-            return False
+        with self._lock:
+            cache_file = self._get_cache_file_path()
+            if not os.path.exists(cache_file):
+                return False
+            
+            try:
+                with open(cache_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                self.index = CodeIndex.from_dict(data)
+                self._index_loaded = True
+                logger.info(f"Loaded code index from {cache_file}")
+                return True
+            except Exception as e:
+                logger.warning(f"Failed to load index from cache: {e}")
+                return False
     
     def save_index(self) -> bool:
         """Save index to cache file. Returns True if successful."""
-        cache_file = self._get_cache_file_path()
-        try:
-            with open(cache_file, 'w', encoding='utf-8') as f:
-                json.dump(self.index.to_dict(), f, indent=2)
-            logger.info(f"Saved code index to {cache_file}")
-            return True
-        except Exception as e:
-            logger.warning(f"Failed to save index to cache: {e}")
-            return False
+        with self._lock:
+            cache_file = self._get_cache_file_path()
+            temp_path: str | None = None
+            try:
+                with tempfile.NamedTemporaryFile(
+                    'w',
+                    encoding='utf-8',
+                    dir=self.cache_dir,
+                    delete=False,
+                    suffix='.tmp',
+                ) as temp_file:
+                    json.dump(self.index.to_dict(), temp_file, indent=2)
+                    temp_path = temp_file.name
+                os.replace(temp_path, cache_file)
+                logger.info(f"Saved code index to {cache_file}")
+                return True
+            except Exception as e:
+                if temp_path:
+                    try:
+                        os.remove(temp_path)
+                    except OSError:
+                        pass
+                logger.warning(f"Failed to save index to cache: {e}")
+                return False
     
     def find_cs_files(self, include_packages: bool = False) -> list[str]:
         """Find all C# files in the project."""
@@ -559,102 +600,140 @@ class CodeIndexManager:
     
     def build_index(self, include_packages: bool = False, force_rebuild: bool = False) -> dict[str, Any]:
         """Build the complete code index."""
-        if not force_rebuild and self.load_index():
-            # Check for modifications and update incrementally
-            return self.update_index(include_packages)
-        
-        logger.info(f"Building code index for {self.project_root}")
-        
-        cs_files = self.find_cs_files(include_packages)
-        total_files = len(cs_files)
-        processed = 0
-        errors = 0
-        
-        self.index = CodeIndex(
-            version="1.0",
-            created_at=datetime.now().isoformat(),
-            updated_at=datetime.now().isoformat(),
-            project_root=self.project_root,
-            files={}
-        )
-        
-        for file_path in cs_files:
-            try:
-                file_index = CSharpParser.parse_file(file_path)
-                self.index.files[file_path] = file_index
-                processed += 1
-            except Exception as e:
-                logger.warning(f"Failed to parse {file_path}: {e}")
-                errors += 1
-        
-        self.index._rebuild_lookup_tables()
-        self._index_loaded = True
-        self.save_index()
-        
-        symbol_count = sum(len(f.symbols) for f in self.index.files.values())
-        
-        return {
-            "success": True,
-            "files_processed": processed,
-            "files_total": total_files,
-            "errors": errors,
-            "symbols_indexed": symbol_count
-        }
+        with self._lock:
+            if not force_rebuild and self.load_index():
+                # Check for modifications and update incrementally
+                return self.update_index(include_packages)
+            
+            logger.info(f"Building code index for {self.project_root}")
+            
+            cs_files = self.find_cs_files(include_packages)
+            total_files = len(cs_files)
+            processed = 0
+            errors = 0
+            
+            self.index = CodeIndex(
+                version="1.0",
+                created_at=datetime.now().isoformat(),
+                updated_at=datetime.now().isoformat(),
+                project_root=self.project_root,
+                files={}
+            )
+            
+            # Parallel parse — file I/O dominates and releases the GIL, so threads give
+            # a meaningful speedup even though regex matching itself is GIL-bound.
+            def _safe_parse(path: str) -> tuple[str, FileIndex | None, Exception | None]:
+                try:
+                    return path, CSharpParser.parse_file(path), None
+                except Exception as ex:  # noqa: BLE001 — we want to surface per-file errors below
+                    return path, None, ex
+
+            with ThreadPoolExecutor(max_workers=_parser_worker_count()) as pool:
+                for file_path, file_index, err in pool.map(_safe_parse, cs_files):
+                    if err is not None:
+                        logger.warning(f"Failed to parse {file_path}: {err}")
+                        errors += 1
+                        continue
+                    self.index.files[file_path] = file_index
+                    processed += 1
+
+            self.index._rebuild_lookup_tables()
+            self._index_loaded = True
+            self.save_index()
+            
+            symbol_count = sum(len(f.symbols) for f in self.index.files.values())
+            
+            return {
+                "success": True,
+                "files_processed": processed,
+                "files_total": total_files,
+                "errors": errors,
+                "symbols_indexed": symbol_count
+            }
     
     def update_index(self, include_packages: bool = False) -> dict[str, Any]:
         """Incrementally update the index based on file modifications."""
-        if not self._index_loaded:
-            self.load_index()
-        
-        cs_files = self.find_cs_files(include_packages)
-        
-        added = 0
-        updated = 0
-        removed = 0
-        errors = 0
-        
-        # Check for new or modified files
-        current_files = set(cs_files)
-        indexed_files = set(self.index.files.keys())
-        
-        # Remove files that no longer exist
-        for file_path in indexed_files - current_files:
-            del self.index.files[file_path]
-            removed += 1
-        
-        # Add or update files
-        for file_path in current_files:
-            try:
-                current_hash = CSharpParser.compute_file_hash(file_path)
-                
-                if file_path not in self.index.files:
-                    # New file
-                    file_index = CSharpParser.parse_file(file_path)
-                    self.index.files[file_path] = file_index
-                    added += 1
-                elif self.index.files[file_path].file_hash != current_hash:
-                    # Modified file
-                    file_index = CSharpParser.parse_file(file_path)
-                    self.index.files[file_path] = file_index
-                    updated += 1
-            except Exception as e:
-                logger.warning(f"Failed to update {file_path}: {e}")
-                errors += 1
-        
-        self.index.updated_at = datetime.now().isoformat()
-        self.index._rebuild_lookup_tables()
-        self.save_index()
-        
-        symbol_count = sum(len(f.symbols) for f in self.index.files.values())
-        
-        return {
-            "success": True,
-            "files_added": added,
-            "files_updated": updated,
-            "files_removed": removed,
-            "errors": errors,
-            "total_symbols": symbol_count
-        }
+        with self._lock:
+            if not self._index_loaded:
+                self.load_index()
+            
+            cs_files = self.find_cs_files(include_packages)
+            
+            added = 0
+            updated = 0
+            removed = 0
+            errors = 0
+            
+            # Check for new or modified files
+            current_files = set(cs_files)
+            indexed_files = set(self.index.files.keys())
+            
+            # Remove files that no longer exist
+            for file_path in indexed_files - current_files:
+                del self.index.files[file_path]
+                removed += 1
+            
+            # Per-file diff worker. Runs in a thread; mutations to shared state happen
+            # on the main thread after results come back to keep the existing locking
+            # invariants intact. Returns a tagged tuple so the main thread knows what
+            # (if anything) to apply.
+            def _diff_one(file_path: str):
+                try:
+                    if file_path not in self.index.files:
+                        return ("new", file_path, CSharpParser.parse_file(file_path), None)
+
+                    try:
+                        current_mtime = os.path.getmtime(file_path)
+                    except OSError:
+                        return ("missing", file_path, None, None)
+
+                    cached = self.index.files[file_path]
+                    if current_mtime == cached.last_modified:
+                        return ("skip", file_path, None, None)
+
+                    current_hash = CSharpParser.compute_file_hash(file_path)
+                    if cached.file_hash == current_hash:
+                        return ("touch", file_path, None, current_mtime)
+
+                    return ("updated", file_path, CSharpParser.parse_file(file_path), None)
+                except Exception as ex:  # noqa: BLE001 — surfaced per-file via "error" tag
+                    return ("error", file_path, None, ex)
+
+            with ThreadPoolExecutor(max_workers=_parser_worker_count()) as pool:
+                for tag, file_path, file_index, extra in pool.map(_diff_one, current_files):
+                    if tag == "new":
+                        self.index.files[file_path] = file_index
+                        added += 1
+                    elif tag == "updated":
+                        self.index.files[file_path] = file_index
+                        updated += 1
+                    elif tag == "touch":
+                        self.index.files[file_path].last_modified = extra  # mtime
+                    elif tag == "missing":
+                        # File was deleted between discovery and processing —
+                        # evict the stale entry so the index stays consistent.
+                        if file_path in self.index.files:
+                            del self.index.files[file_path]
+                            removed += 1
+                    elif tag == "error":
+                        logger.warning(f"Failed to update {file_path}: {extra}")
+                        errors += 1
+                    # tag == "skip" → nothing to do
+            
+            self.index.updated_at = datetime.now().isoformat()
+            self.index._rebuild_lookup_tables()
+            self.save_index()
+            
+            symbol_count = sum(len(f.symbols) for f in self.index.files.values())
+            
+            return {
+                "success": True,
+                "files_added": added,
+                "files_updated": updated,
+                "files_removed": removed,
+                "errors": errors,
+                "total_symbols": symbol_count
+            }
     
     def search_code(
         self,
@@ -666,68 +745,94 @@ class CodeIndexManager:
         offset: int = 0
     ) -> dict[str, Any]:
         """Search across all C# files using regex or text search."""
-        if not self._index_loaded:
-            self.load_index()
-        
-        results: list[dict[str, Any]] = []
-        
-        # Compile regex if needed
-        flags = re.IGNORECASE if ignore_case else 0
-        if regex:
-            try:
-                compiled_pattern = re.compile(pattern, flags)
-            except re.error as e:
-                return {"success": False, "error": f"Invalid regex pattern: {e}"}
-        else:
-            compiled_pattern = re.compile(re.escape(pattern), flags)
-        
-        # Filter files by pattern if specified
-        files_to_search = list(self.index.files.keys())
-        if file_pattern:
-            file_regex = re.compile(file_pattern, re.IGNORECASE)
-            files_to_search = [f for f in files_to_search if file_regex.search(f)]
-        
-        for file_path in files_to_search:
-            try:
-                with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
-                    content = f.read()
-                
-                # Search in content
-                for match in compiled_pattern.finditer(content):
-                    # Find line number
-                    line_num = content[:match.start()].count('\n') + 1
-                    line_start = content.rfind('\n', 0, match.start()) + 1
-                    line_end = content.find('\n', match.start())
-                    if line_end == -1:
-                        line_end = len(content)
+        with self._lock:
+            if not self._index_loaded:
+                self.load_index()
+            
+            results: list[dict[str, Any]] = []
+            
+            # Compile regex if needed
+            flags = re.IGNORECASE if ignore_case else 0
+            if regex:
+                try:
+                    compiled_pattern = re.compile(pattern, flags)
+                except re.error as e:
+                    return {"success": False, "error": f"Invalid regex pattern: {e}"}
+            else:
+                compiled_pattern = re.compile(re.escape(pattern), flags)
+            
+            # Filter files by pattern if specified
+            files_to_search = list(self.index.files.keys())
+            if file_pattern:
+                # Patterns containing glob metacharacters are matched against the
+                # file basename using fnmatch so that e.g. "Player*.cs" works
+                # correctly.  Plain words / regex strings are matched as a
+                # case-insensitive substring against the full path.
+                if any(c in file_pattern for c in ('*', '?', '[')):
+                    import fnmatch
+                    files_to_search = [
+                        f for f in files_to_search
+                        if fnmatch.fnmatch(os.path.basename(f), file_pattern)
+                    ]
+                else:
+                    try:
+                        file_regex = re.compile(file_pattern, re.IGNORECASE)
+                    except re.error:
+                        file_regex = re.compile(re.escape(file_pattern), re.IGNORECASE)
+                    files_to_search = [f for f in files_to_search if file_regex.search(f)]
+            
+            stale_paths: list[str] = []
+            for file_path in files_to_search:
+                if not os.path.isfile(file_path):
+                    stale_paths.append(file_path)
+                    continue
+                try:
+                    with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
+                        content = f.read()
                     
-                    line_content = content[line_start:line_end].strip()
-                    
-                    results.append({
-                        "file_path": file_path,
-                        "line_number": line_num,
-                        "column": match.start() - line_start + 1,
-                        "match": match.group(0),
-                        "line_content": line_content
-                    })
-                    
-                    if len(results) >= max_results + offset:
-                        break
+                    # Search in content
+                    for match in compiled_pattern.finditer(content):
+                        # Find line number
+                        line_num = content[:match.start()].count('\n') + 1
+                        line_start = content.rfind('\n', 0, match.start()) + 1
+                        line_end = content.find('\n', match.start())
+                        if line_end == -1:
+                            line_end = len(content)
                         
-            except Exception as e:
-                logger.warning(f"Failed to search {file_path}: {e}")
-        
-        total = len(results)
-        paginated_results = results[offset:offset + max_results] if offset < len(results) else []
-        
-        return {
-            "success": True,
-            "results": paginated_results,
-            "total": total,
-            "offset": offset,
-            "limit": max_results,
-            "has_more": total > offset + max_results
-        }
+                        line_content = content[line_start:line_end].strip()
+                        
+                        results.append({
+                            "file_path": file_path,
+                            "line_number": line_num,
+                            "column": match.start() - line_start + 1,
+                            "match": match.group(0),
+                            "line_content": line_content
+                        })
+                        
+                        if len(results) >= max_results + offset:
+                            break
+                            
+                except Exception as e:
+                    logger.warning(f"Failed to search {file_path}: {e}")
+            
+            # Evict stale entries from the index so future searches are faster
+            if stale_paths:
+                logger.info(f"Evicting {len(stale_paths)} stale files from code index")
+                for sp in stale_paths:
+                    self.index.files.pop(sp, None)
+                self.save_index()
+            
+            total = len(results)
+            paginated_results = results[offset:offset + max_results] if offset < len(results) else []
+            
+            return {
+                "success": True,
+                "results": paginated_results,
+                "total": total,
+                "offset": offset,
+                "limit": max_results,
+                "has_more": total > offset + max_results
+            }
     
     def find_symbol(
         self,
@@ -736,30 +841,31 @@ class CodeIndexManager:
         exact_match: bool = True
     ) -> dict[str, Any]:
         """Find symbol definitions by name."""
-        if not self._index_loaded:
-            self.load_index()
-        
-        results: list[dict[str, Any]] = []
-        
-        for file_path, file_index in self.index.files.items():
-            for symbol in file_index.symbols:
-                # Match by name
-                name_matches = (
-                    symbol.name == name if exact_match
-                    else name.lower() in symbol.name.lower()
-                )
-                
-                # Match by type if specified
-                type_matches = symbol_type is None or symbol.type == symbol_type
-                
-                if name_matches and type_matches:
-                    results.append(symbol.to_dict())
-        
-        return {
-            "success": True,
-            "results": results,
-            "count": len(results)
-        }
+        with self._lock:
+            if not self._index_loaded:
+                self.load_index()
+            
+            results: list[dict[str, Any]] = []
+            
+            for file_path, file_index in self.index.files.items():
+                for symbol in file_index.symbols:
+                    # Match by name
+                    name_matches = (
+                        symbol.name == name if exact_match
+                        else name.lower() in symbol.name.lower()
+                    )
+                    
+                    # Match by type if specified
+                    type_matches = symbol_type is None or symbol.type == symbol_type
+                    
+                    if name_matches and type_matches:
+                        results.append(symbol.to_dict())
+            
+            return {
+                "success": True,
+                "results": results,
+                "count": len(results)
+            }
     
     def find_references(
         self,
@@ -768,70 +874,82 @@ class CodeIndexManager:
         offset: int = 0
     ) -> dict[str, Any]:
         """Find all references to a symbol."""
-        if not self._index_loaded:
-            self.load_index()
-        
-        # First find the symbol definition
-        symbol_info = self.find_symbol(symbol_name, exact_match=True)
-        if not symbol_info["results"]:
+        with self._lock:
+            if not self._index_loaded:
+                self.load_index()
+            
+            # First find the symbol definition
+            symbol_info = self.find_symbol(symbol_name, exact_match=True)
+            if not symbol_info["results"]:
+                return {
+                    "success": True,
+                    "results": [],
+                    "total": 0,
+                    "message": f"Symbol '{symbol_name}' not found in index"
+                }
+            
+            # Search for references
+            results: list[dict[str, Any]] = []
+            
+            # Use word boundary for more accurate matching
+            pattern = r'\b' + re.escape(symbol_name) + r'\b'
+            compiled = re.compile(pattern)
+            
+            stale_paths: list[str] = []
+            for file_path in self.index.files.keys():
+                if not os.path.isfile(file_path):
+                    stale_paths.append(file_path)
+                    continue
+                try:
+                    with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
+                        content = f.read()
+                    
+                    for match in compiled.finditer(content):
+                        line_num = content[:match.start()].count('\n') + 1
+                        line_start = content.rfind('\n', 0, match.start()) + 1
+                        line_end = content.find('\n', match.start())
+                        if line_end == -1:
+                            line_end = len(content)
+                        
+                        line_content = content[line_start:line_end].strip()
+                        
+                        # Skip definition lines (heuristic)
+                        if any(keyword in line_content for keyword in ['class ', 'struct ', 'interface ', 'enum ', 'void ', 'public ', 'private ', 'protected ']):
+                            if symbol_name in line_content.split(':' if ':' in line_content else '{')[0]:
+                                continue
+                        
+                        results.append({
+                            "file_path": file_path,
+                            "line_number": line_num,
+                            "column": match.start() - line_start + 1,
+                            "context": line_content
+                        })
+                        
+                        if len(results) >= max_results + offset:
+                            break
+                            
+                except Exception as e:
+                    logger.warning(f"Failed to search references in {file_path}: {e}")
+            
+            # Evict stale entries from the index
+            if stale_paths:
+                logger.info(f"Evicting {len(stale_paths)} stale files from code index")
+                for sp in stale_paths:
+                    self.index.files.pop(sp, None)
+                self.save_index()
+            
+            total = len(results)
+            paginated_results = results[offset:offset + max_results] if offset < len(results) else []
+            
             return {
                 "success": True,
-                "results": [],
-                "total": 0,
-                "message": f"Symbol '{symbol_name}' not found in index"
+                "symbol": symbol_info["results"][0] if symbol_info["results"] else None,
+                "results": paginated_results,
+                "total": total,
+                "offset": offset,
+                "limit": max_results,
+                "has_more": total > offset + max_results
             }
-        
-        # Search for references
-        results: list[dict[str, Any]] = []
-        
-        # Use word boundary for more accurate matching
-        pattern = r'\b' + re.escape(symbol_name) + r'\b'
-        compiled = re.compile(pattern)
-        
-        for file_path in self.index.files.keys():
-            try:
-                with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
-                    content = f.read()
-                
-                for match in compiled.finditer(content):
-                    line_num = content[:match.start()].count('\n') + 1
-                    line_start = content.rfind('\n', 0, match.start()) + 1
-                    line_end = content.find('\n', match.start())
-                    if line_end == -1:
-                        line_end = len(content)
-                    
-                    line_content = content[line_start:line_end].strip()
-                    
-                    # Skip definition lines (heuristic)
-                    if any(keyword in line_content for keyword in ['class ', 'struct ', 'interface ', 'enum ', 'void ', 'public ', 'private ', 'protected ']):
-                        if symbol_name in line_content.split(':' if ':' in line_content else '{')[0]:
-                            continue
-                    
-                    results.append({
-                        "file_path": file_path,
-                        "line_number": line_num,
-                        "column": match.start() - line_start + 1,
-                        "context": line_content
-                    })
-                    
-                    if len(results) >= max_results + offset:
-                        break
-                        
-            except Exception as e:
-                logger.warning(f"Failed to search references in {file_path}: {e}")
-        
-        total = len(results)
-        paginated_results = results[offset:offset + max_results] if offset < len(results) else []
-        
-        return {
-            "success": True,
-            "symbol": symbol_info["results"][0] if symbol_info["results"] else None,
-            "results": paginated_results,
-            "total": total,
-            "offset": offset,
-            "limit": max_results,
-            "has_more": total > offset + max_results
-        }
     
     def get_symbols(
         self,
@@ -842,82 +960,85 @@ class CodeIndexManager:
         offset: int = 0
     ) -> dict[str, Any]:
         """List all symbols in a file or across the entire codebase."""
-        if not self._index_loaded:
-            self.load_index()
-        
-        results: list[dict[str, Any]] = []
-        
-        files_to_search = [file_path] if file_path else list(self.index.files.keys())
-        
-        for fp in files_to_search:
-            if fp not in self.index.files:
-                continue
+        with self._lock:
+            if not self._index_loaded:
+                self.load_index()
             
-            file_index = self.index.files[fp]
-            for symbol in file_index.symbols:
-                # Apply filters
-                if symbol_type and symbol.type != symbol_type:
-                    continue
-                if namespace and symbol.namespace != namespace:
+            results: list[dict[str, Any]] = []
+            
+            files_to_search = [file_path] if file_path else list(self.index.files.keys())
+            
+            for fp in files_to_search:
+                if fp not in self.index.files:
                     continue
                 
-                results.append(symbol.to_dict())
-        
-        total = len(results)
-        paginated_results = results[offset:offset + max_results] if offset < len(results) else []
-        
-        return {
-            "success": True,
-            "results": paginated_results,
-            "total": total,
-            "offset": offset,
-            "limit": max_results,
-            "has_more": total > offset + max_results
-        }
+                file_index = self.index.files[fp]
+                for symbol in file_index.symbols:
+                    # Apply filters
+                    if symbol_type and symbol.type != symbol_type:
+                        continue
+                    if namespace and symbol.namespace != namespace:
+                        continue
+                    
+                    results.append(symbol.to_dict())
+            
+            total = len(results)
+            paginated_results = results[offset:offset + max_results] if offset < len(results) else []
+            
+            return {
+                "success": True,
+                "results": paginated_results,
+                "total": total,
+                "offset": offset,
+                "limit": max_results,
+                "has_more": total > offset + max_results
+            }
     
     def get_index_status(self) -> dict[str, Any]:
         """Get current index status and statistics."""
-        if not self._index_loaded:
-            loaded = self.load_index()
-        else:
-            loaded = True
-        
-        file_count = len(self.index.files)
-        symbol_count = sum(len(f.symbols) for f in self.index.files.values())
-        
-        symbol_types: dict[str, int] = {}
-        for file_index in self.index.files.values():
-            for symbol in file_index.symbols:
-                symbol_types[symbol.type] = symbol_types.get(symbol.type, 0) + 1
-        
-        return {
-            "success": True,
-            "loaded": loaded,
-            "project_root": self.project_root,
-            "cache_file": self._get_cache_file_path(),
-            "files_indexed": file_count,
-            "total_symbols": symbol_count,
-            "symbol_types": symbol_types,
-            "created_at": self.index.created_at,
-            "updated_at": self.index.updated_at
-        }
+        with self._lock:
+            if not self._index_loaded:
+                loaded = self.load_index()
+            else:
+                loaded = True
+            
+            file_count = len(self.index.files)
+            symbol_count = sum(len(f.symbols) for f in self.index.files.values())
+            
+            symbol_types: dict[str, int] = {}
+            for file_index in self.index.files.values():
+                for symbol in file_index.symbols:
+                    symbol_types[symbol.type] = symbol_types.get(symbol.type, 0) + 1
+            
+            return {
+                "success": True,
+                "loaded": loaded,
+                "project_root": self.project_root,
+                "cache_file": self._get_cache_file_path(),
+                "files_indexed": file_count,
+                "total_symbols": symbol_count,
+                "symbol_types": symbol_types,
+                "created_at": self.index.created_at,
+                "updated_at": self.index.updated_at
+            }
     
     def clear_index(self) -> dict[str, Any]:
         """Clear the current index and cache."""
-        cache_file = self._get_cache_file_path()
-        if os.path.exists(cache_file):
-            try:
-                os.remove(cache_file)
-            except Exception as e:
-                logger.warning(f"Failed to remove cache file: {e}")
-        
-        self.index = CodeIndex(project_root=self.project_root)
-        self._index_loaded = False
-        
-        return {
-            "success": True,
-            "message": "Index cleared successfully"
-        }
+        with self._lock:
+            cache_file = self._get_cache_file_path()
+            if os.path.exists(cache_file):
+                try:
+                    os.remove(cache_file)
+                except Exception as e:
+                    logger.warning(f"Failed to remove cache file: {e}")
+            
+            self.index = CodeIndex(project_root=self.project_root)
+            self._index_loaded = False
+            
+            return {
+                "success": True,
+                "message": "Index cleared successfully"
+            }
 
 
 # Global instance for reuse
@@ -926,7 +1047,8 @@ _index_managers: dict[str, CodeIndexManager] = {}
 
 def get_index_manager(project_root: str | None = None) -> CodeIndexManager:
     """Get or create an index manager for a project."""
-    root = project_root or os.getcwd()
-    if root not in _index_managers:
-        _index_managers[root] = CodeIndexManager(root)
-    return _index_managers[root]
+    root = normalize_project_root(project_root)
+    key = get_project_root_key(root)
+    if key not in _index_managers:
+        _index_managers[key] = CodeIndexManager(root)
+    return _index_managers[key]

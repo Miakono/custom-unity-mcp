@@ -7,6 +7,7 @@ import services.catalog as catalog_module
 from services.catalog import build_tool_catalog, export_tool_catalog_artifacts
 from services.registry import mcp_for_unity_tool
 import services.registry.tool_registry as tool_registry_module
+import services.unity_tool_source as unity_tool_source_module
 
 
 @pytest.fixture(autouse=True)
@@ -36,12 +37,25 @@ def _register_minimal_toolset():
         return None
 
 
-def test_build_tool_catalog_infers_capabilities():
+def _stub_unity_handlers(monkeypatch: pytest.MonkeyPatch, *tool_names: str) -> None:
+    handlers = dict(unity_tool_source_module.discover_unity_tool_handlers())
+    for tool_name in tool_names:
+        handlers.setdefault(tool_name, (f"tests/{tool_name}.cs",))
+    monkeypatch.setattr(
+        unity_tool_source_module,
+        "discover_unity_tool_handlers",
+        lambda: handlers,
+    )
+
+
+def test_build_tool_catalog_infers_capabilities(monkeypatch):
     _register_minimal_toolset()
+    _stub_unity_handlers(monkeypatch, "_manage_scene", "_run_tests", "manage_ui")
 
     catalog = build_tool_catalog()
 
-    assert catalog["generated_from"] == "live_tool_registry"
+    assert catalog["generated_from"] == "server_tool_registry"
+    assert catalog["compatibility_source"] == "unity_csharp_source_scan"
     assert catalog["tool_count"] >= 4
 
     core_tool = next(item for item in catalog["tools"] if item["name"] == "_manage_scene")
@@ -72,8 +86,9 @@ def test_build_tool_catalog_infers_capabilities():
     )
 
 
-def test_export_tool_catalog_artifacts_writes_expected_files(tmp_path):
+def test_export_tool_catalog_artifacts_writes_expected_files(tmp_path, monkeypatch):
     _register_minimal_toolset()
+    _stub_unity_handlers(monkeypatch, "_manage_scene", "_run_tests", "manage_ui")
 
     result = export_tool_catalog_artifacts(tmp_path)
 
@@ -115,6 +130,7 @@ def test_build_tool_catalog_bootstraps_registry_when_empty(monkeypatch):
         return 1
 
     monkeypatch.setattr(catalog_module, "ensure_tool_registry_populated", fake_ensure)
+    _stub_unity_handlers(monkeypatch, "_bootstrapped_tool")
 
     catalog = build_tool_catalog()
 
@@ -123,6 +139,7 @@ def test_build_tool_catalog_bootstraps_registry_when_empty(monkeypatch):
 
 
 def test_build_tool_catalog_includes_manage_screenshot_from_runtime_registry():
+    tool_registry_module._tool_registry.clear()
     catalog = build_tool_catalog()
 
     manage_screenshot = next(item for item in catalog["tools"] if item["name"] == "manage_screenshot")
@@ -130,3 +147,22 @@ def test_build_tool_catalog_includes_manage_screenshot_from_runtime_registry():
     assert manage_screenshot["group"] == "visual_qa"
     assert "capture_editor_window" in manage_screenshot["supported_actions"]
     assert "get_last_screenshot" in manage_screenshot["supported_actions"]
+
+
+def test_build_tool_catalog_excludes_unsupported_unity_targeted_tools(monkeypatch):
+    _register_minimal_toolset()
+
+    @mcp_for_unity_tool(group="core")
+    def unsupported_unity_tool():
+        return None
+
+    monkeypatch.setattr(
+        unity_tool_source_module,
+        "discover_unity_tool_handlers",
+        lambda: {"_manage_scene": ("MCPForUnity/Editor/Tools/ManageScene.cs",)},
+    )
+
+    catalog = build_tool_catalog()
+
+    assert all(item["name"] != "unsupported_unity_tool" for item in catalog["tools"])
+    assert "unsupported_unity_tool" in catalog["compatibility_summary"]["unsupported_tools"]

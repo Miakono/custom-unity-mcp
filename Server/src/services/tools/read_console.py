@@ -51,16 +51,21 @@ async def read_console(
     # Set defaults if values are None
     action = action if action is not None else 'get'
     
-    # Parse types if it's a JSON string (handles client compatibility issue #561)
+    # Parse types if it's a JSON string, or treat a plain string as a single-item filter.
     if isinstance(types, str):
-        types = parse_json_payload(types)
+        parsed_types = parse_json_payload(types)
+        if isinstance(parsed_types, str):
+            types = [parsed_types]
+        else:
+            types = parsed_types
     # Validate types is a list after parsing
     if types is not None and not isinstance(types, list):
         return {
             "success": False,
             "message": (
                 f"types must be a list, got {type(types).__name__}. "
-                "If passing as JSON string, use format: '[\"error\", \"warning\"]'"
+                "If passing as JSON string, use format: '[\"error\", \"warning\"]', "
+                "or pass a single string like 'error'"
             )
         }
     if types is not None:

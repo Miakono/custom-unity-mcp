@@ -369,28 +369,50 @@ class ReflectionHelper:
 def get_reflection_capability_status() -> dict[str, Any]:
     """
     Get the current status of reflection capabilities.
-    
-    Returns:
-        Dictionary with capability status information
+
+    The previous implementation advertised discover_/get_type_info/find_objects as
+    available even when reflection was disabled — but every call to those errors
+    with "Reflection is DISABLED". This function now mirrors the actual gating in
+    ReflectionController.cs:GetAvailableOperations so the list reflects what
+    Claude can actually call.
     """
     enabled = ReflectionHelper.is_reflection_enabled()
-    
+    high_risk_allowed = enabled  # High-risk ops mirror enabled state today.
+
+    # Always callable — meta ops never gated by the reflection flag.
+    available = ["get_capability_status", "clear_cache"]
+
+    if enabled:
+        available.extend([
+            "discover_methods",
+            "discover_properties",
+            "discover_fields",
+            "get_type_info",
+            "find_objects",
+            "get_property",
+            "get_field",
+        ])
+        if high_risk_allowed:
+            available.extend([
+                "invoke_method",
+                "set_property",
+                "set_field",
+                "create_instance",
+            ])
+
     return {
         "enabled": enabled,
-        "highRiskAllowed": enabled,  # High-risk ops allowed if reflection is enabled
-        "availableOperations": (
-            ["discover_methods", "discover_properties", "discover_fields", "get_type_info", "find_objects"]
-            if not enabled else
-            [
-                "discover_methods", "discover_properties", "discover_fields", "get_type_info",
-                "invoke_method", "get_property", "set_property", "get_field", "set_field",
-                "create_instance", "find_objects"
-            ]
+        "highRiskAllowed": high_risk_allowed,
+        "availableOperations": available,
+        "warning": (
+            None if enabled
+            else "Reflection is disabled. Set 'reflection_enabled: true' in server config to enable. "
+                 "When disabled, only get_capability_status and clear_cache are callable."
         ),
         "cacheStats": {
             "types": len(ReflectionHelper._type_cache),
             "methods": len(ReflectionHelper._method_cache),
             "properties": len(ReflectionHelper._property_cache),
             "fields": len(ReflectionHelper._field_cache),
-        }
+        },
     }

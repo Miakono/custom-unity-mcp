@@ -151,9 +151,11 @@ class TransactionManager:
     This class provides thread-safe (within asyncio context) transaction
     management with optional disk persistence.
     """
-    
+
     _instance: TransactionManager | None = None
-    
+    # Keep at most this many completed/rolled-back/failed transactions in memory.
+    _MAX_COMPLETED_TRANSACTIONS: int = 200
+
     def __new__(cls) -> TransactionManager:
         if cls._instance is None:
             cls._instance = super().__new__(cls)
@@ -172,8 +174,24 @@ class TransactionManager:
         """Set the directory for persisting transaction state to disk."""
         self._persistence_dir = Path(path)
         self._persistence_dir.mkdir(parents=True, exist_ok=True)
-    
-    def generate_transaction_id(self, name: str) -> str:
+
+    def _prune_completed_transactions(self) -> None:
+        """Evict the oldest completed/failed/rolled-back transactions when over the cap."""
+        completed = [
+            (tid, txn)
+            for tid, txn in self._transactions.items()
+            if txn.status != TransactionStatus.PENDING
+        ]
+        overflow = len(completed) - self._MAX_COMPLETED_TRANSACTIONS
+        if overflow <= 0:
+            return
+        # Sort by completion time ascending so oldest are removed first.
+        _min_dt = datetime.min.replace(tzinfo=timezone.utc)
+        completed.sort(key=lambda x: x[1].completed_at or _min_dt)
+        for tid, _ in completed[:overflow]:
+            self._transactions.pop(tid, None)
+
+
         """Generate a unique transaction ID based on name and timestamp."""
         timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
         unique = uuid4().hex[:8]
@@ -279,11 +297,12 @@ class TransactionManager:
         
         txn.commit()
         self._persist_transaction(txn)
-        
+        self._prune_completed_transactions()
+
         # Clear current transaction if this was it
         if self._current_transaction_id == transaction_id:
             self._current_transaction_id = None
-        
+
         return txn
     
     def rollback_transaction(self, transaction_id: str) -> Transaction:
@@ -308,6 +327,7 @@ class TransactionManager:
         
         txn.rollback()
         self._persist_transaction(txn)
+        self._prune_completed_transactions()
         return txn
     
     def preview_transaction(self, transaction_id: str) -> dict[str, Any]:

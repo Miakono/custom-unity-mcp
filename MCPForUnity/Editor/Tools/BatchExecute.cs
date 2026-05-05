@@ -17,7 +17,7 @@ namespace MCPForUnity.Editor.Tools
     public static class BatchExecute
     {
         /// <summary>Default limit when no EditorPrefs override is set.</summary>
-        internal const int DefaultMaxCommandsPerBatch = 25;
+        internal const int DefaultMaxCommandsPerBatch = 50;
 
         /// <summary>Hard ceiling to prevent extreme editor freezes regardless of user setting.</summary>
         internal const int AbsoluteMaxCommandsPerBatch = 100;
@@ -65,6 +65,24 @@ namespace MCPForUnity.Editor.Tools
             int invocationFailureCount = 0;
             bool anyCommandFailed = false;
 
+            // Suppress per-import refresh storms while a batch is running. Any asset operations
+            // queued by inner commands are coalesced into a single AssetDatabase refresh when the
+            // batch finishes — this is the single biggest win for multi-asset workflows.
+            // NOTE: a few specialized tools (script edits, scene saves) still call ImportAsset
+            // explicitly with ForceSynchronousImport; those calls remain safe inside the gate.
+            bool startedAssetEditing = false;
+            try
+            {
+                AssetDatabase.StartAssetEditing();
+                startedAssetEditing = true;
+            }
+            catch (Exception ex)
+            {
+                McpLog.Warn($"batch_execute: StartAssetEditing threw, continuing without batch gate: {ex.Message}");
+            }
+
+            try
+            {
             foreach (var token in commandsToken)
             {
                 if (token is not JObject commandObj)
@@ -162,6 +180,15 @@ namespace MCPForUnity.Editor.Tools
                     {
                         break;
                     }
+                }
+            }
+            }
+            finally
+            {
+                if (startedAssetEditing)
+                {
+                    try { AssetDatabase.StopAssetEditing(); }
+                    catch (Exception ex) { McpLog.Warn($"batch_execute: StopAssetEditing threw: {ex.Message}"); }
                 }
             }
 

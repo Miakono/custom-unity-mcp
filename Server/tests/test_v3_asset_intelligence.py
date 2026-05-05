@@ -265,6 +265,15 @@ class TestSearchAssetsAdvanced:
         
         assert result["success"] is True
 
+    async def test_search_preserves_empty_referenced_by_filter(self, ctx, mock_search_results):
+        """test_search_with_filters: Preserves empty referenced_by to support unused-asset queries."""
+        with patch("services.tools.search_assets_advanced.send_with_unity_instance",
+                   AsyncMock(return_value=mock_search_results)) as mock_send:
+            result = await search_assets_advanced(ctx, referenced_by=[])
+
+        assert result["success"] is True
+        assert mock_send.await_args.args[3]["referencedBy"] == []
+
     async def test_search_without_metadata(self, ctx, mock_search_results):
         """test_search_with_filters: Can exclude metadata for faster results."""
         with patch("services.tools.search_assets_advanced.send_with_unity_instance",

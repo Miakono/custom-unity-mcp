@@ -338,9 +338,23 @@ Console Monitoring:
 - Check `read_console` regularly to catch errors, warnings, and compilation status
 - Filter by log type (Error, Warning, Log) to focus on specific issues
 
+Performance Profiling:
+- Use `manage_profiler get_status` first to confirm the editor is in the state you expect (isPlaying, profilerEnabled). CPU/render counters return their most useful numbers in Play mode.
+- For a quick read: `manage_profiler get_snapshot` returns CPU total frame time, memory breakdown, draw calls, and object counts. The first call after a domain reload bootstraps the recorder pool and may return zeros for time-based counters; the next call has data (Unity needs at least one frame to elapse).
+- For sustained measurement: `record_profiler_session(duration_seconds=30)` orchestrates start → collect → stop and returns aggregated min/max/avg frame time, FPS, draw calls, and memory MB. Prefer 10-30s windows; longer wastes time, shorter under-samples.
+- For per-tool latency or comparing changes: `run_benchmark` with a `tool_sequence` (e.g. spawn N enemies, then read state). `compare_benchmarks` returns regression/improvement deltas with percentages.
+- What "bad" looks like: frame time >33ms (below 30 FPS), GC allocations per frame >0 in steady state (object pooling needed), texture memory >1GB on PC / >256MB on mobile, draw calls >2000.
+- Known limits: GPU Frame Time is 0 unless GPU profiling is enabled in the Unity Profiler window (platform-dependent). Per-thread Main/Render Thread counters can be unreliable in Edit mode — trust CPU Total Frame Time. Per-category Scripts/Physics/Animation breakdown requires Deep Profiling enabled.
+
 Menu Items:
 - Use `execute_menu_item` when you have read the menu items resource
 - This lets you interact with Unity's menu system and third-party tools
+
+Server self-update workflow:
+- After editing Python source under Server/src/, call `reload_server` to pick up the change in this session — do NOT kill the MCP process. Killing it severs the stdio pipe and Claude Code does not auto-reconnect, forcing a session restart.
+- For tool body changes, helper edits, action_policy tweaks, or transport fixes: `reload_server` works in place.
+- For *new* tools, renamed tools, or @mcp_for_unity_tool decorator parameter changes: a fresh Claude Code session is still cleanest because tool registration runs at import time and FastMCP may keep stale references.
+- For Unity-side C# changes: just refresh Unity (focus the editor or call `refresh_unity`) — no MCP server restart needed because the C# code lives in the Unity Editor process, not the MCP server.
 
 Payload sizing & paging (important):
 - Many Unity queries can return very large JSON. Prefer **paged + summary-first** calls.

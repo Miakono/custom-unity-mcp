@@ -243,6 +243,31 @@ class TestUnityInstanceMiddlewareInjection:
         mock_context.set_state.assert_called_with("unity_instance", instance_id)
 
     @pytest.mark.asyncio
+    async def test_middleware_normalizes_json_string_arguments_before_validation(self, mock_context):
+        """Current behavior: JSON-like string arguments are parsed before FastMCP validates tool params."""
+        middleware = UnityInstanceMiddleware()
+        instance_id = "Project@abc123"
+
+        await middleware.set_active_instance(mock_context, instance_id)
+
+        middleware_ctx = Mock()
+        middleware_ctx.fastmcp_context = mock_context
+        middleware_ctx.message = SimpleNamespace(arguments={
+            "asset_types": "[\"scriptable_objects\"]",
+            "referenced_by": "[\"guid-123\"]",
+            "search_path": "Assets/Data",
+        })
+
+        async def mock_call_next(_ctx):
+            return {"status": "ok"}
+
+        await middleware.on_call_tool(middleware_ctx, mock_call_next)
+
+        assert middleware_ctx.message.arguments["asset_types"] == ["scriptable_objects"]
+        assert middleware_ctx.message.arguments["referenced_by"] == ["guid-123"]
+        assert middleware_ctx.message.arguments["search_path"] == "Assets/Data"
+
+    @pytest.mark.asyncio
     async def test_middleware_injects_into_resource_context(self, mock_context):
         """
         Current behavior: on_read_resource() performs same injection as

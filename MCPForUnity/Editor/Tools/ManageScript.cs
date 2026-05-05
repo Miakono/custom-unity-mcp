@@ -381,10 +381,14 @@ namespace MCPForUnity.Editor.Tools
                 var uri = $"mcpforunity://path/{relativePath}";
                 var ok = new SuccessResponse(
                     $"Script '{name}.cs' created successfully at '{relativePath}'.",
-                    new { uri, scheduledRefresh = false }
+                    new { uri, scheduledRefresh = true }
                 );
 
-                ManageScriptRefreshHelpers.ImportAndRequestCompile(relativePath);
+                // CreateScript may introduce new types — Hot Reload cannot patch those, so
+                // the eventual flush MUST compile. But we still debounce so a burst of
+                // create_script calls (common in agent setup workflows) coalesces into
+                // exactly one compile when the window settles.
+                ManageScriptRefreshHelpers.ScheduleScriptRefreshForceCompile(relativePath);
 
                 return ok;
             }
@@ -774,18 +778,29 @@ namespace MCPForUnity.Editor.Tools
                     try { if (File.Exists(backup)) File.Delete(backup); } catch { }
                 }
 
-                // Respect refresh mode: immediate vs debounced
+                // Respect refresh mode: immediate vs debounced. When Hot Reload is running,
+                // its filesystem watcher patches the change in-domain — calling ImportAsset
+                // + RequestScriptCompilation here would force a full domain reload and undo
+                // the entire benefit of having Hot Reload installed.
                 bool immediate = string.Equals(refreshModeFromCaller, "immediate", StringComparison.OrdinalIgnoreCase) ||
                                   string.Equals(refreshModeFromCaller, "sync", StringComparison.OrdinalIgnoreCase);
-                if (immediate)
+                bool deferToHotReload = HotReloadIntegration.ShouldDeferScriptCompilation();
+
+                if (deferToHotReload)
+                {
+                    McpLog.Info($"[ManageScript] ApplyTextEdits: deferring to Hot Reload for '{relativePath}'");
+                }
+                else if (immediate)
                 {
                     McpLog.Info($"[ManageScript] ApplyTextEdits: immediate refresh for '{relativePath}'");
                     AssetDatabase.ImportAsset(
                         relativePath,
                         ImportAssetOptions.ForceSynchronousImport | ImportAssetOptions.ForceUpdate
                     );
+                    MCPForUnity.Editor.Services.PerfMetrics.RecordForcedSyncImport();
 #if UNITY_EDITOR
                     UnityEditor.Compilation.CompilationPipeline.RequestScriptCompilation();
+                    MCPForUnity.Editor.Services.PerfMetrics.RecordCompileTrigger();
 #endif
                 }
                 else
@@ -2519,53 +2534,27 @@ namespace MCPForUnity.Editor.Tools
 #endif
 
         /// <summary>
-        /// Validates Unity-specific coding rules and best practices
-        /// //TODO: Naive Unity Checks and not really yield any results, need to be improved
+        /// Validates Unity-specific coding rules. Only checks that look at structural
+        /// signals (declarations, using directives) — heuristic substring co-occurrence
+        /// checks like "FindObjectOfType + Update() = bad" produced false positives on
+        /// every file that mentioned both keywords anywhere, so they were removed.
         /// </summary>
         private static void ValidateScriptSyntaxUnity(string contents, System.Collections.Generic.List<string> errors)
         {
-            // Check for common Unity anti-patterns
-            if (contents.Contains("FindObjectOfType") && contents.Contains("Update()"))
-            {
-                errors.Add("WARNING: FindObjectOfType in Update() can cause performance issues");
-            }
-
-            if (contents.Contains("GameObject.Find") && contents.Contains("Update()"))
-            {
-                errors.Add("WARNING: GameObject.Find in Update() can cause performance issues");
-            }
-
-            // Check for proper MonoBehaviour usage
+            // Missing using directive for MonoBehaviour. Real bug — file won't compile.
             if (contents.Contains(": MonoBehaviour") && !contents.Contains("using UnityEngine"))
             {
                 errors.Add("WARNING: MonoBehaviour requires 'using UnityEngine;'");
             }
 
-            // Check for SerializeField usage
+            // Missing using directive for SerializeField. Real bug — attribute won't resolve.
             if (contents.Contains("[SerializeField]") && !contents.Contains("using UnityEngine"))
             {
                 errors.Add("WARNING: SerializeField requires 'using UnityEngine;'");
             }
 
-            // Check for proper coroutine usage
-            if (contents.Contains("StartCoroutine") && !contents.Contains("IEnumerator"))
-            {
-                errors.Add("WARNING: StartCoroutine typically requires IEnumerator methods");
-            }
-
-            // Check for Update without FixedUpdate for physics
-            if (contents.Contains("Rigidbody") && contents.Contains("Update()") && !contents.Contains("FixedUpdate()"))
-            {
-                errors.Add("WARNING: Consider using FixedUpdate() for Rigidbody operations");
-            }
-
-            // Check for missing null checks on Unity objects
-            if (contents.Contains("GetComponent<") && !contents.Contains("!= null"))
-            {
-                errors.Add("WARNING: Consider null checking GetComponent results");
-            }
-
-            // Check for proper event function signatures
+            // Unity event functions are reflection-invoked by signature; wrong signature
+            // means Unity silently never calls them. Worth flagging.
             if (contents.Contains("void Start(") && !contents.Contains("void Start()"))
             {
                 errors.Add("WARNING: Start() should not have parameters");
@@ -2575,12 +2564,6 @@ namespace MCPForUnity.Editor.Tools
             {
                 errors.Add("WARNING: Update() should not have parameters");
             }
-
-            // Check for inefficient string operations
-            if (contents.Contains("Update()") && contents.Contains("\"") && contents.Contains("+"))
-            {
-                errors.Add("WARNING: String concatenation in Update() can cause garbage collection issues");
-            }
         }
 
         /// <summary>
@@ -2588,11 +2571,9 @@ namespace MCPForUnity.Editor.Tools
         /// </summary>
         private static void ValidateSemanticRules(string contents, System.Collections.Generic.List<string> errors)
         {
-            // Check for potential memory leaks
-            if (contents.Contains("new ") && contents.Contains("Update()"))
-            {
-                errors.Add("WARNING: Creating objects in Update() may cause memory issues");
-            }
+            // (Removed: substring co-occurrence of "new " and "Update()" produced false
+            // positives on virtually every script — the keywords coexist constantly with
+            // no semantic relationship. A real check would need an AST.)
 
             // Check for magic numbers
             var magicNumberPattern = new Regex(@"\b\d+\.?\d*f?\b(?!\s*[;})\]])", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(2));
@@ -2727,7 +2708,12 @@ namespace MCPForUnity.Editor.Tools
         // Guard to ensure we only have a single ticking callback running.
         private static bool _scheduled;
 
-        public static void Schedule(string relPath, TimeSpan window)
+        // If any caller in the current debounce window scheduled with forceCompile=true (e.g. create_script
+        // creating a new type Hot Reload cannot patch), the eventual flush MUST trigger a compile —
+        // even if Hot Reload would otherwise defer it. Reset on every flush.
+        private static bool _forceCompile;
+
+        public static void Schedule(string relPath, TimeSpan window, bool forceCompile = false)
         {
             // Record that work is pending and track the path in a threadsafe way.
             Interlocked.Exchange(ref _pending, 1);
@@ -2735,6 +2721,7 @@ namespace MCPForUnity.Editor.Tools
             {
                 _paths.Add(relPath);
                 _lastRequest = DateTime.UtcNow;
+                if (forceCompile) _forceCompile = true;
 
                 // If a debounce timer is already scheduled it will pick up the new request.
                 if (_scheduled)
@@ -2773,18 +2760,65 @@ namespace MCPForUnity.Editor.Tools
             if (Interlocked.Exchange(ref _pending, 0) == 1)
             {
                 string[] toImport;
-                lock (_lock) { toImport = _paths.ToArray(); _paths.Clear(); }
+                bool forceCompile;
+                lock (_lock)
+                {
+                    toImport = _paths.ToArray();
+                    _paths.Clear();
+                    forceCompile = _forceCompile;
+                    _forceCompile = false;
+                }
+
+                // Hot Reload's file watcher will pick up the writes — skip our import +
+                // domain-reload trigger to preserve the in-domain patch.
+                // EXCEPTION: if any caller in this window scheduled with forceCompile=true
+                // (new type was added — Hot Reload can't patch new types), we must compile.
+                if (!forceCompile && HotReloadIntegration.ShouldDeferScriptCompilation())
+                {
+                    return;
+                }
+
                 foreach (var p in toImport)
                 {
                     var sp = ManageScriptRefreshHelpers.SanitizeAssetsPath(p);
                     AssetDatabase.ImportAsset(sp, ImportAssetOptions.ForceUpdate | ImportAssetOptions.ForceSynchronousImport);
+                    MCPForUnity.Editor.Services.PerfMetrics.RecordForcedSyncImport();
                 }
 #if UNITY_EDITOR
                 UnityEditor.Compilation.CompilationPipeline.RequestScriptCompilation();
+                MCPForUnity.Editor.Services.PerfMetrics.RecordCompileTrigger();
 #endif
                 // Fallback if needed:
                 // AssetDatabase.Refresh();
             }
+        }
+
+        /// <summary>
+        /// Force the debounce queue to flush immediately. Used by the compile_now tool so
+        /// agents can deterministically wait for a compile after a burst of edits.
+        /// </summary>
+        public static void FlushNow()
+        {
+            if (Interlocked.Exchange(ref _pending, 0) != 1) return;
+
+            string[] toImport;
+            lock (_lock)
+            {
+                toImport = _paths.ToArray();
+                _paths.Clear();
+                _scheduled = false;
+            }
+
+            foreach (var p in toImport)
+            {
+                var sp = ManageScriptRefreshHelpers.SanitizeAssetsPath(p);
+                AssetDatabase.ImportAsset(sp, ImportAssetOptions.ForceUpdate | ImportAssetOptions.ForceSynchronousImport);
+                MCPForUnity.Editor.Services.PerfMetrics.RecordForcedSyncImport();
+            }
+#if UNITY_EDITOR
+            UnityEditor.Compilation.CompilationPipeline.RequestScriptCompilation();
+            MCPForUnity.Editor.Services.PerfMetrics.RecordCompileTrigger();
+#endif
         }
     }
 
@@ -2809,14 +2843,37 @@ namespace MCPForUnity.Editor.Tools
             RefreshDebounce.Schedule(sp, TimeSpan.FromMilliseconds(200));
         }
 
-        public static void ImportAndRequestCompile(string relPath, bool synchronous = true)
+        /// <summary>
+        /// Schedule a debounced refresh that ALWAYS results in a compile when the window
+        /// elapses, even if Hot Reload is active. Use this when the edit introduces new types
+        /// (e.g. create_script) — Hot Reload cannot patch new types in-domain.
+        /// </summary>
+        public static void ScheduleScriptRefreshForceCompile(string relPath)
         {
             var sp = SanitizeAssetsPath(relPath);
+            RefreshDebounce.Schedule(sp, TimeSpan.FromMilliseconds(200), forceCompile: true);
+        }
+
+        public static void ImportAndRequestCompile(string relPath, bool synchronous = true, bool allowHotReloadDefer = true)
+        {
+            var sp = SanitizeAssetsPath(relPath);
+
+            // When Hot Reload is running, its file watcher patches in-domain method-body
+            // changes. Triggering an import + RequestScriptCompilation would force a full
+            // domain reload and discard the patch. Callers creating new files (new types,
+            // which Hot Reload cannot patch) must pass allowHotReloadDefer: false.
+            if (allowHotReloadDefer && HotReloadIntegration.ShouldDeferScriptCompilation())
+            {
+                return;
+            }
+
             var opts = ImportAssetOptions.ForceUpdate;
             if (synchronous) opts |= ImportAssetOptions.ForceSynchronousImport;
             AssetDatabase.ImportAsset(sp, opts);
+            if (synchronous) MCPForUnity.Editor.Services.PerfMetrics.RecordForcedSyncImport();
 #if UNITY_EDITOR
             UnityEditor.Compilation.CompilationPipeline.RequestScriptCompilation();
+            MCPForUnity.Editor.Services.PerfMetrics.RecordCompileTrigger();
 #endif
         }
     }

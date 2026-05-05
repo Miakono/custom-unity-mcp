@@ -28,6 +28,10 @@ from core.capability_flags import (
     supports_verification,
     get_tool_capability_flags,
 )
+from services.unity_tool_source import (
+    get_unity_tool_compatibility,
+    summarize_registry_compatibility,
+)
 
 
 def _repo_root() -> Path:
@@ -178,16 +182,22 @@ def _get_tool_signature_details(func: Any, tool_name: str) -> dict[str, Any]:
 
 
 def build_tool_catalog() -> dict[str, Any]:
-    """Build a machine-readable tool catalog from the live registry."""
+    """Build a machine-readable tool catalog from the publishable registry surface."""
     ensure_tool_registry_populated()
+    registry_tools = get_registered_tools()
+    compatibility_summary = summarize_registry_compatibility(registry_tools)
     entries = []
 
-    for tool in sorted(get_registered_tools(), key=lambda item: item["name"]):
+    for tool in sorted(registry_tools, key=lambda item: item["name"]):
         group = tool.get("group")
         unity_target = tool.get("unity_target")
         kwargs = tool.get("kwargs") or {}
         tags = sorted(kwargs.get("tags") or [])
         signature_details = _get_tool_signature_details(tool.get("func"), tool["name"])
+        compatibility = get_unity_tool_compatibility(tool["name"], unity_target)
+
+        if not compatibility.publishable:
+            continue
 
         entries.append({
             "name": tool["name"],
@@ -198,6 +208,7 @@ def build_tool_catalog() -> dict[str, Any]:
             "unity_target": unity_target,
             "tags": tags,
             "capabilities": _get_tool_capabilities(tool["name"], unity_target),
+            "compatibility": compatibility.as_dict(),
             "parameters": signature_details["parameters"],
             "supported_actions": signature_details["supported_actions"],
             "action_capabilities": signature_details["action_capabilities"],
@@ -210,11 +221,13 @@ def build_tool_catalog() -> dict[str, Any]:
 
     return {
         "version": 1,
-        "generated_from": "live_tool_registry",
+        "generated_from": "server_tool_registry",
+        "compatibility_source": "unity_csharp_source_scan",
         "default_enabled_groups": sorted(DEFAULT_ENABLED_GROUPS),
         "group_count": len(TOOL_GROUPS),
         "tool_count": len(entries),
         "grouped_counts": grouped_counts,
+        "compatibility_summary": compatibility_summary,
         "tools": entries,
     }
 

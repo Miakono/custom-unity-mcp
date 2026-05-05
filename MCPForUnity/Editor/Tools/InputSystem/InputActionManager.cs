@@ -124,9 +124,9 @@ namespace MCPForUnity.Editor.Tools.InputSystem
 
                 yamlContent = yamlContent.Insert(insertIndex, newMapYaml);
                 File.WriteAllText(assetPath, yamlContent);
-                
-                AssetDatabase.Refresh();
-                
+
+                AssetDatabase.ImportAsset(assetPath);
+
                 return new SuccessResponse($"Created action map '{mapName}'", new { assetPath });
             }
             catch (Exception ex)
@@ -160,9 +160,9 @@ namespace MCPForUnity.Editor.Tools.InputSystem
 
                 yamlContent = regex.Replace(yamlContent, "");
                 File.WriteAllText(assetPath, yamlContent);
-                
-                AssetDatabase.Refresh();
-                
+
+                AssetDatabase.ImportAsset(assetPath);
+
                 return new SuccessResponse($"Deleted action map '{mapName}'");
             }
             catch (Exception ex)
@@ -302,8 +302,8 @@ namespace MCPForUnity.Editor.Tools.InputSystem
                 }
 
                 File.WriteAllText(assetPath, yamlContent);
-                AssetDatabase.Refresh();
-                
+                AssetDatabase.ImportAsset(assetPath);
+
                 return new SuccessResponse($"Created action '{actionName}'", new { actionId, actionType });
             }
             catch (Exception ex)
@@ -344,8 +344,8 @@ namespace MCPForUnity.Editor.Tools.InputSystem
                 yamlContent = bindingRegex.Replace(yamlContent, "");
 
                 File.WriteAllText(assetPath, yamlContent);
-                AssetDatabase.Refresh();
-                
+                AssetDatabase.ImportAsset(assetPath);
+
                 return new SuccessResponse($"Deleted action '{actionName}'");
             }
             catch (Exception ex)
@@ -727,9 +727,9 @@ namespace MCPForUnity.Editor.Tools.InputSystem
 
                 yamlContent = regex.Replace(yamlContent, "");
                 File.WriteAllText(assetPath, yamlContent);
-                
-                AssetDatabase.Refresh();
-                
+
+                AssetDatabase.ImportAsset(assetPath);
+
                 return new SuccessResponse($"Deleted control scheme '{schemeName}'");
             }
             catch (Exception ex)

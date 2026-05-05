@@ -1,3 +1,4 @@
+import asyncio
 import os
 import time
 from typing import Any
@@ -271,7 +272,9 @@ async def get_editor_state(ctx: Context) -> MCPResponse:
                 external_changes_scanner.set_project_root(
                     instance_id, project_root)
 
-            ext = external_changes_scanner.update_and_get(instance_id)
+            ext = await asyncio.to_thread(
+                external_changes_scanner.update_and_get, instance_id
+            )
 
             assets = state_v2.get("assets")
             if not isinstance(assets, dict):

@@ -195,7 +195,7 @@ async def search_assets_advanced(
             params["searchPath"] = search_path
         if has_dependencies:
             params["hasDependencies"] = has_dependencies
-        if referenced_by:
+        if referenced_by is not None:
             params["referencedBy"] = referenced_by
         if import_settings:
             params["importSettings"] = import_settings

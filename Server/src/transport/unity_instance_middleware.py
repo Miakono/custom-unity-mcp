@@ -12,6 +12,7 @@ from fastmcp.server.middleware import Middleware, MiddlewareContext
 
 from core.config import config
 from services.registry import get_registered_tools
+from services.tools.utils import parse_json_payload
 from transport.plugin_hub import PluginHub
 
 logger = logging.getLogger("mcp-for-unity-server")
@@ -360,6 +361,10 @@ class UnityInstanceMiddleware(Middleware):
                     # Raises ValueError with a user-friendly message on invalid input.
                     active_instance = await self._resolve_instance_value(raw_str, ctx)
                     logger.debug("Per-call unity_instance resolved to: %s", active_instance)
+
+        if isinstance(msg_args, dict):
+            for key, value in list(msg_args.items()):
+                msg_args[key] = parse_json_payload(value)
 
         if not active_instance:
             active_instance = await self.get_active_instance(ctx)

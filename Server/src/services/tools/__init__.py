@@ -10,6 +10,7 @@ from core.telemetry_decorator import telemetry_tool
 from core.logging_decorator import log_execution
 from utils.module_discovery import discover_modules
 from services.registry import get_registered_tools, TOOL_GROUPS, DEFAULT_ENABLED_GROUPS
+from services.unity_tool_source import get_unity_tool_compatibility
 
 logger = logging.getLogger("mcp-for-unity-server")
 
@@ -50,6 +51,15 @@ def register_all_tools(mcp: FastMCP, *, project_scoped_tools: bool = True):
         tool_name = tool_info['name']
         description = tool_info['description']
         kwargs = tool_info['kwargs']
+
+        compatibility = get_unity_tool_compatibility(tool_name, tool_info.get('unity_target'))
+        if not compatibility.publishable:
+            logger.warning(
+                "Skipping unsupported Unity-targeted tool registration: %s (target=%s)",
+                tool_name,
+                compatibility.unity_target,
+            )
+            continue
 
         if not project_scoped_tools and tool_name == "execute_custom_tool":
             logger.info(
