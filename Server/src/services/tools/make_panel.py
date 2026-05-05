@@ -19,16 +19,27 @@ from transport.legacy.unity_connection import async_send_command_with_retry
 @mcp_for_unity_tool(
     group="ui",
     description=(
-        "Generates ready-to-use UI Toolkit panels from packaged component templates. "
-        "Writes a .uxml referencing a token-styled component plus a sibling .uss for project-specific overrides. "
-        "Pairs with the MCPForUnity component library (Modal, LevelUpChoice).\n\n"
+        "Generates ready-to-use UI Toolkit panels from a registry of named templates. "
+        "Writes a .uxml referencing token-styled markup plus a sibling .uss for project-specific overrides. "
+        "Built-in templates use tokens.uss so they stay visually consistent with the MCPForUnity component library.\n\n"
         "Actions:\n"
         "  generate         — write a panel's .uxml + .uss to outputPath.\n"
-        "  attach_to_scene  — wire the generated panel to a UIDocument on a target GameObject.\n\n"
-        "Templates:\n"
-        "  modal     params: { title, bodyText (or bodyXml), showCloseButton (bool, default true) }\n"
-        "  level_up  params: { choices: [{ name, description, iconPath, rarity }, ...] }\n"
-        "            rarity: Common | Uncommon | Rare | Epic | Legendary"
+        "  attach_to_scene  — wire the generated panel to a UIDocument on a target GameObject.\n"
+        "  list_templates   — return all registered template names + aliases (no params required).\n\n"
+        "Built-in templates:\n"
+        "  modal           params: { title, bodyText (or bodyXml), showCloseButton (bool), openOnAttach (bool) }\n"
+        "  level_up        params: { title, choices: [{ name, description, iconPath, rarity, isPrimary }, ...] }\n"
+        "                  rarity: Common | Uncommon | Rare | Epic | Legendary\n"
+        "  loading_screen  params: { title, subtitle, progress (0..1) }\n"
+        "                  full-screen panel with centered title and a #loading-screen__bar-fill progress bar slot.\n"
+        "  confirm_dialog  params: { title, body, confirmText, cancelText, danger (bool) }\n"
+        "                  modal with title, body, and #confirm-yes / #confirm-no buttons.\n"
+        "  picker          params: { title, itemHeight (int), showCancel (bool) }\n"
+        "                  modal wrapping a #picker-list ListView. Bind itemsSource/makeItem/bindItem from C#.\n"
+        "  slotted         params: { title (optional), rootName }\n"
+        "                  generic panel with a #content slot — token-styled but no extra chrome.\n\n"
+        "Project-side templates: register from an [InitializeOnLoad] static ctor via "
+        "MakePanelTemplateRegistry.Register(name, generator, aliases). They become discoverable through list_templates."
     ),
     annotations=ToolAnnotations(
         title="Make Panel",
@@ -41,12 +52,15 @@ async def make_panel(
         "generate",
         "attach_to_scene",
         "attach",
+        "list_templates",
     ], "Action to perform."] = "generate",
 
-    template: Annotated[Literal[
-        "modal",
-        "level_up",
-    ], "Component template to scaffold. Required for generate."] | None = None,
+    # NOTE: kept as `str | None` (not Literal) so projects can register custom
+    # template names without editing this file. The C# side validates against
+    # MakePanelTemplateRegistry; call action='list_templates' to discover.
+    template: Annotated[str,
+                        "Template name (built-ins: modal, level_up, loading_screen, confirm_dialog, picker, slotted; "
+                        "or any project-registered name). Required for generate."] | None = None,
 
     output_path: Annotated[str,
                             "Assets-relative .uxml path to write (e.g. 'Assets/UI/LevelUp.uxml'). "
@@ -89,6 +103,10 @@ async def make_panel(
             params_dict["params"] = params
         if overwrite is not None:
             params_dict["overwrite"] = bool(overwrite)
+    elif action_lower == "list_templates":
+        # No required params — the registry is the source of truth and lookup
+        # is read-only. Forward the action verbatim.
+        pass
     elif action_lower in ("attach_to_scene", "attach"):
         if not output_path:
             return {"success": False, "message": "'output_path' is required (the .uxml just generated)."}

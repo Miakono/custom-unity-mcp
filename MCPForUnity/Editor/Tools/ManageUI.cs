@@ -96,6 +96,12 @@ namespace MCPForUnity.Editor.Tools
                     case "modify_visual_element":
                         return ModifyVisualElement(@params);
 
+                    case "validate_uxml":
+                        return UI.UxmlValidator.ValidateUxml(@params);
+
+                    case "validate_uss":
+                        return UI.UxmlValidator.ValidateUss(@params);
+
                     default:
                         return new ErrorResponse($"Unknown action: {action}");
                 }
@@ -356,6 +362,26 @@ namespace MCPForUnity.Editor.Tools
                 path += ".asset";
             }
 
+            // Validate top-level keys *before* mutating anything. Top-level
+            // PanelSettings keys (e.g. sort_order: 9999) used to be silently
+            // dropped because only `settings` is the documented carrier — fail
+            // loudly so callers learn the right shape.
+            var topLevelError = ValidatePanelSettingsTopLevelKeys(
+                @params,
+                action: "create_panel_settings",
+                accepted: s_createPanelSettingsTopLevelKeys);
+            if (topLevelError != null) return topLevelError;
+
+            // Validate inner `settings` keys against the reflected PanelSettings
+            // field set so misspelled/unsupported keys produce a structured
+            // error instead of being dropped on the floor.
+            JToken settingsToken = p.GetRaw("settings");
+            if (settingsToken is JObject preCheckObj)
+            {
+                var settingsError = ValidatePanelSettingsBodyKeys(preCheckObj, action: "create_panel_settings");
+                if (settingsError != null) return settingsError;
+            }
+
             if (AssetDatabase.LoadAssetAtPath<PanelSettings>(path) != null)
             {
                 return new ErrorResponse($"PanelSettings already exists at {path}");
@@ -368,7 +394,6 @@ namespace MCPForUnity.Editor.Tools
             }
 
             // Apply any settings passed as a flat dict
-            JToken settingsToken = p.GetRaw("settings");
             var changes = new List<string>();
             if (settingsToken is JObject settingsObj)
             {
@@ -419,6 +444,16 @@ namespace MCPForUnity.Editor.Tools
             if (!path.EndsWith(".asset", StringComparison.OrdinalIgnoreCase))
                 path += ".asset";
 
+            // Validate the request shape before touching the asset. Both
+            // top-level (e.g. sort_order: 9999 instead of settings.sortingOrder)
+            // and inner `settings` keys are checked, so unknown keys cannot
+            // silently no-op anymore.
+            var topLevelError = ValidatePanelSettingsTopLevelKeys(
+                @params,
+                action: "update_panel_settings",
+                accepted: s_updatePanelSettingsTopLevelKeys);
+            if (topLevelError != null) return topLevelError;
+
             var ps = AssetDatabase.LoadAssetAtPath<PanelSettings>(path);
             if (ps == null)
                 return new ErrorResponse($"No PanelSettings found at {path}");
@@ -426,6 +461,9 @@ namespace MCPForUnity.Editor.Tools
             JToken settingsToken = p.GetRaw("settings");
             if (settingsToken is not JObject settingsObj || settingsObj.Count == 0)
                 return new ErrorResponse("'settings' dict is required with at least one property to update.");
+
+            var bodyError = ValidatePanelSettingsBodyKeys(settingsObj, action: "update_panel_settings");
+            if (bodyError != null) return bodyError;
 
             var changes = new List<string>();
             ApplyPanelSettingsProperties(ps, settingsObj, changes);
@@ -438,6 +476,245 @@ namespace MCPForUnity.Editor.Tools
 
             return new SuccessResponse($"Updated PanelSettings at {path}",
                 new { path, applied = changes });
+        }
+
+        // ─── Strict-key validation for *_panel_settings actions ────────────────
+        //
+        // Background: top-level `sort_order: 9999` on create_panel_settings used
+        // to be silently dropped (only the request's `settings` dict was read),
+        // and `settings: { sort_order: 9999 }` was likewise dropped because the
+        // PanelSettings field is `sortingOrder`. Both paths now return a
+        // structured `unknown_keys` error so the caller learns the right shape.
+
+        // Top-level keys recognised by the action handler itself (NOT inside
+        // `settings`). The legacy `scale_mode` / `reference_resolution` aliases
+        // are kept on create only to preserve the documented backward-compat
+        // path. `unity_instance` is the framework's session-routing key.
+        private static readonly HashSet<string> s_createPanelSettingsTopLevelKeys =
+            new(StringComparer.OrdinalIgnoreCase)
+            {
+                "action",
+                "path",
+                "settings",
+                "scale_mode",
+                "reference_resolution",
+                "unity_instance",
+            };
+
+        private static readonly HashSet<string> s_updatePanelSettingsTopLevelKeys =
+            new(StringComparer.OrdinalIgnoreCase)
+            {
+                "action",
+                "path",
+                "settings",
+                "unity_instance",
+            };
+
+        // The set of keys ApplyPanelSettingsProperties() actually handles —
+        // anything outside this list would be silently dropped, which is the
+        // exact regression the user reported. Built lazily so reflection-based
+        // discovery (used to populate it from PanelSettings + verify against
+        // the hand-rolled switch) only runs on first use.
+        private static HashSet<string> s_panelSettingsAcceptedBodyKeys;
+        private static List<string> s_panelSettingsAcceptedBodyKeysSorted;
+
+        // Snake/dash/space aliases that survive ApplyPanelSettingsProperties'
+        // own underscore-stripping normalizer, so we *only* accept them here
+        // when they will actually be applied downstream. Notably we do NOT
+        // alias `sort_order` → `sortingOrder` — the apply step's normalizer
+        // would still drop it (`sort_order`→`sortorder` ≠ `sortingorder`), so
+        // we let the validator reject it with a hint instead. The user's
+        // headline regression (`sort_order: 9999` silently dropped) thus now
+        // surfaces as a structured `unknown_keys` error pointing at
+        // `sortingOrder`, which is what they asked for in the bug report.
+        private static readonly Dictionary<string, string> s_panelSettingsKeyAliases =
+            new(StringComparer.OrdinalIgnoreCase)
+            {
+                { "scalemode", "scaleMode" },
+                { "screenmatchmode", "screenMatchMode" },
+                { "referenceresolution", "referenceResolution" },
+                { "referencedpi", "referenceDpi" },
+                { "fallbackdpi", "fallbackDpi" },
+                { "targetdisplay", "targetDisplay" },
+                { "themestylesheet", "themeStyleSheet" },
+                { "clearcolor", "clearColor" },
+                { "cleardepthstencil", "clearDepthStencil" },
+                { "colorclearvalue", "colorClearValue" },
+                { "dynamicatlassettings", "dynamicAtlasSettings" },
+            };
+
+        private static HashSet<string> GetPanelSettingsAcceptedBodyKeys()
+        {
+            if (s_panelSettingsAcceptedBodyKeys != null)
+                return s_panelSettingsAcceptedBodyKeys;
+
+            // The canonical accepted set is what ApplyPanelSettingsProperties
+            // can actually wire to PanelSettings — listing more here would just
+            // shift "silently dropped" from validation to apply.
+            var canonical = new[]
+            {
+                "scaleMode",
+                "screenMatchMode",
+                "match",
+                "referenceDpi",
+                "fallbackDpi",
+                "sortingOrder",
+                "targetDisplay",
+                "referenceResolution",
+                "themeStyleSheet",
+                "clearColor",
+                "clearDepthStencil",
+                "colorClearValue",
+                "dynamicAtlasSettings",
+            };
+
+            var set = new HashSet<string>(canonical, StringComparer.OrdinalIgnoreCase);
+
+            // Cross-check against the live PanelSettings type via reflection so
+            // we surface a console warning in dev builds if Unity ever renames
+            // a member (the canonical list will then diverge from the runtime
+            // type). The set we actually validate against is still the
+            // hand-rolled list above so silent drops stay impossible.
+            try
+            {
+                var live = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var prop in typeof(PanelSettings).GetProperties(
+                             System.Reflection.BindingFlags.Instance |
+                             System.Reflection.BindingFlags.Public))
+                {
+                    if (prop.CanWrite && prop.GetIndexParameters().Length == 0)
+                        live.Add(prop.Name);
+                }
+
+                foreach (var name in canonical)
+                {
+                    if (!live.Contains(name))
+                    {
+                        Debug.LogWarning(
+                            $"[manage_ui] PanelSettings no longer exposes a writable '{name}' " +
+                            "property; the apply path may need an update.");
+                    }
+                }
+            }
+            catch
+            {
+                // Reflection is purely advisory here — never fail the request.
+            }
+
+            s_panelSettingsAcceptedBodyKeys = set;
+            var sorted = new List<string>(set);
+            sorted.Sort(StringComparer.OrdinalIgnoreCase);
+            s_panelSettingsAcceptedBodyKeysSorted = sorted;
+            return set;
+        }
+
+        private static List<string> GetPanelSettingsAcceptedBodyKeysSorted()
+        {
+            GetPanelSettingsAcceptedBodyKeys();
+            return s_panelSettingsAcceptedBodyKeysSorted;
+        }
+
+        // Same shape NormalizePropertyName uses, but lowercased so the matcher
+        // collapses "sort_order", "Sort Order", "SortOrder", "sortOrder" all to
+        // the same lookup key.
+        private static string NormalizeKeyForMatching(string key)
+        {
+            if (string.IsNullOrEmpty(key)) return key;
+            var camel = ParamCoercion.NormalizePropertyName(key);
+            return camel?.ToLowerInvariant();
+        }
+
+        private static object ValidatePanelSettingsTopLevelKeys(
+            JObject @params,
+            string action,
+            HashSet<string> accepted)
+        {
+            if (@params == null) return null;
+
+            List<string> unknown = null;
+            foreach (var prop in @params)
+            {
+                if (accepted.Contains(prop.Key)) continue;
+
+                // Anything that *is* a known PanelSettings field at the top
+                // level is the user's most likely actual mistake — flag it
+                // explicitly with a hint to nest it under `settings`.
+                unknown ??= new List<string>();
+                unknown.Add(prop.Key);
+            }
+
+            if (unknown == null) return null;
+
+            var acceptedList = new List<string>(accepted);
+            acceptedList.Sort(StringComparer.OrdinalIgnoreCase);
+
+            string hint =
+                "Top-level params for " + action + " are " +
+                string.Join(", ", acceptedList) +
+                ". PanelSettings fields like sortingOrder/scaleMode go inside the `settings` dict, " +
+                "not at the top level (this used to be silently dropped).";
+
+            return new ErrorResponse(
+                "Unknown top-level keys for " + action + ": " + string.Join(", ", unknown),
+                new
+                {
+                    code = "unknown_keys",
+                    scope = "top_level",
+                    action,
+                    unknown = unknown.ToArray(),
+                    accepted = acceptedList.ToArray(),
+                    hint,
+                });
+        }
+
+        private static object ValidatePanelSettingsBodyKeys(JObject settings, string action)
+        {
+            if (settings == null) return null;
+
+            var accepted = GetPanelSettingsAcceptedBodyKeys();
+            List<string> unknown = null;
+
+            foreach (var prop in settings)
+            {
+                string normalized = NormalizeKeyForMatching(prop.Key);
+                if (string.IsNullOrEmpty(normalized)) continue;
+
+                // Direct camelCase match (case-insensitive after normalization).
+                if (accepted.Contains(normalized)) continue;
+
+                // Snake_case → camelCase alias (sort_order → sortingOrder).
+                if (s_panelSettingsKeyAliases.TryGetValue(normalized, out var aliased) &&
+                    accepted.Contains(aliased))
+                    continue;
+
+                // Final pass: check the camelCase form against the accepted
+                // set directly (handles e.g. "sortingorder" → "sortingOrder").
+                if (accepted.Contains(prop.Key)) continue;
+
+                unknown ??= new List<string>();
+                unknown.Add(prop.Key);
+            }
+
+            if (unknown == null) return null;
+
+            var acceptedList = GetPanelSettingsAcceptedBodyKeysSorted();
+            const string hint =
+                "Snake_case forms that collapse to a single accepted key (e.g. scale_mode → scaleMode, " +
+                "reference_resolution → referenceResolution) are honored, but `sort_order` must be sent " +
+                "as `sortingOrder` (PanelSettings's actual serialized field name). Unknown keys used to " +
+                "be silently dropped.";
+
+            return new ErrorResponse(
+                "Unknown keys in `settings` for " + action + ": " + string.Join(", ", unknown),
+                new
+                {
+                    code = "unknown_keys",
+                    scope = "settings",
+                    action,
+                    unknown = unknown.ToArray(),
+                    accepted = acceptedList.ToArray(),
+                    hint,
+                });
         }
 
         private static PanelSettings CreateDefaultPanelSettings(string path)

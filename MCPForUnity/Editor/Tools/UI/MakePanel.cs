@@ -16,9 +16,16 @@ namespace MCPForUnity.Editor.Tools.UI
     /// referenced via project URIs so the generated panel works anywhere under
     /// Assets/.
     ///
+    /// Templates are looked up via <see cref="MakePanelTemplateRegistry"/>.
+    /// Built-ins (modal, level_up, loading_screen, confirm_dialog, picker,
+    /// slotted) are registered at editor-init time. Project code can register
+    /// additional templates from an [InitializeOnLoad] static ctor — no edit
+    /// to this file required.
+    ///
     /// Actions:
     ///   generate         — write .uxml + .uss for the given template.
     ///   attach_to_scene  — delegate to manage_ui's attach_ui_document action.
+    ///   list_templates   — return all registered template names + aliases.
     /// </summary>
     [McpForUnityTool("make_panel", AutoRegister = false, Group = "ui")]
     public static class MakePanel
@@ -30,6 +37,29 @@ namespace MCPForUnity.Editor.Tools.UI
 
         private const string ModalTypeFullName = "MCPForUnity.UIElements.Modal";
         private const string LevelUpTypeFullName = "MCPForUnity.UIElements.LevelUpChoice";
+
+        static MakePanel()
+        {
+            // Self-register modal + level_up so the registry is the single
+            // source of truth for available templates. The generators close
+            // over BuildModalUxml / BuildLevelUpUxml + BuildPanelUssShell to
+            // keep their generated output byte-for-byte stable for callers
+            // (and existing tests).
+            MakePanelTemplateRegistry.RegisterBuiltin(
+                "modal",
+                (inner, ussFileName) => new MakePanelTemplateResult(
+                    BuildModalUxml(inner, ussFileName),
+                    BuildPanelUssShell("modal", ussFileName),
+                    ModalTypeFullName));
+
+            MakePanelTemplateRegistry.RegisterBuiltin(
+                "level_up",
+                (inner, ussFileName) => new MakePanelTemplateResult(
+                    BuildLevelUpUxml(inner, ussFileName),
+                    BuildPanelUssShell("level_up", ussFileName),
+                    LevelUpTypeFullName),
+                aliases: new[] { "levelup", "level-up" });
+        }
 
         public static object HandleCommand(JObject @params)
         {
@@ -52,14 +82,44 @@ namespace MCPForUnity.Editor.Tools.UI
                     case "attach":
                         return AttachToScene(@params);
 
+                    case "list_templates":
+                    case "list":
+                    case "templates":
+                        return ListTemplates();
+
                     default:
-                        return new ErrorResponse($"Unknown action: {action}. Valid actions: generate, attach_to_scene.");
+                        return new ErrorResponse($"Unknown action: {action}. Valid actions: generate, attach_to_scene, list_templates.");
                 }
             }
             catch (Exception ex)
             {
                 return new ErrorResponse(ex.Message, new { stackTrace = ex.StackTrace });
             }
+        }
+
+        private static object ListTemplates()
+        {
+            var aliasMap = MakePanelTemplateRegistry.GetAliasMap();
+            var sortedNames = new List<string>(aliasMap.Keys);
+            sortedNames.Sort(StringComparer.OrdinalIgnoreCase);
+
+            var entries = new List<object>(sortedNames.Count);
+            foreach (var name in sortedNames)
+            {
+                entries.Add(new
+                {
+                    name,
+                    aliases = aliasMap[name],
+                });
+            }
+
+            return new SuccessResponse(
+                $"Found {entries.Count} registered make_panel templates.",
+                new
+                {
+                    templates = entries,
+                    count = entries.Count,
+                });
         }
 
         private static object Generate(JObject @params)
@@ -69,7 +129,8 @@ namespace MCPForUnity.Editor.Tools.UI
             string template = p.Get("template")?.ToLowerInvariant();
             if (string.IsNullOrEmpty(template))
             {
-                return new ErrorResponse("'template' is required. Supported: modal, level_up.");
+                string supported = string.Join(", ", MakePanelTemplateRegistry.GetCanonicalNames());
+                return new ErrorResponse($"'template' is required. Supported: {supported}.");
             }
 
             var pathResult = p.GetRequired("outputPath", "'outputPath' is required (e.g. 'Assets/UI/MyPanel.uxml').");
@@ -92,28 +153,36 @@ namespace MCPForUnity.Editor.Tools.UI
 
             JObject inner = @params["params"] as JObject ?? new JObject();
 
-            string uxmlContent;
-            string ussContent;
-            string componentTypeFullName;
-
-            switch (template)
+            if (!MakePanelTemplateRegistry.TryGet(template, out var generator))
             {
-                case "modal":
-                    uxmlContent = BuildModalUxml(inner, ussFileName);
-                    ussContent = BuildPanelUssShell("modal", ussFileName);
-                    componentTypeFullName = ModalTypeFullName;
-                    break;
+                string supported = string.Join(", ", MakePanelTemplateRegistry.GetCanonicalNames());
+                return new ErrorResponse($"Unknown template: '{template}'. Supported: {supported}.");
+            }
 
-                case "level_up":
-                case "levelup":
-                case "level-up":
-                    uxmlContent = BuildLevelUpUxml(inner, ussFileName);
-                    ussContent = BuildPanelUssShell("level_up", ussFileName);
-                    componentTypeFullName = LevelUpTypeFullName;
-                    break;
+            MakePanelTemplateResult result;
+            try
+            {
+                result = generator(inner, ussFileName);
+            }
+            catch (Exception ex)
+            {
+                return new ErrorResponse(
+                    $"Template generator '{template}' threw: {ex.Message}",
+                    new { stackTrace = ex.StackTrace });
+            }
 
-                default:
-                    return new ErrorResponse($"Unknown template: '{template}'. Supported: modal, level_up.");
+            string uxmlContent = result.UxmlContent;
+            string ussContent = result.UssContent;
+            string componentTypeFullName = result.ComponentTypeFullName;
+
+            if (string.IsNullOrEmpty(uxmlContent))
+            {
+                return new ErrorResponse($"Template '{template}' returned empty UXML.");
+            }
+            if (ussContent == null)
+            {
+                // Empty stylesheet is fine, but null is a generator bug — guard it.
+                ussContent = string.Empty;
             }
 
             // Write USS first so the AssetDatabase already knows about the
