@@ -1030,8 +1030,25 @@ namespace MCPForUnity.Editor.Tools
             return results;
         }
 
+        private static List<string> _shaderNameCache;
+
+        [InitializeOnLoadMethod]
+        private static void RegisterShaderCacheInvalidation()
+        {
+            EditorApplication.projectChanged += () => _shaderNameCache = null;
+            AssemblyReloadEvents.afterAssemblyReload += () => _shaderNameCache = null;
+        }
+
         internal static List<string> EnumerateShaderNames()
         {
+            // Cached and invalidated on project/assembly changes — Resources.FindObjectsOfTypeAll<Shader>()
+            // walks every loaded shader and is the dominant cost of list_shaders calls.
+            var cached = _shaderNameCache;
+            if (cached != null)
+            {
+                return cached;
+            }
+
             HashSet<string> names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (Shader shader in UnityEngine.Resources.FindObjectsOfTypeAll<Shader>())
             {
@@ -1050,7 +1067,9 @@ namespace MCPForUnity.Editor.Tools
                 }
             }
 
-            return names.OrderBy(name => name, StringComparer.OrdinalIgnoreCase).ToList();
+            var result = names.OrderBy(name => name, StringComparer.OrdinalIgnoreCase).ToList();
+            _shaderNameCache = result;
+            return result;
         }
 
         internal static Transform FindTransformByPath(Transform root, string relativePath)
@@ -1719,6 +1738,50 @@ namespace MCPForUnity.Editor.Tools
                             applied.Add(new { op, path, removed = true });
                         }
                         break;
+                    case "set":
+                    {
+                        GameObject setTarget = GameObject.Find(path);
+                        if (setTarget == null)
+                        {
+                            return new ErrorResponse($"Scene GameObject '{path}' was not found.");
+                        }
+
+                        string setTypeName = LiveV2V3ToolCommon.GetStringParam(operation, "componentType", "component_type");
+                        if (string.IsNullOrWhiteSpace(setTypeName))
+                        {
+                            return new ErrorResponse("'componentType' is required for set op.");
+                        }
+
+                        Component setComponent = setTarget.GetComponents<Component>().FirstOrDefault(candidate => candidate != null && (string.Equals(candidate.GetType().Name, setTypeName, StringComparison.OrdinalIgnoreCase) || string.Equals(candidate.GetType().FullName, setTypeName, StringComparison.OrdinalIgnoreCase)));
+                        if (setComponent == null)
+                        {
+                            return new ErrorResponse($"Component '{setTypeName}' not found on '{path}'.");
+                        }
+
+                        JArray patchArray = operation["patches"] as JArray;
+                        if (patchArray == null || patchArray.Count == 0)
+                        {
+                            return new ErrorResponse("'patches' is required for set op.");
+                        }
+
+                        var outcome = SerializedPropertyPatcher.ApplyPatches(setComponent, patchArray);
+                        if (outcome.AnyChanged)
+                        {
+                            EditorUtility.SetDirty(setComponent);
+                            EditorSceneManager.MarkSceneDirty(setComponent.gameObject.scene);
+                        }
+
+                        applied.Add(new
+                        {
+                            op,
+                            path,
+                            component_type = setComponent.GetType().Name,
+                            results = outcome.Results,
+                            warnings = outcome.Warnings.Count > 0 ? outcome.Warnings : null,
+                            changed = outcome.AnyChanged,
+                        });
+                        break;
+                    }
                     default:
                         return new ErrorResponse($"Unsupported scene patch operation '{op}'.");
                 }
@@ -1812,6 +1875,43 @@ namespace MCPForUnity.Editor.Tools
 
                             applied.Add(new { op, path, component_type = removeTypeName });
                             break;
+                        case "set":
+                        {
+                            if (target == null)
+                            {
+                                return new ErrorResponse($"Target path '{path}' was not found in prefab.");
+                            }
+
+                            string setTypeName = LiveV2V3ToolCommon.GetStringParam(operation, "componentType", "component_type");
+                            if (string.IsNullOrWhiteSpace(setTypeName))
+                            {
+                                return new ErrorResponse("'componentType' is required for set op.");
+                            }
+
+                            Component setComponent = target.GetComponents<Component>().FirstOrDefault(candidate => candidate != null && (string.Equals(candidate.GetType().Name, setTypeName, StringComparison.OrdinalIgnoreCase) || string.Equals(candidate.GetType().FullName, setTypeName, StringComparison.OrdinalIgnoreCase)));
+                            if (setComponent == null)
+                            {
+                                return new ErrorResponse($"Component '{setTypeName}' not found on '{path}'.");
+                            }
+
+                            JArray patchArray = operation["patches"] as JArray;
+                            if (patchArray == null || patchArray.Count == 0)
+                            {
+                                return new ErrorResponse("'patches' is required for set op.");
+                            }
+
+                            var outcome = SerializedPropertyPatcher.ApplyPatches(setComponent, patchArray);
+                            applied.Add(new
+                            {
+                                op,
+                                path,
+                                component_type = setComponent.GetType().Name,
+                                results = outcome.Results,
+                                warnings = outcome.Warnings.Count > 0 ? outcome.Warnings : null,
+                                changed = outcome.AnyChanged,
+                            });
+                            break;
+                        }
                         default:
                             return new ErrorResponse($"Unsupported prefab patch operation '{op}'.");
                     }

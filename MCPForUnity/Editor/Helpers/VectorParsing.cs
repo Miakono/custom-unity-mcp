@@ -726,6 +726,142 @@ namespace MCPForUnity.Editor.Helpers
 
             return null;
         }
+
+        /// <summary>
+        /// Parses a JToken (array or object) into a Vector2Int.
+        /// </summary>
+        public static Vector2Int? ParseVector2Int(JToken token)
+        {
+            if (token == null || token.Type == JTokenType.Null)
+                return null;
+
+            try
+            {
+                if (token is JArray array && array.Count >= 2)
+                {
+                    return new Vector2Int(array[0].ToObject<int>(), array[1].ToObject<int>());
+                }
+
+                if (token is JObject obj && obj.ContainsKey("x") && obj.ContainsKey("y"))
+                {
+                    return new Vector2Int(obj["x"].ToObject<int>(), obj["y"].ToObject<int>());
+                }
+            }
+            catch (Exception ex)
+            {
+                McpLog.Warn($"[VectorParsing] Failed to parse Vector2Int from '{token}': {ex.Message}");
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Parses a JToken (array or object) into a Vector3Int.
+        /// </summary>
+        public static Vector3Int? ParseVector3Int(JToken token)
+        {
+            if (token == null || token.Type == JTokenType.Null)
+                return null;
+
+            try
+            {
+                if (token is JArray array && array.Count >= 3)
+                {
+                    return new Vector3Int(
+                        array[0].ToObject<int>(),
+                        array[1].ToObject<int>(),
+                        array[2].ToObject<int>()
+                    );
+                }
+
+                if (token is JObject obj && obj.ContainsKey("x") && obj.ContainsKey("y") && obj.ContainsKey("z"))
+                {
+                    return new Vector3Int(
+                        obj["x"].ToObject<int>(),
+                        obj["y"].ToObject<int>(),
+                        obj["z"].ToObject<int>()
+                    );
+                }
+            }
+            catch (Exception ex)
+            {
+                McpLog.Warn($"[VectorParsing] Failed to parse Vector3Int from '{token}': {ex.Message}");
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Parses a JToken into a RectInt.
+        /// Accepts {x, y, width, height} or [x, y, width, height].
+        /// </summary>
+        public static RectInt? ParseRectInt(JToken token)
+        {
+            if (token == null || token.Type == JTokenType.Null)
+                return null;
+
+            try
+            {
+                if (token is JObject obj &&
+                    obj.ContainsKey("x") && obj.ContainsKey("y") &&
+                    obj.ContainsKey("width") && obj.ContainsKey("height"))
+                {
+                    return new RectInt(
+                        obj["x"].ToObject<int>(),
+                        obj["y"].ToObject<int>(),
+                        obj["width"].ToObject<int>(),
+                        obj["height"].ToObject<int>()
+                    );
+                }
+
+                if (token is JArray array && array.Count >= 4)
+                {
+                    return new RectInt(
+                        array[0].ToObject<int>(),
+                        array[1].ToObject<int>(),
+                        array[2].ToObject<int>(),
+                        array[3].ToObject<int>()
+                    );
+                }
+            }
+            catch (Exception ex)
+            {
+                McpLog.Warn($"[VectorParsing] Failed to parse RectInt from '{token}': {ex.Message}");
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Parses a JToken into a BoundsInt.
+        /// Supports {position: {x,y,z}, size: {x,y,z}} or {center: ..., size: ...}.
+        /// </summary>
+        public static BoundsInt? ParseBoundsInt(JToken token)
+        {
+            if (token == null || token.Type == JTokenType.Null)
+                return null;
+
+            try
+            {
+                if (token is JObject obj)
+                {
+                    JToken posToken = obj["position"] ?? obj["center"];
+                    JToken sizeToken = obj["size"];
+                    if (posToken != null && sizeToken != null)
+                    {
+                        var position = ParseVector3Int(posToken) ?? Vector3Int.zero;
+                        var size = ParseVector3Int(sizeToken) ?? Vector3Int.zero;
+                        return new BoundsInt(position, size);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                McpLog.Warn($"[VectorParsing] Failed to parse BoundsInt from '{token}': {ex.Message}");
+            }
+
+            return null;
+        }
     }
 }
 
