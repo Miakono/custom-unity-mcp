@@ -53,6 +53,11 @@ namespace MCPForUnity.Editor.Tools
             public int? maxDepth { get; set; }
             public int? maxChildrenPerNode { get; set; }
             public bool? includeTransform { get; set; }
+
+            // save: opt-in override for the destructive-save guard. Required when the
+            // active scene's root GameObject count would shrink by >=5 OR >=30% vs. the
+            // existing on-disk file (data-loss protection against degenerate in-memory states).
+            public bool? confirmDestructiveSave { get; set; }
         }
 
         private static float[] ParseFloatArray(JToken token)
@@ -119,6 +124,9 @@ namespace MCPForUnity.Editor.Tools
                 maxDepth = ParamCoercion.CoerceIntNullable(p["maxDepth"] ?? p["max_depth"]),
                 maxChildrenPerNode = ParamCoercion.CoerceIntNullable(p["maxChildrenPerNode"] ?? p["max_children_per_node"]),
                 includeTransform = ParamCoercion.CoerceBoolNullable(p["includeTransform"] ?? p["include_transform"]),
+
+                // save: destructive-save guard override (camelCase + snake_case)
+                confirmDestructiveSave = ParamCoercion.CoerceBoolNullable(p["confirmDestructiveSave"] ?? p["confirm_destructive_save"]),
             };
         }
 
@@ -238,7 +246,7 @@ namespace MCPForUnity.Editor.Tools
                         );
                 case "save":
                     // Save current scene, optionally to a new path
-                    return SaveScene(fullPath, relativePath);
+                    return SaveScene(fullPath, relativePath, cmd.confirmDestructiveSave ?? false);
                 case "get_hierarchy":
                     try { McpLog.Info("[ManageScene] get_hierarchy: entering", always: false); } catch { }
                     var gh = GetSceneHierarchyPaged(cmd);
@@ -428,7 +436,16 @@ namespace MCPForUnity.Editor.Tools
             }
         }
 
-        private static object SaveScene(string fullPath, string relativePath)
+        // Threshold constants for the destructive-save guard.
+        // A save is "destructive" if the in-memory root count would shrink by at least
+        // this many roots OR by at least this fraction of the on-disk root count.
+        // The fraction is encoded as integer numerator/denominator to avoid float math.
+        private const int DestructiveSaveAbsoluteThreshold = 5;       // shrink of >=5 roots
+        private const int DestructiveSaveShrinkNumerator = 3;          // shrink of >=30%
+        private const int DestructiveSaveShrinkDenominator = 10;
+        private const string DestructiveSaveBlockedCode = "destructive_save_blocked";
+
+        private static object SaveScene(string fullPath, string relativePath, bool confirmDestructiveSave)
         {
             try
             {
@@ -440,6 +457,22 @@ namespace MCPForUnity.Editor.Tools
 
                 bool saved;
                 string finalPath = currentScene.path; // Path where it was last saved or will be saved
+                // Resolve the path we'll actually write to and whether it already exists on disk.
+                string targetRelativePath = (!string.IsNullOrEmpty(relativePath) && currentScene.path != relativePath)
+                    ? relativePath
+                    : currentScene.path;
+
+                // --- Destructive-save guard ---------------------------------------------
+                // Compare the in-memory root count to the on-disk root count. If the new
+                // scene shrinks the root list by >=DestructiveSaveAbsoluteThreshold roots OR
+                // by >=30%, refuse the save unless the caller passed confirmDestructiveSave=true.
+                // First saves (no on-disk file yet) skip the check — there's no baseline.
+                if (!string.IsNullOrEmpty(targetRelativePath))
+                {
+                    var guardResult = CheckDestructiveSaveGuard(currentScene, targetRelativePath, confirmDestructiveSave);
+                    if (guardResult != null) return guardResult;
+                }
+                // ------------------------------------------------------------------------
 
                 if (!string.IsNullOrEmpty(relativePath) && currentScene.path != relativePath)
                 {
@@ -482,6 +515,176 @@ namespace MCPForUnity.Editor.Tools
             {
                 return new ErrorResponse($"Error saving scene: {e.Message}");
             }
+        }
+
+        /// <summary>
+        /// Compares in-memory root GameObject count to the on-disk scene's root count.
+        /// Returns an <see cref="ErrorResponse"/> with code <c>destructive_save_blocked</c>
+        /// if the save would lose &gt;=<see cref="DestructiveSaveAbsoluteThreshold"/> roots OR
+        /// &gt;=30% of roots and <paramref name="confirmDestructiveSave"/> is false. Logs a
+        /// warning and returns null for smaller intentional shrinks. Returns null when the
+        /// file does not exist yet (first save) or when the on-disk count cannot be read.
+        /// </summary>
+        private static object CheckDestructiveSaveGuard(Scene currentScene, string targetRelativePath, bool confirmDestructiveSave)
+        {
+            int newRootCount = currentScene.rootCount;
+
+            // Resolve the on-disk path. targetRelativePath is "Assets/..." relative to project root.
+            string projectRoot = Application.dataPath.Substring(0, Application.dataPath.Length - "Assets".Length);
+            string onDiskFullPath = Path.Combine(projectRoot, targetRelativePath);
+
+            // First save (no on-disk file): skip guard, no baseline to compare against.
+            if (!File.Exists(onDiskFullPath))
+            {
+                return null;
+            }
+
+            int oldRootCount;
+            try
+            {
+                oldRootCount = CountSceneRootsOnDisk(onDiskFullPath);
+            }
+            catch (Exception ex)
+            {
+                // If we can't read/parse the file, don't block the save — log and proceed.
+                try { McpLog.Warn($"[ManageScene] Destructive-save guard: failed to read '{targetRelativePath}': {ex.Message}. Skipping guard."); } catch { }
+                return null;
+            }
+
+            // Couldn't determine a meaningful prior count — skip guard.
+            if (oldRootCount <= 0) return null;
+
+            int delta = oldRootCount - newRootCount;
+            if (delta <= 0) return null; // grew or unchanged
+
+            bool largeAbsolute = delta >= DestructiveSaveAbsoluteThreshold;
+            // Fraction check without floats: delta / oldRootCount >= 3/10  <=>  delta * 10 >= oldRootCount * 3
+            bool largeFraction = delta * DestructiveSaveShrinkDenominator >= oldRootCount * DestructiveSaveShrinkNumerator;
+
+            if (largeAbsolute || largeFraction)
+            {
+                if (!confirmDestructiveSave)
+                {
+                    string msg = $"Refusing to save '{targetRelativePath}': scene root GameObject count would drop from {oldRootCount} to {newRootCount} (delta -{delta}). " +
+                                 $"This usually indicates the in-memory scene is in a degenerate state (e.g. after a tool that shifted the active stage). " +
+                                 $"If this is intentional, pass confirmDestructiveSave=true to override.";
+                    return new ErrorResponse(msg, new
+                    {
+                        code = DestructiveSaveBlockedCode,
+                        scenePath = targetRelativePath,
+                        oldRootCount,
+                        newRootCount,
+                        delta
+                    });
+                }
+
+                // Confirmed — log loudly and proceed.
+                try { McpLog.Warn($"[ManageScene] Destructive save confirmed by caller: '{targetRelativePath}' roots {oldRootCount} -> {newRootCount} (delta -{delta})."); } catch { }
+                return null;
+            }
+
+            // Small shrink (1-4 roots and <30%): warn but allow.
+            try { McpLog.Warn($"[ManageScene] Saving '{targetRelativePath}' will shrink root count from {oldRootCount} to {newRootCount} (delta -{delta})."); } catch { }
+            return null;
+        }
+
+        /// <summary>
+        /// Counts root GameObjects in a Unity scene file by scanning its YAML.
+        /// A "root" Transform is one whose <c>m_Father: {fileID: 0}</c>. We scan every
+        /// Transform/RectTransform document and count the ones with a zero-fileID parent.
+        /// If we don't find any Transform documents (corrupted/unexpected format), we fall
+        /// back to counting GameObject document headers (<c>--- !u!1 &amp;</c>) as a proxy
+        /// for total GameObject count. The guard's delta-based comparison still functions
+        /// usefully under either counting mode because both modes apply consistently to
+        /// the same file's contents.
+        /// </summary>
+        private static int CountSceneRootsOnDisk(string fullPath)
+        {
+            // Read the file. Scenes are typically a few hundred KB; readable in one shot.
+            string[] lines = File.ReadAllLines(fullPath);
+
+            int rootCount = 0;
+            int totalGameObjectHeaders = 0;
+            bool sawAnyTransform = false;
+
+            // Document header forms we care about:
+            //   --- !u!1 &<id>      -> GameObject
+            //   --- !u!4 &<id>      -> Transform
+            //   --- !u!224 &<id>    -> RectTransform (UI; also has m_Father)
+            // A document ends at the next "--- " line or end-of-file.
+            int i = 0;
+            while (i < lines.Length)
+            {
+                string line = lines[i];
+                if (line.StartsWith("--- !u!", StringComparison.Ordinal))
+                {
+                    // Parse the class id between "!u!" and the following space.
+                    int idStart = "--- !u!".Length;
+                    int idEnd = line.IndexOf(' ', idStart);
+                    if (idEnd > idStart)
+                    {
+                        string classIdStr = line.Substring(idStart, idEnd - idStart);
+                        if (int.TryParse(classIdStr, out int classId))
+                        {
+                            if (classId == 1)
+                            {
+                                totalGameObjectHeaders++;
+                            }
+                            else if (classId == 4 || classId == 224)
+                            {
+                                sawAnyTransform = true;
+                                // Scan this document's body for m_Father until the next document header.
+                                int j = i + 1;
+                                while (j < lines.Length && !lines[j].StartsWith("--- ", StringComparison.Ordinal))
+                                {
+                                    string body = lines[j];
+                                    // Match a m_Father line. Accepted forms (Unity is consistent here):
+                                    //   "  m_Father: {fileID: 0}"
+                                    //   "  m_Father: {fileID: 12345}"
+                                    int idx = body.IndexOf("m_Father:", StringComparison.Ordinal);
+                                    if (idx >= 0)
+                                    {
+                                        // Look for "fileID:" after the colon.
+                                        int fileIdIdx = body.IndexOf("fileID:", idx, StringComparison.Ordinal);
+                                        if (fileIdIdx >= 0)
+                                        {
+                                            // Extract the digits following "fileID:".
+                                            int k = fileIdIdx + "fileID:".Length;
+                                            while (k < body.Length && body[k] == ' ') k++;
+                                            int numStart = k;
+                                            // Allow a leading minus just in case.
+                                            if (k < body.Length && (body[k] == '-' || body[k] == '+')) k++;
+                                            while (k < body.Length && char.IsDigit(body[k])) k++;
+                                            if (k > numStart)
+                                            {
+                                                if (long.TryParse(body.Substring(numStart, k - numStart), out long parentFileId))
+                                                {
+                                                    if (parentFileId == 0) rootCount++;
+                                                }
+                                            }
+                                        }
+                                        break; // Only one m_Father per Transform.
+                                    }
+                                    j++;
+                                }
+                                i = j;
+                                continue;
+                            }
+                        }
+                    }
+                }
+                i++;
+            }
+
+            if (sawAnyTransform)
+            {
+                return rootCount;
+            }
+
+            // Fallback: file had no parseable Transform documents — use GameObject-header count
+            // as a coarse proxy. This is documented behavior; the guard's delta-based check
+            // still catches catastrophic regressions (e.g. 1518-line scene -> 346-line stub).
+            return totalGameObjectHeaders;
         }
 
         private static object CaptureScreenshot(SceneCommand cmd)
