@@ -37,5 +37,5 @@ Shared meta-tools:
 Primary tools:
 - `run_benchmark`
 - `start_fixture_capture`
-- `start_trace`
 - `start_fixture_replay`
+- `start_trace`

@@ -8,7 +8,7 @@ Use this file for smoke-matrix scope and concrete live validation outcomes.
 Use `Docs/V2_V3_VALIDATION_PLAN.md` for the broader validation workflow entry points.
 Use `Docs/HANDOFF_2026-03-06.md` for the latest validated implementation snapshot.
 
-Last updated: 2026-03-07
+Last updated: 2026-03-10
 
 ## Scope
 
@@ -142,7 +142,11 @@ Live-passed in this representative pass:
 - The smoke runner no longer hardcodes a single scene object; it probes a list of known smoke objects and binds to one that exists in the active scene.
 - During refresh or domain reload, the Unity session can briefly disappear from `/api/instances`; this is expected while the editor recompiles.
 - For local Windows HTTP sessions, `capture_editor_window` may be served directly by the Python server using backend marker `server_hwnd_client_bbox` instead of the Unity-side native capture path.
+- Local code-intelligence tools (`search_code`, `find_references`) run on background threads and do not block the MCP event loop. Stale index entries for deleted files are auto-evicted on the first search after deletion; no manual cache purge is required. Glob patterns like `*.cs` are supported for `file_pattern` and are automatically converted to regex internally.
 - The screenshot smoke extension increases the representative HTTP matrix from 29 commands to 32 commands.
+- Package update troubleshooting note:
+	- `com.singularitygroup.hotreload` may log invalid-path delete warnings for temporary package files (`Packages/manifest.json.<number>`, `Packages/packages-lock.json.<number>`). Treat these as watcher noise unless accompanied by real compile errors.
+	- Addressables tools in `com.customgamedev.unity-mcp` are now opt-in via `MCP_ENABLE_ADDRESSABLES_TOOLS` to prevent default install compile breaks from Addressables API drift.
 
 ## Known Limits
 

@@ -1,4 +1,13 @@
 {
+  "compatibility_source": "unity_csharp_source_scan",
+  "compatibility_summary": {
+    "alias_tool_count": 8,
+    "publishable_tool_count": 133,
+    "server_only_tool_count": 64,
+    "unsupported_tools": [
+      "manage_video_capture"
+    ]
+  },
   "default_enabled_groups": [
     "animation",
     "asset_intelligence",
@@ -20,7 +29,7 @@
     "vfx",
     "visual_qa"
   ],
-  "generated_from": "live_tool_registry",
+  "generated_from": "server_tool_registry",
   "group_count": 19,
   "subagent_count": 20,
   "subagents": [
@@ -58,7 +67,7 @@
             "tool": "manage_tools"
           },
           "specialist_id": "unity-core-specialist",
-          "tool_count": 44
+          "tool_count": 43
         },
         "dev_tools": {
           "activate": {
@@ -451,22 +460,30 @@
       ],
       "tool_group_description": "Essential scene, script, asset & editor tools (always on by default)",
       "tools": [
+        "apply_text_edits",
         "batch_execute",
+        "build_code_index",
+        "code_index_status",
+        "create_script",
+        "delete_script",
         "execute_menu_item",
+        "execute_runtime_command",
         "find_gameobjects",
         "find_in_file",
+        "find_references",
+        "find_symbol",
         "get_command_stats",
         "get_diagnostics",
+        "get_runtime_connection_info",
+        "get_runtime_status",
+        "get_sha",
+        "get_symbols",
+        "list_event_subscriptions",
+        "list_runtime_tools",
         "manage_addressables",
         "manage_asset",
         "manage_checkpoints",
         "manage_code_intelligence",
-        "search_code",
-        "find_symbol",
-        "find_references",
-        "get_symbols",
-        "build_code_index",
-        "code_index_status",
         "manage_components",
         "manage_editor",
         "manage_gameobject",
@@ -474,27 +491,18 @@
         "manage_package_manager",
         "manage_prefabs",
         "manage_reflection",
-        "refresh_unity",
         "manage_scene",
-        "apply_text_edits",
-        "create_script",
-        "delete_script",
-        "validate_script",
         "manage_script",
-        "get_sha",
         "manage_selection",
-        "manage_video_capture",
         "manage_windows",
         "ping",
+        "poll_subscription_events",
         "read_console",
-        "validate_compile_health",
-        "get_runtime_status",
-        "list_runtime_tools",
-        "execute_runtime_command",
-        "get_runtime_connection_info",
+        "refresh_unity",
         "script_apply_edits",
-        "list_event_subscriptions",
-        "poll_subscription_events"
+        "search_code",
+        "validate_compile_health",
+        "validate_script"
       ],
       "when_to_use": [
         "Scene composition, hierarchy edits, and asset inspection.",
@@ -552,8 +560,8 @@
       "tools": [
         "run_benchmark",
         "start_fixture_capture",
-        "start_trace",
-        "start_fixture_replay"
+        "start_fixture_replay",
+        "start_trace"
       ],
       "when_to_use": [],
       "workflow": []
@@ -1129,9 +1137,9 @@
       "tools": [
         "audit_prefab_integrity",
         "audit_scene_integrity",
+        "get_test_job",
         "preflight_audit",
-        "run_tests",
-        "get_test_job"
+        "run_tests"
       ],
       "when_to_use": [
         "Run tests after code or asset mutations.",

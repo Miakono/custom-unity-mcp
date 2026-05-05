@@ -37,9 +37,9 @@ Shared meta-tools:
 Primary tools:
 - `audit_prefab_integrity`
 - `audit_scene_integrity`
+- `get_test_job`
 - `preflight_audit`
 - `run_tests`
-- `get_test_job`
 
 Use when:
 - Run tests after code or asset mutations.

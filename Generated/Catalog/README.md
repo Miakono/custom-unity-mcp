@@ -2,7 +2,7 @@
 
 Generated machine-readable catalog derived from the live server tool registry.
 
-Tool count: 134
+Tool count: 133
 Default enabled groups: animation, asset_intelligence, core, dev_tools, diff_patch, events, input, navigation, pipeline, pipeline_control, profiling, project_config, scripting_ext, spatial, testing, transactions, ui, vfx, visual_qa
 
 ## analyze_asset_dependencies
@@ -2572,46 +2572,6 @@ Manage Unity VFX components (ParticleSystem, VisualEffect, LineRenderer, TrailRe
   - `target`: type=`string`, required=`false`
   - `search_method`: type=`enum`, required=`false`, enum=`by_id`, `by_layer`, `by_name`, `by_path`, `by_tag`
   - `properties`: type=`object | string`, required=`false`
-
-## manage_video_capture
-
-Record video and capture GIF animations from Unity gameplay. Works in both Editor and Play mode. Actions: start (begin recording), stop (end and save), get_status (recording info), capture_gif (short animated GIF), set_settings (configure fps/quality/resolution). 
-
-Workflow:
-1. Use set_settings to configure capture quality and format
-2. Use start to begin recording (MP4 or frame sequence)
-3. Use get_status to monitor recording progress
-4. Use stop to end recording and save the file
-5. Use capture_gif for short animated clips (auto-stops when duration reached)
-
-- Group: `core`
-- Unity target: `manage_video_capture`
-- Action model: `mixed`
-- Mutating: `true`
-- High risk: `true`
-- Supports dry-run: `false`
-- Local only: `false`
-- Runtime only: `false`
-- Requires explicit opt-in: `false`
-- Supported actions: `capture_gif`, `get_status`, `set_settings`, `start`, `stop`
-- Known read-only actions: `get_status`
-- Parameters:
-  - `action`: type=`enum`, required=`true`, enum=`capture_gif`, `get_status`, `set_settings`, `start`, `stop`
-  - `output_path`: type=`string`, required=`false`
-  - `duration_seconds`: type=`number`, required=`false`
-  - `fps`: type=`integer`, required=`false`
-  - `quality`: type=`enum`, required=`false`, enum=`high`, `low`, `medium`, `ultra`
-  - `resolution`: type=`object`, required=`false`
-  - `format`: type=`enum`, required=`false`, enum=`frames`, `gif`, `mp4`
-  - `include_audio`: type=`boolean`, required=`false`
-  - `loop_count`: type=`integer`, required=`false`
-  - `frame_skip`: type=`integer`, required=`false`
-- Action contracts:
-  - `capture_gif`: read_only=`false`, mutating=`true`, high_risk=`true`, supports_dry_run=`false`
-  - `get_status`: read_only=`true`, mutating=`false`, high_risk=`false`, supports_dry_run=`false`
-  - `set_settings`: read_only=`false`, mutating=`true`, high_risk=`true`, supports_dry_run=`false`
-  - `start`: read_only=`false`, mutating=`true`, high_risk=`true`, supports_dry_run=`false`
-  - `stop`: read_only=`false`, mutating=`true`, high_risk=`true`, supports_dry_run=`false`
 
 ## manage_windows
 
