@@ -40,6 +40,12 @@ class ServerConfig:
     framed_receive_timeout: float = 2.0
     max_heartbeat_frames: int = 16
     heartbeat_timeout: float = 2.0
+    # Bound on how long we wait for a complete response after a request was
+    # successfully sent. Bumped from the previous fall-through to
+    # `connection_timeout` (effectively whatever was set, which left
+    # moderately-sized payloads exposed to mid-frame disconnects on Windows).
+    # 60s is generous enough for ~16MB responses while still bounded.
+    response_receive_timeout: float = 60.0
 
     # Logging settings
     log_level: str = "INFO"

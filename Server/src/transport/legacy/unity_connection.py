@@ -27,6 +27,23 @@ _connection_lock = threading.Lock()
 FRAMED_MAX = 64 * 1024 * 1024
 
 
+class UnityResponseUnavailableError(ConnectionError):
+    """Raised when the request was sent to Unity but the response could not be read.
+
+    The Unity-side action may have already committed (file written, scene mutated,
+    etc.). Callers should NOT treat this as a hard failure — they should warn the
+    LLM to verify state before retrying, since a blind retry can duplicate effects
+    (e.g. "file already exists" on a second create).
+
+    This corresponds to error code "response_unavailable" in MCPResponse payloads.
+    """
+
+    def __init__(self, message: str, *, request_sent: bool = True, underlying: BaseException | None = None):
+        super().__init__(message)
+        self.request_sent = request_sent
+        self.underlying = underlying
+
+
 @dataclass
 class UnityConnection:
     """Manages the socket connection to the Unity Editor."""
@@ -157,10 +174,19 @@ class UnityConnection:
                 self.sock.setblocking(orig_blocking)
 
     def _read_exact(self, sock: socket.socket, count: int) -> bytes:
+        # Robust framed read: loops on partial recv() until the declared length is
+        # reached. This guards against partial reads on moderately-sized payloads
+        # where a single recv() can return fewer bytes than requested.
         data = bytearray()
         while len(data) < count:
-            chunk = sock.recv(count - len(data))
+            try:
+                chunk = sock.recv(count - len(data))
+            except socket.timeout:
+                # Surface as a timeout the caller can map to a retry hint.
+                raise
             if not chunk:
+                # Peer closed mid-frame — request was already sent, but the
+                # response is gone. Caller maps this to UnityResponseUnavailableError.
                 raise ConnectionError(
                     "Connection closed before reading expected bytes")
             data.extend(chunk)
@@ -354,6 +380,7 @@ class UnityConnection:
                     }).encode('utf-8')
 
                 # Send/receive are serialized to protect the shared socket
+                request_sent = False
                 with self._io_lock:
                     mode = 'framed' if self.use_framing else 'legacy'
                     with contextlib.suppress(Exception):
@@ -366,16 +393,40 @@ class UnityConnection:
                         self.sock.sendall(payload)
                     else:
                         self.sock.sendall(payload)
+                    # Mark the request as committed to the wire. Any failure beyond this
+                    # point means Unity may have executed the command — callers must
+                    # treat read errors as "response unavailable", not "operation failed".
+                    request_sent = True
                     logger.info("[TIMING-STDIO] sendall took %.3fs command=%s", time.time() - t_send_start, command_type)
 
-                    # During retry bursts use a short receive timeout and ensure restoration
-                    restore_timeout = None
+                    # Pick the receive timeout. Larger payloads (e.g. file writes,
+                    # scene mutations) can take several seconds for Unity to compute
+                    # and stream back. The previous default fell through to whatever
+                    # `connection_timeout` happened to be — bump to a dedicated
+                    # receive timeout so the read doesn't bail mid-frame.
+                    receive_timeout = float(getattr(config, 'response_receive_timeout', 60.0))
+                    restore_timeout = self.sock.gettimeout()
                     if attempt > 0 and last_short_timeout is None:
-                        restore_timeout = self.sock.gettimeout()
+                        # On a retry burst we still want to fail fast on dead sockets
+                        # so we can rediscover the port — not wait the full window.
                         self.sock.settimeout(1.0)
+                    else:
+                        self.sock.settimeout(receive_timeout)
                     try:
                         t_recv_start = time.time()
-                        response_data = self.receive_full_response(self.sock)
+                        try:
+                            response_data = self.receive_full_response(self.sock)
+                        except (ConnectionError, TimeoutError, socket.timeout, OSError) as recv_exc:
+                            if request_sent:
+                                # Distinct error: request committed, response unavailable.
+                                # Callers map this to {success: false, code: "response_unavailable"}
+                                # rather than a generic failure, so the LLM doesn't blindly retry.
+                                raise UnityResponseUnavailableError(
+                                    f"Request sent but response unavailable: {recv_exc}",
+                                    request_sent=True,
+                                    underlying=recv_exc,
+                                ) from recv_exc
+                            raise
                         logger.info("[TIMING-STDIO] receive took %.3fs command=%s len=%d", time.time() - t_recv_start, command_type, len(response_data))
                         with contextlib.suppress(Exception):
                             logger.debug(
@@ -398,6 +449,16 @@ class UnityConnection:
                         'message', 'Unknown Unity error')
                     raise Exception(err)
                 return resp.get('result', {})
+            except UnityResponseUnavailableError:
+                # Do not retry — the request was already committed on the Unity side.
+                # A blind retry could duplicate the side-effect (e.g. a second create
+                # producing "file already exists"). Propagate so callers can warn.
+                try:
+                    if self.sock:
+                        self.sock.close()
+                finally:
+                    self.sock = None
+                raise
             except Exception as e:
                 logger.warning(
                     f"Unity communication attempt {attempt+1} failed: {e}")
@@ -539,9 +600,23 @@ class UnityConnectionPool:
             ConnectionError: If instance cannot be resolved
         """
         if not instances:
-            raise ConnectionError(
-                "No Unity Editor instances found. Please ensure Unity is running with Miakono Unity MCP."
-            )
+            # If the discovery cache was empty, retry once with a forced rescan before
+            # giving up — Unity may have just (re)connected, or our cache may be stale
+            # from a previous "no instance" scan during domain reload.
+            try:
+                refreshed = self.discover_all_instances(force_refresh=True)
+            except Exception:
+                refreshed = []
+            if refreshed:
+                instances = refreshed
+            else:
+                requested = instance_identifier or "<auto-resolve>"
+                raise ConnectionError(
+                    f"No Unity Editor instances reachable for '{requested}'. "
+                    "Confirm Unity is running with the MCP for Unity package installed and the bridge listening, "
+                    "then check the mcpforunity://instances resource. If multiple Unity editors are running, "
+                    "call set_active_instance(\"Name@hash\") to pin routing."
+                )
 
         # Use default instance if no identifier provided
         if instance_identifier is None:
@@ -836,8 +911,24 @@ def send_command_with_retry(
     # Commands that trigger compilation/reload shouldn't retry on disconnect
     send_max_attempts = None if retry_on_reload else 0
 
-    response = conn.send_command(
-        command_type, params, max_attempts=send_max_attempts)
+    try:
+        response = conn.send_command(
+            command_type, params, max_attempts=send_max_attempts)
+    except UnityResponseUnavailableError as exc:
+        # Surface a distinct error so callers can warn the LLM that the side-effect
+        # may have committed even though the response was lost. A bare "error" string
+        # caused users to retry blindly and hit "file already exists".
+        return MCPResponse(
+            success=False,
+            error="Connection closed before reading response (Unity may have completed the action)",
+            hint="verify_state",
+            data={
+                "code": "response_unavailable",
+                "requestSent": True,
+                "hint": "The Unity-side action may have completed; verify state before retrying",
+                "underlying": str(exc),
+            },
+        )
     retries = 0
     wait_started = None
     reason = _extract_response_reason(response)
@@ -874,7 +965,20 @@ def send_command_with_retry(
         )
         time.sleep(max(0.0, sleep_ms / 1000.0))
         retries += 1
-        response = conn.send_command(command_type, params)
+        try:
+            response = conn.send_command(command_type, params)
+        except UnityResponseUnavailableError as exc:
+            return MCPResponse(
+                success=False,
+                error="Connection closed before reading response (Unity may have completed the action)",
+                hint="verify_state",
+                data={
+                    "code": "response_unavailable",
+                    "requestSent": True,
+                    "hint": "The Unity-side action may have completed; verify state before retrying",
+                    "underlying": str(exc),
+                },
+            )
         reason = _extract_response_reason(response)
 
     if wait_started is not None:

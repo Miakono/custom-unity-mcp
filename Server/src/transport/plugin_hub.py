@@ -310,8 +310,13 @@ class PluginHub(WebSocketEndpoint):
                 params=params,
                 timeout=unity_timeout_s,
             )
+            request_sent = False
             try:
                 await websocket.send_json(msg.model_dump())
+                # Send completed: any subsequent failure must be reported as
+                # "response_unavailable" rather than a plain failure, since the
+                # Unity-side action may have already committed.
+                request_sent = True
             except Exception as exc:
                 # If send fails (socket already closing), fail the future so callers don't hang.
                 if not future.done():
@@ -321,6 +326,21 @@ class PluginHub(WebSocketEndpoint):
                 result = await asyncio.wait_for(future, timeout=server_wait_s)
                 return result
             except PluginDisconnectedError as exc:
+                # The request was already on the wire — Unity may have completed it.
+                # Distinct error code so callers can warn the LLM rather than retry blindly
+                # (a blind retry on e.g. a `create` op produces "file already exists").
+                if request_sent:
+                    return MCPResponse(
+                        success=False,
+                        error="Connection closed before reading response (Unity may have completed the action)",
+                        hint="verify_state",
+                        data={
+                            "code": "response_unavailable",
+                            "requestSent": True,
+                            "hint": "The Unity-side action may have completed; verify state before retrying",
+                            "underlying": str(exc),
+                        },
+                    ).model_dump()
                 return MCPResponse(success=False, error=str(exc), hint="retry").model_dump()
             except asyncio.TimeoutError:
                 if command_type in cls._FAST_FAIL_COMMANDS:
@@ -328,6 +348,19 @@ class PluginHub(WebSocketEndpoint):
                         success=False,
                         error=f"Unity did not respond to '{command_type}' within {server_wait_s:.1f}s; please retry",
                         hint="retry",
+                    ).model_dump()
+                # Non-fast-path timeout: request was sent but Unity didn't reply in
+                # time. Treat as response_unavailable so callers verify state.
+                if request_sent:
+                    return MCPResponse(
+                        success=False,
+                        error=f"No response from Unity within {server_wait_s:.1f}s (action may have completed)",
+                        hint="verify_state",
+                        data={
+                            "code": "response_unavailable",
+                            "requestSent": True,
+                            "hint": "The Unity-side action may have completed; verify state before retrying",
+                        },
                     ).model_dump()
                 raise
         finally:
