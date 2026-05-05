@@ -3,13 +3,17 @@ using System.Collections.Generic;
 using MCPForUnity.Editor.Helpers;
 using MCPForUnity.Runtime.Helpers;
 using Unity.Profiling;
-using Unity.Profiling.Editor;
 using UnityEngine;
 
 namespace MCPForUnity.Editor.Tools.Profiler
 {
     /// <summary>
     /// Data structure for a profiler snapshot capturing CPU, GPU, Memory and Rendering stats.
+    /// All Capture() methods read from <see cref="ProfilerRecorderPool"/>, which holds
+    /// long-lived ProfilerRecorder instances. The previous implementation created
+    /// ephemeral recorders inside using-blocks and read LastValue immediately, which
+    /// always returned 0 because Unity needs at least one frame to elapse before any
+    /// recorder has data.
     /// </summary>
     [Serializable]
     public class ProfilerSnapshot
@@ -18,22 +22,22 @@ namespace MCPForUnity.Editor.Tools.Profiler
         public int frameIndex;
         public double frameTimeMs;
         public double fps;
-        
+
         // CPU Data
         public CpuData cpu;
-        
+
         // GPU Data
         public GpuData gpu;
-        
+
         // Memory Data
         public MemoryData memory;
-        
+
         // Rendering Data
         public RenderingData rendering;
-        
+
         // Audio Data
         public AudioData audio;
-        
+
         public static ProfilerSnapshot Capture()
         {
             var snapshot = new ProfilerSnapshot
@@ -46,23 +50,24 @@ namespace MCPForUnity.Editor.Tools.Profiler
                 rendering = RenderingData.Capture(),
                 audio = AudioData.Capture()
             };
-            
-            // Calculate frame time and FPS from render thread time if available
-            if (snapshot.cpu.renderThreadTimeMs > 0)
+
+            // Frame time priority: total > main thread > render thread > 0
+            // Total Frame Time is the most representative if available.
+            if (snapshot.cpu.totalTimeMs > 0)
             {
-                snapshot.frameTimeMs = snapshot.cpu.renderThreadTimeMs;
+                snapshot.frameTimeMs = snapshot.cpu.totalTimeMs;
             }
             else if (snapshot.cpu.mainThreadTimeMs > 0)
             {
                 snapshot.frameTimeMs = snapshot.cpu.mainThreadTimeMs;
             }
-            else
+            else if (snapshot.cpu.renderThreadTimeMs > 0)
             {
-                snapshot.frameTimeMs = snapshot.cpu.totalTimeMs;
+                snapshot.frameTimeMs = snapshot.cpu.renderThreadTimeMs;
             }
-            
+
             snapshot.fps = snapshot.frameTimeMs > 0 ? 1000.0 / snapshot.frameTimeMs : 0;
-            
+
             return snapshot;
         }
     }
@@ -80,7 +85,7 @@ namespace MCPForUnity.Editor.Tools.Profiler
         public double renderingTimeMs;
         public double editorOverheadMs;
         public double gcTimeMs;
-        
+
         // Per-category breakdown
         public Dictionary<string, double> categoryBreakdown;
 
@@ -93,22 +98,22 @@ namespace MCPForUnity.Editor.Tools.Profiler
 
             try
             {
-                // Get frame time from ProfilerRecorder if available
-                using (var totalTimeRecorder = ProfilerRecorder.StartNew(ProfilerCategory.Internal, "CPU Total Frame Time"))
-                using (var mainThreadRecorder = ProfilerRecorder.StartNew(ProfilerCategory.Internal, "CPU Main Thread Frame Time"))
-                using (var renderThreadRecorder = ProfilerRecorder.StartNew(ProfilerCategory.Internal, "CPU Render Thread Frame Time"))
-                {
-                    // Give a frame for recorders to capture data
-                    if (totalTimeRecorder.Valid && totalTimeRecorder.Count > 0)
-                        data.totalTimeMs = totalTimeRecorder.LastValue / 1000000.0; // Convert ns to ms
-                    if (mainThreadRecorder.Valid && mainThreadRecorder.Count > 0)
-                        data.mainThreadTimeMs = mainThreadRecorder.LastValue / 1000000.0;
-                    if (renderThreadRecorder.Valid && renderThreadRecorder.Count > 0)
-                        data.renderThreadTimeMs = renderThreadRecorder.LastValue / 1000000.0;
-                }
+                // Use the average across the recorder's sample buffer for a more stable
+                // frame-time reading than a single LastValue. Buffer is ~60 samples
+                // (~1s at 60 Hz), so this smooths short spikes.
+                data.totalTimeMs = ProfilerRecorderPool.ReadAverageNanosecondsAsMs(
+                    ProfilerCategory.Internal, ProfilerRecorderPool.Counters.CpuTotalFrameTime);
+                data.mainThreadTimeMs = ProfilerRecorderPool.ReadAverageNanosecondsAsMs(
+                    ProfilerCategory.Internal, ProfilerRecorderPool.Counters.CpuMainThreadFrameTime);
+                data.renderThreadTimeMs = ProfilerRecorderPool.ReadAverageNanosecondsAsMs(
+                    ProfilerCategory.Internal, ProfilerRecorderPool.Counters.CpuRenderThreadFrameTime);
 
-                // Try to get category-specific timings
-                CaptureCategoryTimes(data);
+                // Build category breakdown — only include categories with non-zero data.
+                // Unity doesn't expose per-category CPU time as a single counter, so this
+                // is best-effort and will be sparse outside of deep profiling.
+                if (data.totalTimeMs > 0) data.categoryBreakdown["Total"] = data.totalTimeMs;
+                if (data.mainThreadTimeMs > 0) data.categoryBreakdown["MainThread"] = data.mainThreadTimeMs;
+                if (data.renderThreadTimeMs > 0) data.categoryBreakdown["RenderThread"] = data.renderThreadTimeMs;
             }
             catch (Exception ex)
             {
@@ -116,83 +121,6 @@ namespace MCPForUnity.Editor.Tools.Profiler
             }
 
             return data;
-        }
-
-        private static void CaptureCategoryTimes(CpuData data)
-        {
-            // Scripting time
-            try
-            {
-                using (var recorder = ProfilerRecorder.StartNew(ProfilerCategory.Scripts, "Scripting"))
-                {
-                    if (recorder.Valid && recorder.Count > 0)
-                        data.scriptsTimeMs = recorder.LastValue / 1000000.0;
-                }
-            }
-            catch { }
-
-            // Physics time
-            try
-            {
-                using (var recorder = ProfilerRecorder.StartNew(ProfilerCategory.Physics, "Physics.Processing"))
-                {
-                    if (recorder.Valid && recorder.Count > 0)
-                        data.physicsTimeMs = recorder.LastValue / 1000000.0;
-                }
-            }
-            catch { }
-
-            // Animation time
-            try
-            {
-                using (var recorder = ProfilerRecorder.StartNew(ProfilerCategory.Animation, "Animation.Update"))
-                {
-                    if (recorder.Valid && recorder.Count > 0)
-                        data.animationTimeMs = recorder.LastValue / 1000000.0;
-                }
-            }
-            catch { }
-
-            // UI time
-            try
-            {
-                using (var recorder = ProfilerRecorder.StartNew(ProfilerCategory.Gui, "UI"))
-                {
-                    if (recorder.Valid && recorder.Count > 0)
-                        data.uiTimeMs = recorder.LastValue / 1000000.0;
-                }
-            }
-            catch { }
-
-            // Rendering time
-            try
-            {
-                using (var recorder = ProfilerRecorder.StartNew(ProfilerCategory.Render, "Render"))
-                {
-                    if (recorder.Valid && recorder.Count > 0)
-                        data.renderingTimeMs = recorder.LastValue / 1000000.0;
-                }
-            }
-            catch { }
-
-            // GC time
-            try
-            {
-                using (var recorder = ProfilerRecorder.StartNew(ProfilerCategory.Memory, "GC.Collect"))
-                {
-                    if (recorder.Valid && recorder.Count > 0)
-                        data.gcTimeMs = recorder.LastValue / 1000000.0;
-                }
-            }
-            catch { }
-
-            // Build category breakdown
-            if (data.scriptsTimeMs > 0) data.categoryBreakdown["Scripts"] = data.scriptsTimeMs;
-            if (data.physicsTimeMs > 0) data.categoryBreakdown["Physics"] = data.physicsTimeMs;
-            if (data.animationTimeMs > 0) data.categoryBreakdown["Animation"] = data.animationTimeMs;
-            if (data.uiTimeMs > 0) data.categoryBreakdown["UI"] = data.uiTimeMs;
-            if (data.renderingTimeMs > 0) data.categoryBreakdown["Rendering"] = data.renderingTimeMs;
-            if (data.gcTimeMs > 0) data.categoryBreakdown["GC"] = data.gcTimeMs;
         }
     }
 
@@ -211,11 +139,11 @@ namespace MCPForUnity.Editor.Tools.Profiler
 
             try
             {
-                using (var recorder = ProfilerRecorder.StartNew(ProfilerCategory.Render, "GPU Frame Time"))
-                {
-                    if (recorder.Valid && recorder.Count > 0)
-                        data.totalTimeMs = recorder.LastValue / 1000000.0;
-                }
+                data.totalTimeMs = ProfilerRecorderPool.ReadAverageNanosecondsAsMs(
+                    ProfilerCategory.Render, ProfilerRecorderPool.Counters.GpuFrameTime);
+                // Note: per-pass GPU breakdown (opaque/transparent/shadow/post) is not
+                // exposed as discrete counters in standard Unity. Would require Frame
+                // Debugger or a custom render-pass profiler. Leaving these as 0 is honest.
             }
             catch (Exception ex)
             {
@@ -233,15 +161,21 @@ namespace MCPForUnity.Editor.Tools.Profiler
         public long totalAllocatedMemoryBytes;
         public long gcHeapSizeBytes;
         public long gcUsedMemoryBytes;
+        public long gcAllocatedInFrameBytes;
         public long textureMemoryBytes;
         public long meshMemoryBytes;
         public long audioMemoryBytes;
+        public long videoMemoryBytes;
         public long renderTextureMemoryBytes;
         public long bufferMemoryBytes;
         public int gcCollectionCount;
         public long managedHeapSizeBytes;
         public long managedUsedSizeBytes;
-        
+
+        public int gameObjectCount;
+        public int sceneObjectCount;
+        public int assetCount;
+
         // System memory
         public long systemTotalMemoryBytes;
         public long systemUsedMemoryBytes;
@@ -252,62 +186,47 @@ namespace MCPForUnity.Editor.Tools.Profiler
 
             try
             {
-                // Total memory
-                data.totalUsedMemoryBytes = GC.GetTotalMemory(false);
-                data.totalAllocatedMemoryBytes = GC.GetTotalMemory(true);
-
-                // Try to get more detailed memory info from ProfilerRecorder
-                using (var recorder = ProfilerRecorder.StartNew(ProfilerCategory.Memory, "Total Used Memory"))
+                // Prefer Profiler counters; fall back to GC.GetTotalMemory if they're 0
+                // (which can happen in edit mode when nothing is rendering).
+                data.totalUsedMemoryBytes = ProfilerRecorderPool.ReadLong(
+                    ProfilerCategory.Memory, ProfilerRecorderPool.Counters.TotalUsedMemory);
+                if (data.totalUsedMemoryBytes == 0)
                 {
-                    if (recorder.Valid && recorder.Count > 0)
-                        data.totalUsedMemoryBytes = (long)recorder.LastValue;
+                    data.totalUsedMemoryBytes = GC.GetTotalMemory(forceFullCollection: false);
                 }
 
-                // Texture memory
-                try
-                {
-                    using (var recorder = ProfilerRecorder.StartNew(ProfilerCategory.Memory, "Texture Memory"))
-                    {
-                        if (recorder.Valid && recorder.Count > 0)
-                            data.textureMemoryBytes = (long)recorder.LastValue;
-                    }
-                }
-                catch { }
+                data.totalAllocatedMemoryBytes = ProfilerRecorderPool.ReadLong(
+                    ProfilerCategory.Memory, ProfilerRecorderPool.Counters.TotalReservedMemory);
 
-                // Mesh memory
-                try
-                {
-                    using (var recorder = ProfilerRecorder.StartNew(ProfilerCategory.Memory, "Mesh Memory"))
-                    {
-                        if (recorder.Valid && recorder.Count > 0)
-                            data.meshMemoryBytes = (long)recorder.LastValue;
-                    }
-                }
-                catch { }
+                data.gcUsedMemoryBytes = ProfilerRecorderPool.ReadLong(
+                    ProfilerCategory.Memory, ProfilerRecorderPool.Counters.GcUsedMemory);
+                data.gcHeapSizeBytes = ProfilerRecorderPool.ReadLong(
+                    ProfilerCategory.Memory, ProfilerRecorderPool.Counters.GcReservedMemory);
+                data.gcAllocatedInFrameBytes = ProfilerRecorderPool.ReadLong(
+                    ProfilerCategory.Memory, ProfilerRecorderPool.Counters.GcAllocatedInFrame);
 
-                // Audio memory
-                try
-                {
-                    using (var recorder = ProfilerRecorder.StartNew(ProfilerCategory.Audio, "Audio AudioManager"))
-                    {
-                        if (recorder.Valid && recorder.Count > 0)
-                            data.audioMemoryBytes = (long)recorder.LastValue;
-                    }
-                }
-                catch { }
+                data.textureMemoryBytes = ProfilerRecorderPool.ReadLong(
+                    ProfilerCategory.Memory, ProfilerRecorderPool.Counters.TextureMemory);
+                data.meshMemoryBytes = ProfilerRecorderPool.ReadLong(
+                    ProfilerCategory.Memory, ProfilerRecorderPool.Counters.MeshMemory);
+                data.audioMemoryBytes = ProfilerRecorderPool.ReadLong(
+                    ProfilerCategory.Memory, ProfilerRecorderPool.Counters.AudioReservedMemory);
+                data.videoMemoryBytes = ProfilerRecorderPool.ReadLong(
+                    ProfilerCategory.Memory, ProfilerRecorderPool.Counters.VideoMemory);
 
-                // Render texture memory
-                try
-                {
-                    using (var recorder = ProfilerRecorder.StartNew(ProfilerCategory.Memory, "Render Texture Memory"))
-                    {
-                        if (recorder.Valid && recorder.Count > 0)
-                            data.renderTextureMemoryBytes = (long)recorder.LastValue;
-                    }
-                }
-                catch { }
+                // Object counts give Claude actionable signal about scene complexity.
+                data.gameObjectCount = (int)ProfilerRecorderPool.ReadLong(
+                    ProfilerCategory.Memory, ProfilerRecorderPool.Counters.GameObjectCount);
+                data.sceneObjectCount = (int)ProfilerRecorderPool.ReadLong(
+                    ProfilerCategory.Memory, ProfilerRecorderPool.Counters.SceneObjectCount);
+                data.assetCount = (int)ProfilerRecorderPool.ReadLong(
+                    ProfilerCategory.Memory, ProfilerRecorderPool.Counters.AssetCount);
 
-                // GC collection count
+                // Managed-heap shadow figures — useful when comparing against profiler totals.
+                data.managedHeapSizeBytes = GC.GetTotalMemory(false);
+                data.managedUsedSizeBytes = data.managedHeapSizeBytes;
+
+                // GC collection count (gen 0)
                 data.gcCollectionCount = GC.CollectionCount(0);
 
                 // System memory
@@ -341,8 +260,24 @@ namespace MCPForUnity.Editor.Tools.Profiler
 
             try
             {
-                // Try to get rendering stats from Unity's internal APIs
-                // These may not be available in all Unity versions
+                // Primary path: ProfilerRecorder counters from the Render category.
+                // These work in both Editor and built players, in edit mode and play mode,
+                // wherever the renderer ran a frame recently.
+                data.drawCalls = (int)ProfilerRecorderPool.ReadLong(
+                    ProfilerCategory.Render, ProfilerRecorderPool.Counters.DrawCallsCount);
+                data.setPassCalls = (int)ProfilerRecorderPool.ReadLong(
+                    ProfilerCategory.Render, ProfilerRecorderPool.Counters.SetPassCallsCount);
+                data.triangles = (int)ProfilerRecorderPool.ReadLong(
+                    ProfilerCategory.Render, ProfilerRecorderPool.Counters.TrianglesCount);
+                data.vertices = (int)ProfilerRecorderPool.ReadLong(
+                    ProfilerCategory.Render, ProfilerRecorderPool.Counters.VerticesCount);
+                data.batches = (int)ProfilerRecorderPool.ReadLong(
+                    ProfilerCategory.Render, ProfilerRecorderPool.Counters.BatchesCount);
+                data.shadowCasters = (int)ProfilerRecorderPool.ReadLong(
+                    ProfilerCategory.Render, ProfilerRecorderPool.Counters.ShadowCastersCount);
+
+                // Secondary path: UnityEditor.UnityStats exposes per-batch breakdowns
+                // (static/dynamic/instanced) that aren't covered by the Render counters.
                 CaptureFromUnityStats(data);
             }
             catch (Exception ex)
@@ -355,45 +290,57 @@ namespace MCPForUnity.Editor.Tools.Profiler
 
         private static void CaptureFromUnityStats(RenderingData data)
         {
-            // Use reflection to try to access Unity's internal rendering statistics
-            // This is best-effort as the APIs change between versions
+            // UnityEditor.UnityStats fields/properties vary by version. Look up via
+            // reflection so this code compiles against any 2020+ editor and silently
+            // skips fields that have moved or been renamed.
             try
             {
                 var unityStatsType = typeof(UnityEditor.Editor).Assembly.GetType("UnityEditor.UnityStats");
-                if (unityStatsType != null)
+                if (unityStatsType == null) return;
+
+                // Prefer fields, fall back to properties for newer Unity revisions.
+                int? TryReadInt(string name)
                 {
-                    var drawCallsField = unityStatsType.GetField("drawCalls", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public);
-                    if (drawCallsField != null)
-                        data.drawCalls = (int)drawCallsField.GetValue(null);
-
-                    var setPassCallsField = unityStatsType.GetField("setPassCalls", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public);
-                    if (setPassCallsField != null)
-                        data.setPassCalls = (int)setPassCallsField.GetValue(null);
-
-                    var trianglesField = unityStatsType.GetField("triangles", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public);
-                    if (trianglesField != null)
-                        data.triangles = (int)trianglesField.GetValue(null);
-
-                    var verticesField = unityStatsType.GetField("vertices", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public);
-                    if (verticesField != null)
-                        data.vertices = (int)verticesField.GetValue(null);
-
-                    var batchesField = unityStatsType.GetField("batches", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public);
-                    if (batchesField != null)
-                        data.batches = (int)batchesField.GetValue(null);
-
-                    var staticBatchesField = unityStatsType.GetField("staticBatchedDrawCalls", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public);
-                    if (staticBatchesField != null)
-                        data.staticBatchedDrawCalls = (int)staticBatchesField.GetValue(null);
-
-                    var dynamicBatchesField = unityStatsType.GetField("dynamicBatchedDrawCalls", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public);
-                    if (dynamicBatchesField != null)
-                        data.dynamicBatchedDrawCalls = (int)dynamicBatchesField.GetValue(null);
-
-                    var instancedDrawCallsField = unityStatsType.GetField("instancedDrawCalls", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public);
-                    if (instancedDrawCallsField != null)
-                        data.instancedDrawCalls = (int)instancedDrawCallsField.GetValue(null);
+                    try
+                    {
+                        var f = unityStatsType.GetField(name,
+                            System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public);
+                        if (f != null) return Convert.ToInt32(f.GetValue(null));
+                        var p = unityStatsType.GetProperty(name,
+                            System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public);
+                        if (p != null) return Convert.ToInt32(p.GetValue(null));
+                    }
+                    catch { }
+                    return null;
                 }
+
+                // Only overwrite if UnityStats has a non-zero value AND the recorder didn't
+                // already populate it. UnityStats reflects the last frame the SceneView /
+                // GameView rendered, which can be more reliable in edit mode.
+                int? dc = TryReadInt("drawCalls");
+                if (dc.HasValue && data.drawCalls == 0) data.drawCalls = dc.Value;
+
+                int? sp = TryReadInt("setPassCalls");
+                if (sp.HasValue && data.setPassCalls == 0) data.setPassCalls = sp.Value;
+
+                int? tris = TryReadInt("triangles");
+                if (tris.HasValue && data.triangles == 0) data.triangles = tris.Value;
+
+                int? verts = TryReadInt("vertices");
+                if (verts.HasValue && data.vertices == 0) data.vertices = verts.Value;
+
+                int? batches = TryReadInt("batches");
+                if (batches.HasValue && data.batches == 0) data.batches = batches.Value;
+
+                // These are UnityStats-only (no recorder equivalent).
+                int? statBatches = TryReadInt("staticBatchedDrawCalls");
+                if (statBatches.HasValue) data.staticBatchedDrawCalls = statBatches.Value;
+
+                int? dynBatches = TryReadInt("dynamicBatchedDrawCalls");
+                if (dynBatches.HasValue) data.dynamicBatchedDrawCalls = dynBatches.Value;
+
+                int? instDc = TryReadInt("instancedDrawCalls");
+                if (instDc.HasValue) data.instancedDrawCalls = instDc.Value;
             }
             catch { }
         }
@@ -414,7 +361,6 @@ namespace MCPForUnity.Editor.Tools.Profiler
 
             try
             {
-                // Count audio sources in the scene
                 if (UnityEngine.Application.isPlaying)
                 {
                     var audioSources = UnityObjectCompatibility.FindObjectsByType<UnityEngine.AudioSource>();

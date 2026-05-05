@@ -344,9 +344,12 @@ async def record_profiler_session(
                     "minFps": aggregated_stats.get("minFps", 0),
                     "maxFps": aggregated_stats.get("maxFps", 0),
                 },
+                # C# AggregatedStats emits avgMemoryBytes / maxMemoryBytes (long); convert
+                # to MB here so the response stays in human-friendly units. The previous
+                # code looked for keys named ...MB and silently fell back to 0.
                 "memory": {
-                    "avgMemoryMB": aggregated_stats.get("avgMemoryMB", 0),
-                    "maxMemoryMB": aggregated_stats.get("maxMemoryMB", 0),
+                    "avgMemoryMB": aggregated_stats.get("avgMemoryBytes", 0) / (1024.0 * 1024.0),
+                    "maxMemoryMB": aggregated_stats.get("maxMemoryBytes", 0) / (1024.0 * 1024.0),
                 } if include_mem else None,
                 "rendering": {
                     "avgDrawCalls": aggregated_stats.get("avgDrawCalls", 0),

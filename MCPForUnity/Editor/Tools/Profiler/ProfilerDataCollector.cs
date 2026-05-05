@@ -19,8 +19,13 @@ namespace MCPForUnity.Editor.Tools.Profiler
         private readonly List<ProfilerSnapshot> _snapshots = new List<ProfilerSnapshot>();
         private readonly int _maxSnapshots;
         private bool _isCollecting;
-        private int _collectionIntervalFrames;
-        private int _lastCollectionFrame;
+        // Wall-clock interval between snapshots. Time.frameCount is frozen in edit mode,
+        // so the original frame-delta gating never triggered when the editor wasn't playing
+        // and the collector accumulated zero samples — which is what made record_profiler_session
+        // return all zeros. Storing seconds and using EditorApplication.timeSinceStartup makes
+        // the collector tick reliably in both edit and play modes.
+        private double _collectionIntervalSeconds;
+        private double _lastCollectionTime;
 
         public bool IsCollecting => _isCollecting;
         public int SnapshotCount => _snapshots.Count;
@@ -32,14 +37,17 @@ namespace MCPForUnity.Editor.Tools.Profiler
         }
 
         /// <summary>
-        /// Starts collecting profiler snapshots.
+        /// Starts collecting profiler snapshots. <paramref name="intervalFrames"/> is
+        /// converted to a wall-clock interval (assuming ~60 FPS) so collection still
+        /// progresses when the editor is not in play mode.
         /// </summary>
         public void Start(int intervalFrames = 10)
         {
             _isCollecting = true;
-            _collectionIntervalFrames = Math.Max(1, intervalFrames);
-            _lastCollectionFrame = UnityEngine.Time.frameCount;
-            McpLog.Info("[ProfilerDataCollector] Started collecting profiler data.");
+            int frames = Math.Max(1, intervalFrames);
+            _collectionIntervalSeconds = frames / 60.0;
+            _lastCollectionTime = UnityEditor.EditorApplication.timeSinceStartup;
+            McpLog.Info($"[ProfilerDataCollector] Started collecting profiler data (interval: {_collectionIntervalSeconds * 1000:F0}ms).");
         }
 
         /// <summary>
@@ -48,7 +56,7 @@ namespace MCPForUnity.Editor.Tools.Profiler
         public void Stop()
         {
             _isCollecting = false;
-            McpLog.Info("[ProfilerDataCollector] Stopped collecting profiler data.");
+            McpLog.Info($"[ProfilerDataCollector] Stopped collecting profiler data ({_snapshots.Count} snapshots collected).");
         }
 
         /// <summary>
@@ -58,11 +66,11 @@ namespace MCPForUnity.Editor.Tools.Profiler
         {
             if (!_isCollecting) return;
 
-            int currentFrame = UnityEngine.Time.frameCount;
-            if (currentFrame - _lastCollectionFrame >= _collectionIntervalFrames)
+            double now = UnityEditor.EditorApplication.timeSinceStartup;
+            if (now - _lastCollectionTime >= _collectionIntervalSeconds)
             {
                 CollectSnapshot();
-                _lastCollectionFrame = currentFrame;
+                _lastCollectionTime = now;
             }
         }
 
