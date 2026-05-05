@@ -267,7 +267,7 @@ namespace MCPForUnity.Editor.Tools.Prefabs
             if (result != null)
             {
                 AssetDatabase.SaveAssets();
-                AssetDatabase.Refresh();
+                AssetDatabase.ImportAsset(path);
             }
 
             return result;
@@ -506,7 +506,7 @@ namespace MCPForUnity.Editor.Tools.Prefabs
                     return new ErrorResponse($"Failed to save prefab asset at '{sanitizedPath}'.");
                 }
 
-                AssetDatabase.Refresh();
+                AssetDatabase.ImportAsset(sanitizedPath);
 
                 McpLog.Info($"[ManagePrefabs] Successfully modified and saved prefab '{sanitizedPath}' (headless).");
 
@@ -768,10 +768,68 @@ namespace MCPForUnity.Editor.Tools.Prefabs
                 }
             }
 
+            // Opt-in override for the list-shrink data-loss guard. Required to replace
+            // a list with a shorter one when the new size is <50% of the old. Read once
+            // and shared across both the legacy componentProperties path and the new
+            // componentPatches path below.
+            bool prefabConfirmReplace = ParamCoercion.CoerceBool(
+                @params["confirmReplace"] ?? @params["confirm_replace"], false);
+            var prefabSetOptions = new SetPropertyOptions { ConfirmReplace = prefabConfirmReplace };
+
+            // SerializedPropertyPatcher-style patches per component type. Converges this
+            // surface with apply_prefab_patch / manage_scriptable_object dialect.
+            //   componentPatches: { "TypeName": [ {propertyPath, op, value, ref}, ... ] }
+            JObject componentPatchesByType = @params["componentPatches"] as JObject ?? @params["component_patches"] as JObject;
+            if (componentPatchesByType != null && componentPatchesByType.Count > 0)
+            {
+                var patchErrors = new List<string>();
+                foreach (var entry in componentPatchesByType.Properties())
+                {
+                    string typeName = entry.Name;
+                    if (!ComponentResolver.TryResolve(typeName, out Type componentType, out string resolveError))
+                    {
+                        patchErrors.Add($"{typeName}: type not found — {resolveError}");
+                        continue;
+                    }
+
+                    Component component = targetGo.GetComponent(componentType);
+                    if (component == null)
+                    {
+                        patchErrors.Add($"{typeName}: not found on '{targetGo.name}'");
+                        continue;
+                    }
+
+                    if (entry.Value is not JArray patchArray || patchArray.Count == 0)
+                    {
+                        continue;
+                    }
+
+                    var result = ComponentOps.ApplyPatches(component, patchArray, prefabSetOptions);
+                    if (!result.Success)
+                    {
+                        foreach (var err in result.Errors)
+                        {
+                            patchErrors.Add($"{typeName}: {Newtonsoft.Json.JsonConvert.SerializeObject(err)}");
+                        }
+                    }
+                    else if (result.AnyChanged)
+                    {
+                        modified = true;
+                    }
+                }
+
+                if (patchErrors.Count > 0)
+                {
+                    return (false, new ErrorResponse($"Failed to apply component patches (no changes saved): {string.Join("; ", patchErrors)}"));
+                }
+            }
+
             // Set properties on existing components
             JObject componentProperties = @params["componentProperties"] as JObject ?? @params["component_properties"] as JObject;
             if (componentProperties != null && componentProperties.Count > 0)
             {
+                var options = prefabSetOptions;
+
                 var errors = new List<string>();
 
                 foreach (var entry in componentProperties.Properties())
@@ -797,7 +855,7 @@ namespace MCPForUnity.Editor.Tools.Prefabs
 
                     foreach (var prop in props.Properties())
                     {
-                        if (!ComponentOps.SetProperty(component, prop.Name, prop.Value, out string setError))
+                        if (!ComponentOps.SetProperty(component, prop.Name, prop.Value, options, out string setError))
                         {
                             errors.Add($"{typeName}.{prop.Name}: {setError}");
                         }
@@ -1058,7 +1116,7 @@ namespace MCPForUnity.Editor.Tools.Prefabs
 
                 if (success)
                 {
-                    AssetDatabase.Refresh();
+                    AssetDatabase.ImportAsset(stage.assetPath);
                     return new SuccessResponse(
                         $"Saved prefab '{stage.assetPath}'.",
                         new
@@ -1107,7 +1165,7 @@ namespace MCPForUnity.Editor.Tools.Prefabs
                         {
                             return new ErrorResponse($"Failed to save prefab '{prefabPath}' before closing.");
                         }
-                        AssetDatabase.Refresh();
+                        AssetDatabase.ImportAsset(prefabPath);
                     }
                 }
 

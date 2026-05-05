@@ -19,7 +19,21 @@ from services.tools.utils import parse_json_payload, normalize_properties
         "Actions: add, remove, set_property. Requires target (instance ID or name) and component_type. "
         "For READING component data, use the mcpforunity://scene/gameobject/{id}/components resource "
         "or mcpforunity://scene/gameobject/{id}/component/{name} for a single component. "
-        "For creating/deleting GameObjects themselves, use manage_gameobject instead."
+        "For creating/deleting GameObjects themselves, use manage_gameobject instead.\n"
+        "\n"
+        "UnityEngine.Object reference shorthand (set_property values targeting asset/scene "
+        "references like VisualTreeAsset, Material, Texture, AudioClip, Sprite, GameObject, "
+        "MonoScript, etc.) — same dialect as manage_scriptable_object and apply_scene_patch:\n"
+        "  - bare 32-hex-char GUID:   \"f1e2d3c4a5b6789012345678abcdef01\"\n"
+        "  - bare asset path:         \"Assets/UI/LoadingScreen.uxml\"\n"
+        "  - GUID object:             {\"guid\": \"f1e2...\"}\n"
+        "  - path object:             {\"path\": \"Assets/UI/LoadingScreen.uxml\"}\n"
+        "  - instanceID object:       {\"instanceID\": 12345}\n"
+        "  - bare integer:            12345  (interpreted as instanceID)\n"
+        "  - scene-name lookup:       {\"name\": \"Player\"}\n"
+        "  - explicit ref wrapper:    {\"ref\": {\"guid\": \"...\"}} or {\"ref\": {\"path\": \"...\"}}\n"
+        "  - null:                    clears the reference\n"
+        "Works for value, every entry of properties, and inside patches[].value."
     )
 )
 async def manage_components(
@@ -56,7 +70,7 @@ async def manage_components(
 
     Actions:
     - add: Add a new component to a GameObject
-    - remove: Remove a component from a GameObject  
+    - remove: Remove a component from a GameObject
     - set_property: Set one or more properties on a component
 
     Examples:
@@ -64,6 +78,24 @@ async def manage_components(
     - Remove BoxCollider: action="remove", target=-12345, component_type="BoxCollider"
     - Set single property: action="set_property", target="Enemy", component_type="Rigidbody", property="mass", value=5.0
     - Set multiple properties: action="set_property", target="Enemy", component_type="Rigidbody", properties={"mass": 5.0, "useGravity": false}
+
+    UnityEngine.Object reference shorthand (set_property values targeting asset or
+    scene-object references). Same dialect as manage_scriptable_object and
+    apply_scene_patch — accepted forms:
+      - bare 32-hex-char GUID:   "f1e2d3c4a5b6789012345678abcdef01"
+      - bare asset path:         "Assets/UI/LoadingScreen.uxml"
+      - GUID object:             {"guid": "f1e2..."}
+      - path object:             {"path": "Assets/UI/LoadingScreen.uxml"}
+      - instanceID object:       {"instanceID": 12345}
+      - bare integer:            12345  (interpreted as instanceID)
+      - scene-name lookup:       {"name": "Player"}
+      - explicit ref wrapper:    {"ref": {"guid": "..."}} or {"ref": {"path": "..."}}
+      - null:                    clears the reference
+
+    Examples:
+    - Assign UXML by path:  property="visualTreeAsset", value={"path": "Assets/UI/LoadingScreen.uxml"}
+    - Assign material by GUID: property="sharedMaterial", value="f1e2d3c4a5b6789012345678abcdef01"
+    - Clear an audio clip:  property="clip", value=None
     """
     unity_instance = await get_unity_instance_from_context(ctx)
 

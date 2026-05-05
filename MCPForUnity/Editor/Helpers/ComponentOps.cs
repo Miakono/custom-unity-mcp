@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
 using Newtonsoft.Json.Linq;
@@ -9,11 +10,39 @@ using UnityEngine.Events;
 namespace MCPForUnity.Editor.Helpers
 {
     /// <summary>
+    /// Options for SetProperty calls. Default is fail-safe — list shrinks &gt;=50% are
+    /// refused unless ConfirmReplace is true. See SetProperty() for details.
+    /// </summary>
+    public struct SetPropertyOptions
+    {
+        /// <summary>
+        /// When true, override the list-shrink guard and allow a write that would
+        /// shrink an existing list/array by &gt;=50%. Required for full replacement.
+        /// </summary>
+        public bool ConfirmReplace;
+
+        public static SetPropertyOptions Default => default;
+    }
+
+    /// <summary>
     /// Low-level component operations extracted from ManageGameObject and ManageComponents.
     /// Provides pure C# operations without JSON parsing or response formatting.
     /// </summary>
     public static class ComponentOps
     {
+        /// <summary>
+        /// Error code prefix used when a write is refused because it would shrink an
+        /// existing list/array by &gt;=50% without explicit confirmation. Callers should
+        /// surface this code in their structured error response.
+        /// </summary>
+        internal const string ListShrinkBlockedPrefix = "list_shrink_blocked: ";
+
+        /// <summary>
+        /// Internal sentinel prefix returned by the reflection path when it intentionally
+        /// declines a write (e.g. UnityEngine.Object collections) so the caller skips
+        /// overwriting the SerializedProperty fallback's more informative error.
+        /// </summary>
+        internal const string ReflectionDeclinedPrefix = "reflection_declined: ";
         /// <summary>
         /// Adds a component to a GameObject with Undo support.
         /// </summary>
@@ -147,6 +176,20 @@ namespace MCPForUnity.Editor.Helpers
         /// <returns>True if property was set successfully</returns>
         public static bool SetProperty(Component component, string propertyName, JToken value, out string error)
         {
+            return SetProperty(component, propertyName, value, SetPropertyOptions.Default, out error);
+        }
+
+        /// <summary>
+        /// Sets a property value on a component using reflection.
+        /// </summary>
+        /// <param name="component">The target component</param>
+        /// <param name="propertyName">The property or field name</param>
+        /// <param name="value">The value to set (JToken)</param>
+        /// <param name="options">Write options (e.g. ConfirmReplace to allow large list shrinks)</param>
+        /// <param name="error">Error message if operation fails</param>
+        /// <returns>True if property was set successfully</returns>
+        public static bool SetProperty(Component component, string propertyName, JToken value, SetPropertyOptions options, out string error)
+        {
             error = null;
 
             if (component == null)
@@ -171,29 +214,118 @@ namespace MCPForUnity.Editor.Helpers
             Type memberType = ResolveMemberType(type, propertyName, normalizedName);
             if (memberType != null && typeof(UnityEventBase).IsAssignableFrom(memberType))
             {
-                return SetViaSerializedProperty(component, propertyName, normalizedName, value, out error);
+                return SetViaSerializedProperty(component, propertyName, normalizedName, value, options, out error);
             }
 
             // Try reflection first (property, field, then non-public serialized field)
-            if (TrySetViaReflection(component, type, propertyName, normalizedName, flags, value, out error))
+            if (TrySetViaReflection(component, type, propertyName, normalizedName, flags, value, options, out error))
                 return true;
+
+            // If reflection refused the write because of the shrink guard, do not fall back to
+            // the SerializedProperty path — that would silently bypass the guard.
+            if (error != null && error.StartsWith(ListShrinkBlockedPrefix, StringComparison.Ordinal))
+                return false;
 
             // Reflection failed — fall back to SerializedProperty which handles arrays,
             // custom serialization (e.g. UdonSharp), and types reflection can't convert.
             string reflectionError = error;
-            if (SetViaSerializedProperty(component, propertyName, normalizedName, value, out error))
+            if (SetViaSerializedProperty(component, propertyName, normalizedName, value, options, out error))
                 return true;
 
             // Both paths failed. If reflection found the member but couldn't convert,
             // report that (more useful than the SerializedProperty error).
             // If reflection didn't find it at all, report the SerializedProperty error.
-            if (reflectionError != null && !reflectionError.Contains("not found"))
+            // The "reflection_declined" sentinel is internal — never surface it to callers.
+            if (reflectionError != null
+                && !reflectionError.Contains("not found")
+                && !reflectionError.StartsWith(ReflectionDeclinedPrefix, StringComparison.Ordinal))
                 error = reflectionError;
 
             return false;
         }
 
-        private static bool TrySetViaReflection(object component, Type type, string propertyName, string normalizedName, BindingFlags flags, JToken value, out string error)
+        /// <summary>
+        /// If the target member holds an existing list/array and the new JArray would shrink
+        /// it by &gt;=50%, refuses the write unless options.ConfirmReplace is true. Smaller
+        /// shrinks log a warning and proceed. Equal/growing writes are unaffected.
+        /// </summary>
+        private static bool CheckListShrinkGuard(string propertyPath, int oldSize, int newSize, SetPropertyOptions options, out string error)
+        {
+            error = null;
+            if (newSize >= oldSize) return true;
+
+            int delta = oldSize - newSize;
+            // delta * 2 >= oldSize iff delta >= ceil(oldSize / 2). Avoids float math.
+            bool largeShrink = oldSize > 0 && (delta * 2 >= oldSize);
+
+            if (largeShrink && !options.ConfirmReplace)
+            {
+                error = $"{ListShrinkBlockedPrefix}'{propertyPath}' would shrink from {oldSize} to {newSize} entries (>=50% loss). " +
+                        "Pass confirmReplace=true to override, or use apply_scene_patch / apply_prefab_patch with explicit array_op for partial edits.";
+                return false;
+            }
+
+            if (delta > 0)
+            {
+                McpLog.Warn($"[ComponentOps] '{propertyPath}' shrinking from {oldSize} to {newSize} entries.");
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// True if the type is an array or implements IList (List&lt;T&gt;, etc.) — i.e. the
+        /// kinds of collections the reflection write path replaces wholesale on assignment.
+        /// </summary>
+        private static bool IsCollectionType(Type t)
+        {
+            if (t == null) return false;
+            if (t.IsArray) return true;
+            if (typeof(IList).IsAssignableFrom(t)) return true;
+            return false;
+        }
+
+        /// <summary>
+        /// True if the type is an array or List&lt;T&gt; whose element type derives from
+        /// UnityEngine.Object. Used to route writes through the SerializedProperty path —
+        /// the reflection path's UnityJsonSerializer silently logs a warning and produces
+        /// null entries when an element string fails to resolve, which is exactly the
+        /// silent-failure mode Phase 2 set out to fix.
+        /// </summary>
+        private static bool IsUnityObjectCollection(Type t)
+        {
+            if (t == null) return false;
+            Type element = null;
+            if (t.IsArray) element = t.GetElementType();
+            else if (t.IsGenericType)
+            {
+                var def = t.GetGenericTypeDefinition();
+                if (def == typeof(List<>)) element = t.GetGenericArguments()[0];
+            }
+            return element != null && typeof(UnityEngine.Object).IsAssignableFrom(element);
+        }
+
+        /// <summary>
+        /// Returns the element count of an existing list/array member, or -1 if the member
+        /// is null or not an indexable collection.
+        /// </summary>
+        private static int GetCurrentCollectionSize(object owner, MemberInfo member)
+        {
+            object current = null;
+            if (member is PropertyInfo pi)
+            {
+                if (!pi.CanRead) return -1;
+                try { current = pi.GetValue(owner); } catch { return -1; }
+            }
+            else if (member is FieldInfo fi)
+            {
+                try { current = fi.GetValue(owner); } catch { return -1; }
+            }
+            if (current == null) return -1;
+            if (current is ICollection col) return col.Count;
+            return -1;
+        }
+
+        private static bool TrySetViaReflection(object component, Type type, string propertyName, string normalizedName, BindingFlags flags, JToken value, SetPropertyOptions options, out string error)
         {
             error = null;
 
@@ -202,6 +334,19 @@ namespace MCPForUnity.Editor.Helpers
                                  ?? type.GetProperty(normalizedName, flags);
             if (propInfo != null && propInfo.CanWrite)
             {
+                // Decline UnityEngine.Object collections — route through SP for proper
+                // per-element error reporting via ObjectReferenceResolver.
+                if (value is JArray && IsUnityObjectCollection(propInfo.PropertyType))
+                {
+                    error = $"{ReflectionDeclinedPrefix}routing object-reference collection '{propertyName}' through SerializedProperty.";
+                    return false;
+                }
+                if (value is JArray jArrProp && IsCollectionType(propInfo.PropertyType))
+                {
+                    int oldSize = GetCurrentCollectionSize(component, propInfo);
+                    if (oldSize >= 0 && !CheckListShrinkGuard(propertyName, oldSize, jArrProp.Count, options, out error))
+                        return false;
+                }
                 try
                 {
                     object convertedValue = PropertyConversion.ConvertToType(value, propInfo.PropertyType);
@@ -225,6 +370,17 @@ namespace MCPForUnity.Editor.Helpers
                                ?? type.GetField(normalizedName, flags);
             if (fieldInfo != null && !fieldInfo.IsInitOnly)
             {
+                if (value is JArray && IsUnityObjectCollection(fieldInfo.FieldType))
+                {
+                    error = $"{ReflectionDeclinedPrefix}routing object-reference collection '{propertyName}' through SerializedProperty.";
+                    return false;
+                }
+                if (value is JArray jArrField && IsCollectionType(fieldInfo.FieldType))
+                {
+                    int oldSize = GetCurrentCollectionSize(component, fieldInfo);
+                    if (oldSize >= 0 && !CheckListShrinkGuard(propertyName, oldSize, jArrField.Count, options, out error))
+                        return false;
+                }
                 try
                 {
                     object convertedValue = PropertyConversion.ConvertToType(value, fieldInfo.FieldType);
@@ -248,6 +404,17 @@ namespace MCPForUnity.Editor.Helpers
                      ?? FindSerializedFieldInHierarchy(type, normalizedName);
             if (fieldInfo != null)
             {
+                if (value is JArray && IsUnityObjectCollection(fieldInfo.FieldType))
+                {
+                    error = $"{ReflectionDeclinedPrefix}routing object-reference collection '{propertyName}' through SerializedProperty.";
+                    return false;
+                }
+                if (value is JArray jArrSerField && IsCollectionType(fieldInfo.FieldType))
+                {
+                    int oldSize = GetCurrentCollectionSize(component, fieldInfo);
+                    if (oldSize >= 0 && !CheckListShrinkGuard(propertyName, oldSize, jArrSerField.Count, options, out error))
+                        return false;
+                }
                 try
                 {
                     object convertedValue = PropertyConversion.ConvertToType(value, fieldInfo.FieldType);
@@ -268,6 +435,103 @@ namespace MCPForUnity.Editor.Helpers
 
             error = $"Property or field '{propertyName}' not found on component '{type.Name}'.";
             return false;
+        }
+
+        /// <summary>
+        /// Result of <see cref="ApplyPatches"/>: aggregate success flag, the per-patch result
+        /// objects from the underlying patcher, and any structured error rows. The structured
+        /// errors mirror the shape used by ManageComponents.set_property so callers can branch
+        /// on <c>code: "list_shrink_blocked"</c> or per-patch failure messages.
+        /// </summary>
+        public readonly struct ApplyPatchesResult
+        {
+            public readonly bool Success;
+            public readonly bool AnyChanged;
+            public readonly List<object> Results;
+            public readonly List<object> Errors;
+
+            public ApplyPatchesResult(bool success, bool anyChanged, List<object> results, List<object> errors)
+            {
+                Success = success;
+                AnyChanged = anyChanged;
+                Results = results ?? new List<object>();
+                Errors = errors ?? new List<object>();
+            }
+        }
+
+        /// <summary>
+        /// Applies a SerializedPropertyPatcher-style patches array to a component and runs
+        /// the list-shrink guard up front for any <c>op: "set"</c> patches whose value is a
+        /// JArray. Routes the actual write through <see cref="SerializedPropertyPatcher.ApplyPatches"/>
+        /// so manage_components.set_property and manage_prefabs.modify_contents can speak the
+        /// same dialect as apply_scene_patch / apply_prefab_patch / manage_scriptable_object.
+        /// Caller is responsible for SetDirty / SaveAssets / MarkSceneDirty after success.
+        /// </summary>
+        public static ApplyPatchesResult ApplyPatches(Component component, JArray patches, SetPropertyOptions options)
+        {
+            var errors = new List<object>();
+
+            if (component == null)
+            {
+                errors.Add(new { code = "invalid_target", message = "Component is null." });
+                return new ApplyPatchesResult(false, false, null, errors);
+            }
+            if (patches == null || patches.Count == 0)
+            {
+                return new ApplyPatchesResult(true, false, null, errors);
+            }
+
+            // Pre-check the list-shrink guard for any "set" patches that target arrays. We
+            // do this against a temporary SerializedObject so we can refuse without applying
+            // partial state. The actual write below opens its own SO inside ApplyPatches —
+            // the precheck is a read-only consistency check, not a write.
+            using (var preSo = new SerializedObject(component))
+            {
+                for (int i = 0; i < patches.Count; i++)
+                {
+                    if (patches[i] is not JObject patchObj) continue;
+                    string opStr = (patchObj["op"]?.ToString() ?? "set").Trim().ToLowerInvariant();
+                    if (opStr != "set") continue;
+                    if (patchObj["value"] is not JArray jArr) continue;
+                    string path = patchObj["propertyPath"]?.ToString()
+                                  ?? patchObj["property_path"]?.ToString()
+                                  ?? patchObj["path"]?.ToString();
+                    if (string.IsNullOrEmpty(path)) continue;
+                    var prop = preSo.FindProperty(SerializedPropertyPatcher.NormalizePropertyPath(path));
+                    if (prop == null || !prop.isArray) continue;
+                    if (!CheckListShrinkGuard(prop.propertyPath, prop.arraySize, jArr.Count, options, out string shrinkError))
+                    {
+                        errors.Add(new
+                        {
+                            propertyPath = prop.propertyPath,
+                            code = "list_shrink_blocked",
+                            message = shrinkError.Substring(ListShrinkBlockedPrefix.Length)
+                        });
+                        return new ApplyPatchesResult(false, false, null, errors);
+                    }
+                }
+            }
+
+            var patcherResult = SerializedPropertyPatcher.ApplyPatches(component, patches);
+
+            // Inspect per-patch results — if any patch reported ok=false, surface it.
+            bool allOk = true;
+            foreach (var r in patcherResult.Results)
+            {
+                JObject jr = r as JObject ?? JObject.FromObject(r);
+                if (jr["ok"]?.Value<bool>() == false)
+                {
+                    allOk = false;
+                    errors.Add(new
+                    {
+                        propertyPath = jr["propertyPath"]?.ToString(),
+                        op = jr["op"]?.ToString(),
+                        message = jr["message"]?.ToString() ?? "Unknown patch failure."
+                    });
+                }
+            }
+
+            return new ApplyPatchesResult(allOk, patcherResult.AnyChanged, patcherResult.Results, errors);
         }
 
         /// <summary>
@@ -427,7 +691,7 @@ namespace MCPForUnity.Editor.Helpers
             return null;
         }
 
-        private static bool SetViaSerializedProperty(Component component, string propertyName, string normalizedName, JToken value, out string error)
+        private static bool SetViaSerializedProperty(Component component, string propertyName, string normalizedName, JToken value, SetPropertyOptions options, out string error)
         {
             error = null;
             using var so = new SerializedObject(component);
@@ -440,14 +704,14 @@ namespace MCPForUnity.Editor.Helpers
                 return false;
             }
 
-            if (!SetSerializedPropertyRecursive(prop, value, out error, 0))
+            if (!SetSerializedPropertyRecursive(prop, value, options, out error, 0))
                 return false;
 
             so.ApplyModifiedProperties();
             return true;
         }
 
-        private static bool SetSerializedPropertyRecursive(SerializedProperty prop, JToken value, out string error, int depth)
+        private static bool SetSerializedPropertyRecursive(SerializedProperty prop, JToken value, SetPropertyOptions options, out string error, int depth)
         {
             error = null;
             const int MaxDepth = 20;
@@ -462,6 +726,10 @@ namespace MCPForUnity.Editor.Helpers
                 // Array + JArray
                 if (prop.isArray && prop.propertyType != SerializedPropertyType.String && value is JArray jArray)
                 {
+                    int oldSize = prop.arraySize;
+                    if (!CheckListShrinkGuard(prop.propertyPath, oldSize, jArray.Count, options, out error))
+                        return false;
+
                     prop.arraySize = jArray.Count;
                     prop.serializedObject.ApplyModifiedProperties();
                     prop.serializedObject.Update();
@@ -469,7 +737,7 @@ namespace MCPForUnity.Editor.Helpers
                     for (int i = 0; i < jArray.Count; i++)
                     {
                         var element = prop.GetArrayElementAtIndex(i);
-                        if (!SetSerializedPropertyRecursive(element, jArray[i], out error, depth + 1))
+                        if (!SetSerializedPropertyRecursive(element, jArray[i], options, out error, depth + 1))
                             return false;
                     }
                     return true;
@@ -486,7 +754,7 @@ namespace MCPForUnity.Editor.Helpers
                             error = $"Sub-property '{kvp.Key}' not found under '{prop.propertyPath}'.";
                             return false;
                         }
-                        if (!SetSerializedPropertyRecursive(child, kvp.Value, out error, depth + 1))
+                        if (!SetSerializedPropertyRecursive(child, kvp.Value, options, out error, depth + 1))
                             return false;
                     }
                     return true;
@@ -555,100 +823,31 @@ namespace MCPForUnity.Editor.Helpers
         {
             error = null;
 
-            if (value == null || value.Type == JTokenType.Null)
-            {
-                prop.objectReferenceValue = null;
-                return true;
-            }
+            // Delegate to the shared resolver so manage_components / manage_prefabs accept
+            // the same shorthand as apply_scene_patch / apply_prefab_patch / manage_scriptable_object —
+            // including bare 32-char GUID strings, which previously fell through to scene-name
+            // lookup and silently failed.
+            var result = ObjectReferenceResolver.Resolve(value, patchObj: null, allowSceneNameFallback: true);
 
-            if (value.Type == JTokenType.Integer)
+            switch (result.Outcome)
             {
-                int id = value.Value<int>();
-                var resolved = UnityEditorObjectLookup.FindObjectByInstanceId(id);
-                if (resolved == null)
-                {
-                    error = $"No object found with instanceID {id}.";
+                case ObjectReferenceResolver.ResolveOutcome.Cleared:
+                    prop.objectReferenceValue = null;
+                    return true;
+
+                case ObjectReferenceResolver.ResolveOutcome.Resolved:
+                    prop.objectReferenceValue = result.Asset;
+                    return true;
+
+                case ObjectReferenceResolver.ResolveOutcome.NeedsSceneSearch:
+                    return ResolveSceneObjectByName(prop, result.SceneNameHint, out error);
+
+                case ObjectReferenceResolver.ResolveOutcome.NotFound:
+                case ObjectReferenceResolver.ResolveOutcome.Unrecognized:
+                default:
+                    error = result.Error ?? "Unsupported object reference value.";
                     return false;
-                }
-                prop.objectReferenceValue = resolved;
-                return true;
             }
-
-            if (value is JObject jObj)
-            {
-                var idToken = jObj["instanceID"];
-                if (idToken != null)
-                {
-                    int id = ParamCoercion.CoerceInt(idToken, 0);
-                    var resolved = UnityEditorObjectLookup.FindObjectByInstanceId(id);
-                    if (resolved == null)
-                    {
-                        error = $"No object found with instanceID {id}.";
-                        return false;
-                    }
-                    prop.objectReferenceValue = resolved;
-                    return true;
-                }
-
-                var guidToken = jObj["guid"];
-                if (guidToken != null)
-                {
-                    string path = AssetDatabase.GUIDToAssetPath(guidToken.ToString());
-                    if (string.IsNullOrEmpty(path))
-                    {
-                        error = $"No asset found for GUID '{guidToken}'.";
-                        return false;
-                    }
-                    prop.objectReferenceValue = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(path);
-                    return true;
-                }
-
-                var pathToken = jObj["path"];
-                if (pathToken != null)
-                {
-                    string sanitized = AssetPathUtility.SanitizeAssetPath(pathToken.ToString());
-                    var resolved = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(sanitized);
-                    if (resolved == null)
-                    {
-                        error = $"No asset found at path '{pathToken}'.";
-                        return false;
-                    }
-                    prop.objectReferenceValue = resolved;
-                    return true;
-                }
-
-                var nameToken = jObj["name"];
-                if (nameToken != null)
-                {
-                    return ResolveSceneObjectByName(prop, nameToken.ToString(), out error);
-                }
-
-                error = "Object reference must contain 'instanceID', 'guid', 'path', or 'name'.";
-                return false;
-            }
-
-            if (value.Type == JTokenType.String)
-            {
-                string strVal = value.ToString();
-                if (strVal.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase) || strVal.Contains("/"))
-                {
-                    string sanitized = AssetPathUtility.SanitizeAssetPath(strVal);
-                    var resolved = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(sanitized);
-                    if (resolved == null)
-                    {
-                        error = $"No asset found at path '{strVal}'.";
-                        return false;
-                    }
-                    prop.objectReferenceValue = resolved;
-                    return true;
-                }
-
-                // Fall back to scene hierarchy lookup by name.
-                return ResolveSceneObjectByName(prop, strVal, out error);
-            }
-
-            error = $"Unsupported object reference format: {value.Type}.";
-            return false;
         }
 
         /// <summary>

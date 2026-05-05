@@ -328,73 +328,39 @@ namespace MCPForUnity.Editor.Helpers
         }
 
         /// <summary>
-        /// Resolves a JSON token into a UnityEngine.Object reference. Supports four forms:
-        ///   1. patchObj.ref = { guid: "..." } or { path: "..." }  (single-property patches)
-        ///   2. valueToken == null/JTokenType.Null  → cleared reference
-        ///   3. valueToken is a 32-hex-char string  → GUID shorthand
-        ///   4. valueToken is a string starting with "Assets/" or containing "/"  → path shorthand
+        /// Resolves a JSON token into a UnityEngine.Object reference. Delegates to the
+        /// shared <see cref="ObjectReferenceResolver"/>. Scene-name fallback is disabled —
+        /// callers of SerializedPropertyPatcher (apply_scene_patch, apply_prefab_patch,
+        /// manage_scriptable_object) require explicit asset references.
+        /// 'NotFound' is treated as a successful resolve to null, matching the prior
+        /// behavior where a missing GUID/path silently produced a null reference.
         /// </summary>
         private static bool TryResolveObjectReference(JToken valueToken, JObject patchObj,
             out UnityEngine.Object resolved, out string resolveMethod, out string error)
         {
+            var result = ObjectReferenceResolver.Resolve(valueToken, patchObj, allowSceneNameFallback: false);
+
             resolved = null;
-            resolveMethod = "explicit";
+            resolveMethod = result.ResolveMethod ?? "explicit";
             error = null;
 
-            var refObj = patchObj?["ref"] as JObject;
-            string refGuid = refObj?["guid"]?.ToString();
-            string refPath = refObj?["path"]?.ToString();
-
-            if (refObj == null && (valueToken == null || valueToken.Type == JTokenType.Null))
+            switch (result.Outcome)
             {
-                resolveMethod = "cleared";
-                return true;
-            }
-
-            if (!string.IsNullOrEmpty(refGuid) || !string.IsNullOrEmpty(refPath))
-            {
-                string resolvedPath = !string.IsNullOrEmpty(refGuid)
-                    ? AssetDatabase.GUIDToAssetPath(refGuid)
-                    : AssetPathUtility.SanitizeAssetPath(refPath);
-
-                if (!string.IsNullOrEmpty(resolvedPath))
-                {
-                    resolved = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(resolvedPath);
-                }
-                resolveMethod = !string.IsNullOrEmpty(refGuid) ? "ref.guid" : "ref.path";
-                return true;
-            }
-
-            if (valueToken?.Type == JTokenType.String)
-            {
-                string strVal = valueToken.ToString();
-
-                if (Regex.IsMatch(strVal, @"^[0-9a-fA-F]{32}$"))
-                {
-                    string guidPath = AssetDatabase.GUIDToAssetPath(strVal);
-                    if (!string.IsNullOrEmpty(guidPath))
-                    {
-                        resolved = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(guidPath);
-                    }
-                    resolveMethod = "guid-shorthand";
+                case ObjectReferenceResolver.ResolveOutcome.Resolved:
+                    resolved = result.Asset;
                     return true;
-                }
-
-                if (strVal.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase) || strVal.Contains("/"))
-                {
-                    string sanitizedPath = AssetPathUtility.SanitizeAssetPath(strVal);
-                    resolved = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(sanitizedPath);
-                    resolveMethod = "path-shorthand";
+                case ObjectReferenceResolver.ResolveOutcome.Cleared:
+                    resolveMethod = "cleared";
                     return true;
-                }
-
-                error = $"Could not resolve object reference from string '{strVal}'. " +
-                        "Provide a 32-char GUID, an Assets/-prefixed path, or { ref: { guid|path: ... } }.";
-                return false;
+                case ObjectReferenceResolver.ResolveOutcome.NotFound:
+                    // Preserve prior SP behavior: missing asset becomes a null assignment.
+                    return true;
+                case ObjectReferenceResolver.ResolveOutcome.NeedsSceneSearch:
+                case ObjectReferenceResolver.ResolveOutcome.Unrecognized:
+                default:
+                    error = result.Error ?? "Unrecognized object reference value.";
+                    return false;
             }
-
-            error = "Object reference value must be null, a GUID/path string, or accompanied by a 'ref' object.";
-            return false;
         }
 
         private static bool TrySetValueRecursive(SerializedProperty prop, JToken valueToken, out string message, int depth)
