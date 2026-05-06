@@ -247,12 +247,18 @@ namespace MCPForUnity.Editor.Tools
 
         // -------------------- entry parsing & assignment --------------------
 
+        private enum EntryKind { ObjectReference, Primitive, Struct }
+
         private struct EntryDescriptor
         {
             public string Error;
+            public EntryKind Kind;
             public UnityEngine.Object ObjectReference;
             public JToken PrimitiveValue;
-            public bool IsObjectReference;
+            // Sub-field map for struct entries: keys are sub-property names (relative to the
+            // newly-appended array element), values are nested EntryDescriptors describing
+            // either an object reference, a primitive, or a nested struct.
+            public Dictionary<string, EntryDescriptor> StructFields;
         }
 
         private static EntryDescriptor ParseEntry(JToken entry)
@@ -265,7 +271,7 @@ namespace MCPForUnity.Editor.Tools
                 {
                     var loaded = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(assetPath);
                     if (loaded == null) return new EntryDescriptor { Error = $"No asset at '{assetPath}'." };
-                    return new EntryDescriptor { ObjectReference = loaded, IsObjectReference = true };
+                    return new EntryDescriptor { Kind = EntryKind.ObjectReference, ObjectReference = loaded };
                 }
                 if (!string.IsNullOrEmpty(assetGuid))
                 {
@@ -273,17 +279,29 @@ namespace MCPForUnity.Editor.Tools
                     if (string.IsNullOrEmpty(path)) return new EntryDescriptor { Error = $"GUID '{assetGuid}' did not resolve." };
                     var loaded = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(path);
                     if (loaded == null) return new EntryDescriptor { Error = $"GUID '{assetGuid}' resolves to '{path}' but failed to load." };
-                    return new EntryDescriptor { ObjectReference = loaded, IsObjectReference = true };
+                    return new EntryDescriptor { Kind = EntryKind.ObjectReference, ObjectReference = loaded };
                 }
                 if (obj["value"] != null)
                 {
-                    return new EntryDescriptor { PrimitiveValue = obj["value"], IsObjectReference = false };
+                    return new EntryDescriptor { Kind = EntryKind.Primitive, PrimitiveValue = obj["value"] };
                 }
-                return new EntryDescriptor { Error = "entry must contain one of: asset_path, asset_guid, value." };
+                if (obj["fields"] is JObject fields)
+                {
+                    var map = new Dictionary<string, EntryDescriptor>();
+                    foreach (var prop in fields.Properties())
+                    {
+                        var nested = ParseEntry(prop.Value);
+                        if (nested.Error != null)
+                            return new EntryDescriptor { Error = $"fields.{prop.Name}: {nested.Error}" };
+                        map[prop.Name] = nested;
+                    }
+                    return new EntryDescriptor { Kind = EntryKind.Struct, StructFields = map };
+                }
+                return new EntryDescriptor { Error = "entry must contain one of: asset_path, asset_guid, value, or fields." };
             }
 
             // Bare primitive
-            return new EntryDescriptor { PrimitiveValue = entry, IsObjectReference = false };
+            return new EntryDescriptor { Kind = EntryKind.Primitive, PrimitiveValue = entry };
         }
 
         private static int FindExistingIndex(SerializedProperty listProp, EntryDescriptor entry)
@@ -291,7 +309,7 @@ namespace MCPForUnity.Editor.Tools
             for (int i = 0; i < listProp.arraySize; i++)
             {
                 var el = listProp.GetArrayElementAtIndex(i);
-                if (entry.IsObjectReference)
+                if (entry.Kind == EntryKind.ObjectReference)
                 {
                     if (el.propertyType == SerializedPropertyType.ObjectReference
                         && el.objectReferenceValue == entry.ObjectReference)
@@ -299,9 +317,18 @@ namespace MCPForUnity.Editor.Tools
                         return i;
                     }
                 }
-                else
+                else if (entry.Kind == EntryKind.Primitive)
                 {
                     if (PrimitiveEquals(el, entry.PrimitiveValue))
+                    {
+                        return i;
+                    }
+                }
+                else if (entry.Kind == EntryKind.Struct)
+                {
+                    // Struct dedupe: match if every named field equals (object refs by identity,
+                    // primitives by value). Unspecified fields don't have to match.
+                    if (StructEqualsExisting(el, entry.StructFields))
                     {
                         return i;
                     }
@@ -310,9 +337,52 @@ namespace MCPForUnity.Editor.Tools
             return -1;
         }
 
+        private static bool StructEqualsExisting(SerializedProperty element, Dictionary<string, EntryDescriptor> fields)
+        {
+            foreach (var kvp in fields)
+            {
+                var sub = element.FindPropertyRelative(kvp.Key);
+                if (sub == null) return false;
+                var v = kvp.Value;
+                if (v.Kind == EntryKind.ObjectReference)
+                {
+                    if (sub.propertyType != SerializedPropertyType.ObjectReference) return false;
+                    if (sub.objectReferenceValue != v.ObjectReference) return false;
+                }
+                else if (v.Kind == EntryKind.Primitive)
+                {
+                    if (!PrimitiveEquals(sub, v.PrimitiveValue)) return false;
+                }
+                else
+                {
+                    // Nested struct dedupe is rare; skip and treat as non-match to err on the
+                    // side of NOT silently merging two complex entries.
+                    return false;
+                }
+            }
+            return true;
+        }
+
         private static string AssignToProperty(SerializedProperty prop, EntryDescriptor entry)
         {
-            if (entry.IsObjectReference)
+            if (entry.Kind == EntryKind.Struct)
+            {
+                if (prop.propertyType != SerializedPropertyType.Generic)
+                    return $"Field is {prop.propertyType}, expected a struct (Generic property) for entry with 'fields'.";
+
+                foreach (var kvp in entry.StructFields)
+                {
+                    var sub = prop.FindPropertyRelative(kvp.Key);
+                    if (sub == null)
+                        return $"Sub-field '{kvp.Key}' not found on element struct.";
+                    var nestedError = AssignToProperty(sub, kvp.Value);
+                    if (nestedError != null)
+                        return $"fields.{kvp.Key}: {nestedError}";
+                }
+                return null;
+            }
+
+            if (entry.Kind == EntryKind.ObjectReference)
             {
                 if (prop.propertyType != SerializedPropertyType.ObjectReference)
                     return $"Field is {prop.propertyType}, expected ObjectReference for asset entry.";
