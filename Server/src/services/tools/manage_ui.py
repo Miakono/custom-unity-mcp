@@ -67,7 +67,11 @@ async def manage_ui(
         "link_stylesheet",
         "list",
         "modify_visual_element",
-    ], "Action to perform."],
+        "validate_uxml",
+        "validate_uss",
+    ], "Action to perform. Use validate_uxml / validate_uss for pre-write schema "
+       "checks (accepts either path= for an existing file or contents= for a "
+       "string to validate before writing)."],
 
     # File operations (create/read/update/link_stylesheet)
     path: Annotated[str,
@@ -192,6 +196,9 @@ async def manage_ui(
     elif action_lower in ("create", "update") and not contents:
         # Let Unity-side validate and return the error
         pass
+    elif action_lower in ("validate_uxml", "validate_uss") and contents:
+        # The validator reads `content`/`contents` as raw text — no base64 wrapping.
+        params_dict["contents"] = contents
 
     if path is not None:
         params_dict["path"] = path

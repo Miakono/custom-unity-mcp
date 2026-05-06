@@ -64,6 +64,20 @@ async def manage_components(
         dict[str, Any],
         "Dictionary of property names to values. Example: {\"mass\": 5.0, \"useGravity\": false}"
     ] | None = None,
+    # SerializedPropertyPatcher-style patches — same dialect as apply_scene_patch /
+    # apply_prefab_patch / manage_scriptable_object. Each entry: {propertyPath, op, value, ref}.
+    patches: Annotated[
+        list[dict[str, Any]],
+        "Patches list (set_property only). Each: {propertyPath, op (default 'set'), value, ref}. "
+        "Supports array_op semantics (set, array_resize, etc.) and the rich type coverage "
+        "of SerializedPropertyPatcher. Use this for complex per-field edits."
+    ] | None = None,
+    # Opt-in override for the list-shrink data-loss guard.
+    confirm_replace: Annotated[
+        bool,
+        "Required to replace a list with a shorter one when the new size is <50% of the "
+        "old. Without this, large list shrinks return code='list_shrink_blocked'."
+    ] = False,
 ) -> dict[str, Any]:
     """
     Manage components on GameObjects.
@@ -146,6 +160,10 @@ async def manage_components(
                 params["value"] = value
             if properties:
                 params["properties"] = properties
+            if patches:
+                params["patches"] = patches
+            if confirm_replace:
+                params["confirmReplace"] = True
 
         if action == "add" and properties:
             params["properties"] = properties

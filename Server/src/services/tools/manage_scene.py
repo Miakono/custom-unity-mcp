@@ -152,6 +152,14 @@ async def manage_scene(
                                      "Child paging hint (safety)."] | None = None,
     include_transform: Annotated[bool | str,
                                  "If true, include local transform in node summaries."] | None = None,
+    # --- save guard ---
+    confirm_destructive_save: Annotated[bool | str,
+                                         "Required for action='save' when the in-memory scene's "
+                                         "root GameObject count would drop by >=5 OR >=30% vs. the "
+                                         "on-disk file. Without this, large drops return "
+                                         "code='destructive_save_blocked' to prevent silently "
+                                         "wiping a scene that was put in a degenerate state by "
+                                         "earlier tool calls (e.g. prefab stage shifts)."] | None = None,
 ) -> dict[str, Any] | ToolResult:
     unity_instance = await get_unity_instance_from_context(ctx)
     gate = await maybe_run_tool_preflight(ctx, "manage_scene", action=action)
@@ -254,6 +262,9 @@ async def manage_scene(
             params["maxChildrenPerNode"] = coerced_max_children_per_node
         if coerced_include_transform is not None:
             params["includeTransform"] = coerced_include_transform
+        coerced_confirm_destructive = coerce_bool(confirm_destructive_save, default=None)
+        if coerced_confirm_destructive:
+            params["confirmDestructiveSave"] = True
 
         # Use centralized retry helper with instance routing
         response = await send_with_unity_instance(async_send_command_with_retry, unity_instance, "manage_scene", params)

@@ -73,6 +73,21 @@ async def manage_prefabs(
     components_to_remove: Annotated[list[str], "Component types to remove in modify_contents."] | None = None,
     create_child: Annotated[dict[str, Any] | list[dict[str, Any]] | str, "Create child GameObject(s) in the prefab. Single object or array of objects, each with: name (required), parent (optional, defaults to target), primitive_type (optional: Cube, Sphere, Capsule, Cylinder, Plane, Quad), position, rotation, scale, components_to_add, tag, layer, set_active."] | None = None,
     component_properties: Annotated[dict[str, dict[str, Any]] | str, "Set properties on existing components in modify_contents. Keys are component type names, values are dicts of property name to value. Example: {\"Rigidbody\": {\"mass\": 5.0}, \"MyScript\": {\"health\": 100}}. Supports object references via {\"guid\": \"...\"}, {\"path\": \"Assets/...\"}, or {\"instanceID\": 123}."] | None = None,
+    # SerializedPropertyPatcher-style patches per component type — same dialect as
+    # apply_prefab_patch / manage_scriptable_object. Each list entry is
+    # {propertyPath, op (default 'set'), value, ref}.
+    component_patches: Annotated[dict[str, list[dict[str, Any]]] | str,
+                                  "Set fields on existing components via the unified patches dialect. "
+                                  "Shape: { \"TypeName\": [ {propertyPath, op, value, ref}, ... ] }. "
+                                  "Supports array_op semantics (set, array_resize) and the rich type "
+                                  "coverage of SerializedPropertyPatcher (Bounds, Gradient, LayerMask). "
+                                  "Use this for complex per-field edits; component_properties is the "
+                                  "simpler shape for top-level field writes."] | None = None,
+    confirm_replace: Annotated[bool,
+                                "Required to replace a list field with a shorter one when the new "
+                                "size is <50% of the old. Without this, large list shrinks return "
+                                "code='list_shrink_blocked'. Applies to component_properties and "
+                                "component_patches paths."] = False,
     # stage parameters
     save_changes: Annotated[bool, "For close_stage: whether to save changes before closing (true=save, false=discard). Default true."] | None = None,
 ) -> dict[str, Any]:
@@ -171,6 +186,14 @@ async def manage_prefabs(
             params["componentsToRemove"] = components_to_remove
         if component_properties is not None:
             params["componentProperties"] = component_properties
+        if isinstance(component_patches, str):
+            component_patches = parse_json_payload(component_patches)
+        if component_patches is not None:
+            if not isinstance(component_patches, dict):
+                return {"success": False, "message": f"component_patches must be a dict (or JSON string of one) keyed by component type name; got {type(component_patches).__name__}"}
+            params["componentPatches"] = component_patches
+        if confirm_replace:
+            params["confirmReplace"] = True
         if create_child is not None:
             # Normalize vector fields within create_child (handles single object or array)
             def normalize_child_params(child: Any, index: int | None = None) -> tuple[dict | None, str | None]:

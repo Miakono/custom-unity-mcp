@@ -164,7 +164,7 @@ _READ_ONLY_ACTIONS: dict[str, set[str]] = {
     "manage_shader": {"read"},
     "manage_video_capture": {"get_status"},
     "manage_tools": {"list_groups"},
-    "manage_ui": {"ping", "read", "get_visual_tree", "list"},
+    "manage_ui": {"ping", "read", "get_visual_tree", "list", "validate_uxml", "validate_uss"},
     "manage_vfx": {
         "ping",
         "particle_get_info",
